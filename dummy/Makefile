@@ -5,12 +5,17 @@
 
 include $(CURDIR)/../config.mk
 
+PROGRAM = dummy
+SRCS_D = main.c
+
+SPDK_FLAGS = -pthread -Wl,--whole-archive,-Bstatic \
+	$(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB)
+
 # Shows how to compile an external application against the SPDK archives.
 all:
-	$(CC) $(COMMON_CFLAGS) -o dummy ./main.c -pthread -Wl,--whole-archive,-Bstatic \
- 	$(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SYS_LIB)
+	$(CC) $(SPDK_CFLAGS) $(SRCS_D) $(SPDK_FLAGS) -o $(PROGRAM)
 
 clean:
-	rm -f dummy
+	rm -f $(PROGRAM)
 
 .PHONY: all clean
