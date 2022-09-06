@@ -71,7 +71,7 @@ proc_start(void *arg1)
 
 	subp_ctx.subprocess_done = proc_finish;
 
-	subp = STO_SUBPROCESS(argv);
+	subp = sto_subprocess_create(argv, SPDK_COUNTOF(argv), true, 0);
 	rc = sto_subprocess_run(subp, &subp_ctx);
 
 	/* sto_subprocess_exit(); */

@@ -82,7 +82,11 @@ static void sto_subprocess_release(struct sto_subprocess *subp, int status)
 	subp_ctx->returncode = status;
 
 	if (subp->capture_output) {
-		/* TODO: */
+		ssize_t read_sz;
+
+		memset(subp_ctx->output, 0, sizeof(subp_ctx->output));
+
+		read_sz = read(0, subp_ctx->output, sizeof(subp_ctx->output) - 1);
 	}
 
 	sto_subprocess_destroy(subp);
@@ -113,6 +117,7 @@ sto_subprocess_create(const char *const argv[], int numargs,
 		return NULL;
 	}
 
+	subp->capture_output = capture_output;
 	subp->numargs = numargs;
 
 	subp->file = argv[0];
@@ -130,50 +135,78 @@ void sto_subprocess_destroy(struct sto_subprocess *subp)
 	rte_free(subp);
 }
 
-static int __subprocess_child_run(struct sto_subprocess *subp)
+static int __redirect_to_null(void)
+{
+	int fd, rc;
+
+	fd = open("/dev/null", O_WRONLY);
+	if (spdk_unlikely(fd == -1)) {
+		SPDK_ERRLOG("Failed to open /dev/null\n");
+		return errno;
+	}
+
+	rc = dup2(fd, 1);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to dup2 stdout\n");
+		return errno;
+	}
+
+	rc = dup2(fd, 2);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to dup2 stderr\n");
+		return errno;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+static int __setup_pipe(int pipefd[2], int dir)
 {
 	int rc;
 
-	if (!subp->capture_output) {
-		int fd;
-
-		fd = open("/dev/null", O_WRONLY);
-		if (spdk_unlikely(fd == -1)) {
-			SPDK_ERRLOG("Failed to open /dev/null\n");
-			return errno;
-		}
-
-		rc = dup2(fd, 1);
-		if (spdk_unlikely(rc == -1)) {
-			SPDK_ERRLOG("Failed to dup2 stdout\n");
-			return errno;
-		}
-
-		rc = dup2(fd, 2);
-		if (spdk_unlikely(rc == -1)) {
-			SPDK_ERRLOG("Failed to dup2 stderr\n");
-			return errno;
-		}
-
-		close(fd);
+	/* close read/write end of pipe */
+	rc = close(pipefd[!dir]);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("ERROR: child close (pipefd[%d]): %s",
+				!dir, strerror(errno));
+		return errno;
 	}
 
-	/*
-	 * execvp() takes (char *const *) for backward compatibility,
-	 * but POSIX guarantees that it will not modify the strings,
-	 * so the cast is safe
-	 */
-	rc = execvp(subp->file, (char *const *) subp->args);
-	if (rc == -1)
-		SPDK_ERRLOG("Error: child execvp: %s", strerror(errno));
+	/* make 0/1 same as read/write-to end of pipe */
+	rc = dup2(pipefd[dir], dir);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("ERROR: child dup2 (pipefd[%d]): %s",
+				dir, strerror(errno));
+		return errno;
+	}
 
-	return rc;
+	/* close excess fildes */
+	rc = close(pipefd[dir]);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("ERROR: child close (pipefd[%d]): %s",
+				dir, strerror(errno));
+		return errno;
+	}
+
+	return 0;
 }
 
 int sto_subprocess_run(struct sto_subprocess *subp,
 		       struct sto_subprocess_ctx *subp_ctx)
 {
+	int pipefd[2];
 	pid_t pid;
+	int rc;
+
+	if (subp->capture_output) {
+		rc = pipe(pipefd);
+		if (spdk_unlikely(rc == -1)) {
+			SPDK_ERRLOG("ERROR: pipe errno=%s\n", strerror(errno));
+			return errno;
+		}
+	}
 
 	pid = fork();
 	if (spdk_unlikely(pid == -1)) {
@@ -183,11 +216,27 @@ int sto_subprocess_run(struct sto_subprocess *subp,
 
 	/* Child */
 	if (!pid) {
-		int rc = __subprocess_child_run(subp);
+		if (subp->capture_output)
+			rc = __setup_pipe(pipefd, 1);
+		else
+			rc = __redirect_to_null();
+
+		/*
+		 * execvp() takes (char *const *) for backward compatibility,
+		 * but POSIX guarantees that it will not modify the strings,
+		 * so the cast is safe
+		 */
+		rc = execvp(subp->file, (char *const *) subp->args);
+		if (rc == -1)
+			SPDK_ERRLOG("Error: child execvp: %s", strerror(errno));
+
 		exit(0);
 	}
 
 	/* Parent */
+	if (subp->capture_output)
+		rc = __setup_pipe(pipefd, 0);
+
 	subp->pid = pid;
 	subp->subp_ctx = subp_ctx;
 	TAILQ_INSERT_TAIL(&sto_subprocess_list, subp, list);

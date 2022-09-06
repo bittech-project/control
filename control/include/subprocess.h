@@ -23,8 +23,7 @@ struct sto_subprocess {
 };
 
 struct sto_subprocess_ctx {
-	char *output;
-	uint32_t output_sz;
+	char output[256];
 
 	int returncode;
 
