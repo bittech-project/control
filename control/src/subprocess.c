@@ -130,11 +130,50 @@ void sto_subprocess_destroy(struct sto_subprocess *subp)
 	rte_free(subp);
 }
 
+static int __subprocess_child_run(struct sto_subprocess *subp)
+{
+	int rc;
+
+	if (!subp->capture_output) {
+		int fd;
+
+		fd = open("/dev/null", O_WRONLY);
+		if (spdk_unlikely(fd == -1)) {
+			SPDK_ERRLOG("Failed to open /dev/null\n");
+			return errno;
+		}
+
+		rc = dup2(fd, 1);
+		if (spdk_unlikely(rc == -1)) {
+			SPDK_ERRLOG("Failed to dup2 stdout\n");
+			return errno;
+		}
+
+		rc = dup2(fd, 2);
+		if (spdk_unlikely(rc == -1)) {
+			SPDK_ERRLOG("Failed to dup2 stderr\n");
+			return errno;
+		}
+
+		close(fd);
+	}
+
+	/*
+	 * execvp() takes (char *const *) for backward compatibility,
+	 * but POSIX guarantees that it will not modify the strings,
+	 * so the cast is safe
+	 */
+	rc = execvp(subp->file, (char *const *) subp->args);
+	if (rc == -1)
+		SPDK_ERRLOG("Error: child execvp: %s", strerror(errno));
+
+	return rc;
+}
+
 int sto_subprocess_run(struct sto_subprocess *subp,
 		       struct sto_subprocess_ctx *subp_ctx)
 {
 	pid_t pid;
-	int rc;
 
 	pid = fork();
 	if (spdk_unlikely(pid == -1)) {
@@ -144,16 +183,8 @@ int sto_subprocess_run(struct sto_subprocess *subp,
 
 	/* Child */
 	if (!pid) {
-		/*
-		 * execvp() takes (char *const *) for backward compatibility,
-		 * but POSIX guarantees that it will not modify the strings,
-		 * so the cast is safe
-		 */
-		rc = execvp(subp->file, (char *const *) subp->args);
-		if (rc == -1)
-			SPDK_ERRLOG("Error: child execvp: %s", strerror(errno));
-
-		exit(errno);
+		int rc = __subprocess_child_run(subp);
+		exit(0);
 	}
 
 	/* Parent */
