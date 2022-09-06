@@ -9,6 +9,7 @@
 #include "subprocess.h"
 
 static char *proc_name = "ls";
+static bool capture_output;
 
 /*
  * We'll use this struct to gather housekeeping proc_context to pass between
@@ -27,6 +28,7 @@ static void
 proc_usage(void)
 {
 	printf(" -P <proc name>                 name of the proc to execute\n");
+	printf(" -O <capture output>            if set subprocess will also capture the output (default 0)\n");
 }
 
 /*
@@ -38,6 +40,9 @@ proc_parse_arg(int ch, char *arg)
 	switch (ch) {
 	case 'P':
 		proc_name = arg;
+		break;
+	case 'O':
+		capture_output = spdk_strtol(arg, 10);
 		break;
 	default:
 		return -EINVAL;
@@ -61,7 +66,6 @@ proc_start(void *arg1)
 	struct sto_subprocess *subp;
 	const char *const argv[] = {
 			proc_context->name,
-			"-lah"
 	};
 	int rc;
 
@@ -71,7 +75,7 @@ proc_start(void *arg1)
 
 	subp_ctx.subprocess_done = proc_finish;
 
-	subp = sto_subprocess_create(argv, SPDK_COUNTOF(argv), true, 0);
+	subp = sto_subprocess_create(argv, SPDK_COUNTOF(argv), capture_output, 0);
 	rc = sto_subprocess_run(subp, &subp_ctx);
 
 	/* sto_subprocess_exit(); */
@@ -92,7 +96,7 @@ main(int argc, char **argv)
 	 * Parse built-in SPDK command line parameters as well
 	 * as our custom one(s).
 	 */
-	if ((rc = spdk_app_parse_args(argc, argv, &opts, "P:", NULL, proc_parse_arg,
+	if ((rc = spdk_app_parse_args(argc, argv, &opts, "P:O:", NULL, proc_parse_arg,
 				      proc_usage)) != SPDK_APP_PARSE_ARGS_SUCCESS) {
 		exit(rc);
 	}
