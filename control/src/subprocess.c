@@ -1,7 +1,4 @@
-#include <errno.h>  /* errno */
-#include <stdlib.h> /* NULL */
-#include <string.h> /* strerror */
-#include <unistd.h> /* readlink */
+#include <spdk/stdinc.h>
 
 #include <spdk/log.h>
 #include <spdk/likely.h>
