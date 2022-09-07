@@ -141,23 +141,31 @@ static int __redirect_to_null(void)
 
 	fd = open("/dev/null", O_WRONLY);
 	if (spdk_unlikely(fd == -1)) {
-		SPDK_ERRLOG("Failed to open /dev/null\n");
+		SPDK_ERRLOG("Failed to open /dev/null: %s\n",
+				strerror(errno));
 		return errno;
 	}
 
 	rc = dup2(fd, 1);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to dup2 stdout\n");
+		SPDK_ERRLOG("Failed to dup2 stdout: %s\n",
+				strerror(errno));
 		return errno;
 	}
 
 	rc = dup2(fd, 2);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to dup2 stderr\n");
+		SPDK_ERRLOG("Failed to dup2 stderr: %s\n",
+				strerror(errno));
 		return errno;
 	}
 
-	close(fd);
+	rc = close(fd);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to close /dev/null: %s",
+				strerror(errno));
+		return errno;
+	}
 
 	return 0;
 }
@@ -169,7 +177,7 @@ static int __setup_pipe(int pipefd[2], int dir)
 	/* close read/write end of pipe */
 	rc = close(pipefd[!dir]);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("ERROR: child close (pipefd[%d]): %s",
+		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
 				!dir, strerror(errno));
 		return errno;
 	}
@@ -177,7 +185,7 @@ static int __setup_pipe(int pipefd[2], int dir)
 	/* make 0/1 same as read/write-to end of pipe */
 	rc = dup2(pipefd[dir], dir);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("ERROR: child dup2 (pipefd[%d]): %s",
+		SPDK_ERRLOG("Failed to child dup2 (pipefd[%d]): %s",
 				dir, strerror(errno));
 		return errno;
 	}
@@ -185,7 +193,7 @@ static int __setup_pipe(int pipefd[2], int dir)
 	/* close excess fildes */
 	rc = close(pipefd[dir]);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("ERROR: child close (pipefd[%d]): %s",
+		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
 				dir, strerror(errno));
 		return errno;
 	}
@@ -198,28 +206,33 @@ int sto_subprocess_run(struct sto_subprocess *subp,
 {
 	int pipefd[2];
 	pid_t pid;
-	int rc;
+	int rc = 0;
 
 	if (subp->capture_output) {
 		rc = pipe(pipefd);
 		if (spdk_unlikely(rc == -1)) {
-			SPDK_ERRLOG("ERROR: pipe errno=%s\n", strerror(errno));
+			SPDK_ERRLOG("Failed to create pipe: %s\n",
+					strerror(errno));
 			return errno;
 		}
 	}
 
 	pid = fork();
 	if (spdk_unlikely(pid == -1)) {
-		SPDK_ERRLOG("ERROR: fork errno=%s\n", strerror(errno));
+		SPDK_ERRLOG("Failed to fork: %s\n",
+				strerror(errno));
 		return errno;
 	}
 
 	/* Child */
 	if (!pid) {
 		if (subp->capture_output)
-			rc = __setup_pipe(pipefd, 1);
+			rc = __setup_pipe(pipefd, STDOUT_FILENO);
 		else
 			rc = __redirect_to_null();
+
+		if (spdk_unlikely(rc))
+			SPDK_ERRLOG("Failed to set up child process\n");
 
 		/*
 		 * execvp() takes (char *const *) for backward compatibility,
@@ -228,14 +241,14 @@ int sto_subprocess_run(struct sto_subprocess *subp,
 		 */
 		rc = execvp(subp->file, (char *const *) subp->args);
 		if (rc == -1)
-			SPDK_ERRLOG("Error: child execvp: %s", strerror(errno));
+			SPDK_ERRLOG("Failed to child execvp: %s", strerror(errno));
 
 		exit(0);
 	}
 
 	/* Parent */
 	if (subp->capture_output)
-		rc = __setup_pipe(pipefd, 0);
+		rc = __setup_pipe(pipefd, STDIN_FILENO);
 
 	subp->pid = pid;
 	subp->subp_ctx = subp_ctx;

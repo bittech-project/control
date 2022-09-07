@@ -5,6 +5,7 @@
 #include <spdk/event.h>
 #include <spdk/log.h>
 #include <spdk/string.h>
+#include <spdk/likely.h>
 
 #include "subprocess.h"
 
@@ -69,13 +70,20 @@ proc_start(void *arg1)
 	};
 	int rc;
 
-	SPDK_NOTICELOG("Successfully started the SPDK application: exec %s\n", proc_context->name);
+	SPDK_NOTICELOG("Successfully started the SPDK application: proc %s\n",
+			proc_context->name);
 
 	sto_subprocess_init();
 
 	subp_ctx.subprocess_done = proc_finish;
 
 	subp = sto_subprocess_create(argv, SPDK_COUNTOF(argv), capture_output, 0);
+	if (spdk_unlikely(subp == NULL)) {
+		SPDK_ERRLOG("Failed to create subprocess\n");
+		spdk_app_stop(-1);
+		return;
+	}
+
 	rc = sto_subprocess_run(subp, &subp_ctx);
 
 	/* sto_subprocess_exit(); */
