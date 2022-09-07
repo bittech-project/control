@@ -7,7 +7,7 @@
 #include <spdk/string.h>
 #include <spdk/likely.h>
 
-#include "subprocess.h"
+#include "sto_subprocess.h"
 
 static char *proc_name = "ls";
 static bool capture_output;

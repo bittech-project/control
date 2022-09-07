@@ -6,7 +6,7 @@
 
 #include <rte_malloc.h>
 
-#include "subprocess.h"
+#include "sto_subprocess.h"
 
 #define STO_SUBPROCESS_POLL_PERIOD	4000 /* 4ms */
 

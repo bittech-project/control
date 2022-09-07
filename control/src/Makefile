@@ -6,7 +6,7 @@
 include $(CURDIR)/../../config.mk
 
 PROGRAM = proc
-SRCS_D = proc.c subprocess.c
+SRCS_D = proc.c sto_subprocess.c
 
 SPDK_FLAGS = -pthread -Wl,--whole-archive,-Bstatic \
 	$(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB)
