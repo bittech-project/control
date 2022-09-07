@@ -100,6 +100,7 @@ sto_subprocess_create(const char *const argv[], int numargs,
 		      bool capture_output, uint64_t timeout)
 {
 	struct sto_subprocess *subp;
+	unsigned int data_len;
 	int i;
 
 	if (spdk_unlikely(!subprocess_initialized)) {
@@ -112,7 +113,10 @@ sto_subprocess_create(const char *const argv[], int numargs,
 		return NULL;
 	}
 
-	subp = rte_zmalloc(NULL, sizeof(*subp) + (numargs * sizeof(char *)), 0);
+	/* Count the number of bytes for the 'numargs' arguments to be allocated */
+	data_len = numargs * sizeof(char *);
+
+	subp = rte_zmalloc(NULL, sizeof(*subp) + data_len, 0);
 	if (spdk_unlikely(!subp)) {
 		SPDK_ERRLOG("Cann't allocate memory for subprocess\n");
 		return NULL;
