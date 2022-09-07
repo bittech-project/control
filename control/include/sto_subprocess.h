@@ -1,5 +1,5 @@
-#ifndef _SUBPROCESS_H_
-#define _SUBPROCESS_H_
+#ifndef _STO_SUBPROCESS_H_
+#define _STO_SUBPROCESS_H_
 
 #include <spdk/util.h>
 
@@ -44,4 +44,4 @@ void sto_subprocess_destroy(struct sto_subprocess *subp);
 int sto_subprocess_run(struct sto_subprocess *subp,
 		       struct sto_subprocess_ctx *subp_ctx);
 
-#endif /* _SUBPROCESS_H_ */
+#endif /* _STO_SUBPROCESS_H_ */
