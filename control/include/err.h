@@ -15,30 +15,36 @@
 
 #define IS_ERR_VALUE(x) spdk_unlikely((uintptr_t)(void *) (x) >= (uintptr_t) - MAX_ERRNO)
 
-static inline void *ERR_PTR(uintptr_t error)
+static inline void *
+ERR_PTR(uintptr_t error)
 {
 	return (void *) error;
 }
 
-static inline uintptr_t PTR_ERR(const void *ptr)
+static inline uintptr_t
+PTR_ERR(const void *ptr)
 {
 	return (uintptr_t) ptr;
 }
 
-static inline uintptr_t IS_ERR(const void *ptr)
+static inline uintptr_t
+IS_ERR(const void *ptr)
 {
 	return IS_ERR_VALUE((uintptr_t) ptr);
 }
 
-static inline uintptr_t IS_ERR_OR_NULL(const void *ptr)
+static inline uintptr_t
+IS_ERR_OR_NULL(const void *ptr)
 {
 	return spdk_unlikely(!ptr) || IS_ERR_VALUE((uintptr_t) ptr);
 }
 
-static inline int PTR_ERR_OR_ZERO(const void *ptr)
+static inline int
+PTR_ERR_OR_ZERO(const void *ptr)
 {
-	if (IS_ERR(ptr))
+	if (IS_ERR(ptr)) {
 		return PTR_ERR(ptr);
+	}
 
 	return 0;
 }

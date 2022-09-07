@@ -51,10 +51,11 @@ proc_parse_arg(int ch, char *arg)
 	return 0;
 }
 
-static void proc_finish(struct sto_subprocess_ctx *subp_ctx)
+static void
+proc_finish(struct sto_subprocess_ctx *subp_ctx)
 {
 	SPDK_NOTICELOG("Exec finish: rc=%d output=%s\n",
-			subp_ctx->returncode, subp_ctx->output);
+		       subp_ctx->returncode, subp_ctx->output);
 }
 
 /*
@@ -66,12 +67,12 @@ proc_start(void *arg1)
 	struct proc_context_t *proc_context = arg1;
 	struct sto_subprocess *subp;
 	const char *const argv[] = {
-			proc_context->name,
+		proc_context->name,
 	};
 	int rc;
 
 	SPDK_NOTICELOG("Successfully started the SPDK application: proc %s\n",
-			proc_context->name);
+		       proc_context->name);
 
 	sto_subprocess_init();
 
