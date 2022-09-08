@@ -1,9 +1,5 @@
-#  SPDX-License-Identifier: BSD-3-Clause
-#  Copyright (c) Intel Corporation.
-#  All rights reserved.
-#
-
-include $(CURDIR)/../../config.mk
+CONTROL_ROOT_DIR := $(abspath $(CURDIR)/../..)
+include $(CONTROL_ROOT_DIR)/spdk.mk
 
 PROGRAM = proc
 SRCS_D = proc.c sto_subprocess.c
