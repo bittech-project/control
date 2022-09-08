@@ -1,8 +1,8 @@
 CONTROL_ROOT_DIR := $(abspath $(CURDIR)/../..)
 include $(CONTROL_ROOT_DIR)/spdk.mk
 
-PROGRAM = proc
-SRCS_D = proc.c sto_subprocess.c sto_control.c sto_subsystem.c
+PROGRAM = control
+SRCS_D = sto_control_app.c sto_subprocess.c sto_control.c sto_subsystem.c
 
 SPDK_FLAGS = -pthread -Wl,--whole-archive,-Bstatic \
 	$(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB)
