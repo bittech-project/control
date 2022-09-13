@@ -4,6 +4,7 @@
 #include <spdk/util.h>
 
 struct sto_subprocess_ctx;
+typedef void (subprocess_done_t) (struct sto_subprocess_ctx *subp_ctx);
 
 struct sto_subprocess {
 	struct sto_subprocess_ctx *subp_ctx;
@@ -27,7 +28,8 @@ struct sto_subprocess_ctx {
 
 	int returncode;
 
-	void (*subprocess_done)(struct sto_subprocess_ctx *subp_ctx);
+	void *priv;
+	subprocess_done_t *subprocess_done;
 };
 
 int sto_subprocess_init(void);
@@ -39,6 +41,8 @@ void sto_subprocess_exit(void);
 struct sto_subprocess *
 sto_subprocess_create(const char *const argv[], int numargs,
 		      bool capture_output, uint64_t timeout);
+void sto_subprocess_init_cb(struct sto_subprocess_ctx *subp_ctx,
+			    subprocess_done_t *subprocess_done, void *priv);
 void sto_subprocess_destroy(struct sto_subprocess *subp);
 
 int sto_subprocess_run(struct sto_subprocess *subp,

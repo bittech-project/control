@@ -62,12 +62,10 @@ sto_rpc_free_subprocess_ctx(struct sto_rpc_subprocess_ctx *ctx)
 	free(ctx);
 }
 
-#define to_subprocess_ctx(x) SPDK_CONTAINEROF(x, struct sto_rpc_subprocess_ctx, subp_ctx);
-
 static void
-sto_rpc_subprocess_finish(struct sto_subprocess_ctx *subp_ctx)
+sto_rpc_subprocess_done(struct sto_subprocess_ctx *subp_ctx)
 {
-	struct sto_rpc_subprocess_ctx *ctx = to_subprocess_ctx(subp_ctx);
+	struct sto_rpc_subprocess_ctx *ctx = subp_ctx->priv;
 	struct spdk_json_write_ctx *w;
 
 	SPDK_DEBUGLOG(sto_control, "RPC subprocess finish: rc=%d output=%s\n",
@@ -112,7 +110,6 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 	}
 
 	ctx->request = request;
-	ctx->subp_ctx.subprocess_done = sto_rpc_subprocess_finish;
 
 	subp = sto_subprocess_create(req->arg_list.args, req->arg_list.num_args, req->capture_output, 0);
 	if (spdk_unlikely(!subp)) {
@@ -120,6 +117,8 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));
 		goto free_ctx;
 	}
+
+	sto_subprocess_init_cb(&ctx->subp_ctx, sto_rpc_subprocess_done, ctx);
 
 	rc = sto_subprocess_run(subp, &ctx->subp_ctx);
 	if (spdk_unlikely(rc)) {

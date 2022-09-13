@@ -137,6 +137,14 @@ sto_subprocess_create(const char *const argv[], int numargs,
 }
 
 void
+sto_subprocess_init_cb(struct sto_subprocess_ctx *subp_ctx,
+		       subprocess_done_t *subprocess_done, void *priv)
+{
+	subp_ctx->subprocess_done = subprocess_done;
+	subp_ctx->priv = priv;
+}
+
+void
 sto_subprocess_destroy(struct sto_subprocess *subp)
 {
 	rte_free(subp);
