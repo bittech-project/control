@@ -164,7 +164,7 @@ sto_subprocess_exec_done(void *arg)
 }
 
 struct sto_subprocess *
-sto_subprocess_create(const char *const argv[], int numargs, bool capture_output)
+sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output)
 {
 	struct sto_subprocess *subp;
 	unsigned int data_len;
@@ -210,7 +210,7 @@ sto_subprocess_init_cb(struct sto_subprocess *subp,
 }
 
 void
-sto_subprocess_destroy(struct sto_subprocess *subp)
+sto_subprocess_free(struct sto_subprocess *subp)
 {
 	rte_free(subp);
 }

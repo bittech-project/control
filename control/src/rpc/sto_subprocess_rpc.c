@@ -79,7 +79,7 @@ sto_rpc_subprocess_done(struct sto_subprocess *subp)
 	spdk_json_write_object_end(w);
 	spdk_jsonrpc_end_result(ctx->request, w);
 
-	sto_subprocess_destroy(subp);
+	sto_subprocess_free(subp);
 
 	sto_rpc_free_subprocess_ctx(ctx);
 }
@@ -112,7 +112,7 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 
 	ctx->request = request;
 
-	subp = sto_subprocess_create(req->arg_list.args, req->arg_list.num_args, req->capture_output);
+	subp = sto_subprocess_alloc(req->arg_list.args, req->arg_list.num_args, req->capture_output);
 	if (spdk_unlikely(!subp)) {
 		SPDK_ERRLOG("Failed to create subprocess\n");
 		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));
@@ -131,7 +131,7 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 	return;
 
 free_subp:
-	sto_subprocess_destroy(subp);
+	sto_subprocess_free(subp);
 
 free_ctx:
 	sto_rpc_free_subprocess_ctx(ctx);
