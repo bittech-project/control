@@ -1,3 +1,5 @@
+SHELL = /bin/bash
+
 CONTROL_ROOT_DIR := $(abspath $(CURDIR)/../..)
 include $(CONTROL_ROOT_DIR)/spdk.mk
 
