@@ -2,78 +2,24 @@
 
 #include <spdk/log.h>
 #include <spdk/likely.h>
-#include <spdk/thread.h>
 
 #include <rte_malloc.h>
 
 #include "sto_subprocess.h"
+#include "sto_exec.h"
 
-#define STO_SUBPROCESS_POLL_PERIOD	4000 /* 4ms */
+static int sto_subprocess_pre_fork(void *arg);
+static int sto_subprocess_exec(void *arg);
+static int sto_subprocess_post_fork(void *arg, pid_t pid);
+static void sto_subprocess_exec_done(void *arg);
 
-static struct spdk_poller *sto_subprocess_poller;
-
-TAILQ_HEAD(sto_subprocess_list, sto_subprocess);
-
-static struct sto_subprocess_list sto_subprocess_list =
-	TAILQ_HEAD_INITIALIZER(sto_subprocess_list);
-
-static int subprocess_initialized;
-
-static int
-sto_subprocess_poll(void *arg)
-{
-	struct sto_subprocess *subp, *tmp;
-
-	TAILQ_FOREACH_SAFE(subp, &sto_subprocess_list, list, tmp) {
-		int status;
-		pid_t return_pid;
-
-		return_pid = waitpid(subp->pid, &status, WNOHANG);
-
-		if (return_pid == 0) {
-			/* child is still running */
-			continue;
-		}
-
-		if (return_pid == subp->pid || return_pid == -1) {
-			/* child is finished. exit status in status */
-			TAILQ_REMOVE(&sto_subprocess_list, subp, list);
-			subp->release(subp, status);
-		}
-	}
-}
-
-int
-sto_subprocess_init(void)
-{
-	if (spdk_unlikely(subprocess_initialized)) {
-		SPDK_ERRLOG("STO subprocess lib has already been initialized\n");
-		return -EINVAL;
-	}
-
-	sto_subprocess_poller = SPDK_POLLER_REGISTER(sto_subprocess_poll,
-				NULL, STO_SUBPROCESS_POLL_PERIOD);
-	if (spdk_unlikely(!sto_subprocess_poller)) {
-		SPDK_ERRLOG("Cann't register the STO subprocess poller\n");
-		return -EFAULT;
-	}
-
-	subprocess_initialized = 1;
-
-	return 0;
-}
-
-void
-sto_subprocess_exit(void)
-{
-	if (spdk_unlikely(!subprocess_initialized)) {
-		SPDK_ERRLOG("STO subprocess lib hasn't been initialized yet\n");
-		return;
-	}
-
-	spdk_poller_unregister(&sto_subprocess_poller);
-	subprocess_initialized = 0;
-}
+static struct sto_exec_ops subprocess_ops = {
+	.name = "subprocess",
+	.pre_fork = sto_subprocess_pre_fork,
+	.exec = sto_subprocess_exec,
+	.post_fork = sto_subprocess_post_fork,
+	.exec_done = sto_subprocess_exec_done,
+};
 
 static int
 sto_redirect_to_null(void)
@@ -143,12 +89,69 @@ sto_setup_pipe(int pipefd[2], int dir)
 	return 0;
 }
 
-static void
-sto_subprocess_release(struct sto_subprocess *subp, int status)
+static int
+sto_subprocess_pre_fork(void *arg)
 {
+	struct sto_subprocess *subp = arg;
+
+	if (subp->capture_output) {
+		int rc = pipe(subp->pipefd);
+		if (spdk_unlikely(rc == -1)) {
+			SPDK_ERRLOG("Failed to create subprocess pipe: %s\n",
+				    strerror(errno));
+			return -errno;
+		}
+	}
+
+	return 0;
+}
+
+static int
+sto_subprocess_exec(void *arg)
+{
+	struct sto_subprocess *subp = arg;
+	int rc = 0;
+
+	if (subp->capture_output) {
+		rc = sto_setup_pipe(subp->pipefd, STDOUT_FILENO);
+	} else {
+		sto_redirect_to_null();
+	}
+
+	/*
+	 * execvp() takes (char *const *) for backward compatibility,
+	 * but POSIX guarantees that it will not modify the strings,
+	 * so the cast is safe
+	 */
+	rc = execvp(subp->file, (char *const *) subp->args);
+	if (rc == -1) {
+		SPDK_ERRLOG("Failed to execvp: %s", strerror(errno));
+	}
+
+	return -errno;
+}
+
+static int
+sto_subprocess_post_fork(void *arg, pid_t pid)
+{
+	struct sto_subprocess *subp = arg;
+	int rc = 0;
+
+	/* Parent */
+	if (pid && subp->capture_output) {
+		rc = sto_setup_pipe(subp->pipefd, STDIN_FILENO);
+	}
+
+	return rc;
+}
+
+static void
+sto_subprocess_exec_done(void *arg)
+{
+	struct sto_subprocess *subp = arg;
 	struct sto_subprocess_ctx *subp_ctx = subp->subp_ctx;
 
-	subp_ctx->returncode = status;
+	subp_ctx->returncode = subp->exec_ctx.exitval;
 
 	if (subp->capture_output) {
 		ssize_t read_sz;
@@ -164,17 +167,11 @@ sto_subprocess_release(struct sto_subprocess *subp, int status)
 }
 
 struct sto_subprocess *
-sto_subprocess_create(const char *const argv[], int numargs,
-		      bool capture_output, uint64_t timeout)
+sto_subprocess_create(const char *const argv[], int numargs, bool capture_output)
 {
 	struct sto_subprocess *subp;
 	unsigned int data_len;
 	int i;
-
-	if (spdk_unlikely(!subprocess_initialized)) {
-		SPDK_ERRLOG("STO subprocess lib hasn't been initialized yet\n");
-		return NULL;
-	}
 
 	if (spdk_unlikely(!numargs)) {
 		SPDK_ERRLOG("Too few arguments\n");
@@ -190,6 +187,8 @@ sto_subprocess_create(const char *const argv[], int numargs,
 		return NULL;
 	}
 
+	sto_exec_init_ctx(&subp->exec_ctx, &subprocess_ops, subp);
+
 	subp->capture_output = capture_output;
 	subp->numargs = numargs;
 
@@ -198,8 +197,6 @@ sto_subprocess_create(const char *const argv[], int numargs,
 	for (i = 0; i < numargs; i++) {
 		subp->args[i] = argv[i];
 	}
-
-	subp->release = sto_subprocess_release;
 
 	return subp;
 }
@@ -222,59 +219,11 @@ int
 sto_subprocess_run(struct sto_subprocess *subp,
 		   struct sto_subprocess_ctx *subp_ctx)
 {
-	int pipefd[2];
-	pid_t pid;
 	int rc = 0;
 
-	if (subp->capture_output) {
-		rc = pipe(pipefd);
-		if (spdk_unlikely(rc == -1)) {
-			SPDK_ERRLOG("Failed to create pipe: %s\n",
-				    strerror(errno));
-			return errno;
-		}
-	}
-
-	pid = fork();
-	if (spdk_unlikely(pid == -1)) {
-		SPDK_ERRLOG("Failed to fork: %s\n",
-			    strerror(errno));
-		return errno;
-	}
-
-	/* Child */
-	if (!pid) {
-		if (subp->capture_output) {
-			rc = sto_setup_pipe(pipefd, STDOUT_FILENO);
-		} else {
-			rc = sto_redirect_to_null();
-		}
-
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Failed to set up child process\n");
-		}
-
-		/*
-		 * execvp() takes (char *const *) for backward compatibility,
-		 * but POSIX guarantees that it will not modify the strings,
-		 * so the cast is safe
-		 */
-		rc = execvp(subp->file, (char *const *) subp->args);
-		if (rc == -1) {
-			SPDK_ERRLOG("Failed to child execvp: %s", strerror(errno));
-		}
-
-		exit(0);
-	}
-
-	/* Parent */
-	if (subp->capture_output) {
-		rc = sto_setup_pipe(pipefd, STDIN_FILENO);
-	}
-
-	subp->pid = pid;
 	subp->subp_ctx = subp_ctx;
-	TAILQ_INSERT_TAIL(&sto_subprocess_list, subp, list);
 
-	return 0;
+	rc = sto_exec(&subp->exec_ctx);
+
+	return rc;
 }
