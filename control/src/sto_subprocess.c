@@ -75,6 +75,74 @@ sto_subprocess_exit(void)
 	subprocess_initialized = 0;
 }
 
+static int
+sto_redirect_to_null(void)
+{
+	int fd, rc;
+
+	fd = open("/dev/null", O_WRONLY);
+	if (spdk_unlikely(fd == -1)) {
+		SPDK_ERRLOG("Failed to open /dev/null: %s\n",
+			    strerror(errno));
+		return -errno;
+	}
+
+	rc = dup2(fd, 1);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to dup2 stdout: %s\n",
+			    strerror(errno));
+		return -errno;
+	}
+
+	rc = dup2(fd, 2);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to dup2 stderr: %s\n",
+			    strerror(errno));
+		return -errno;
+	}
+
+	rc = close(fd);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to close /dev/null: %s",
+			    strerror(errno));
+		return -errno;
+	}
+
+	return 0;
+}
+
+static int
+sto_setup_pipe(int pipefd[2], int dir)
+{
+	int rc;
+
+	/* close read/write end of pipe */
+	rc = close(pipefd[!dir]);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
+			    !dir, strerror(errno));
+		return -errno;
+	}
+
+	/* make 0/1 same as read/write-to end of pipe */
+	rc = dup2(pipefd[dir], dir);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to child dup2 (pipefd[%d]): %s",
+			    dir, strerror(errno));
+		return -errno;
+	}
+
+	/* close excess fildes */
+	rc = close(pipefd[dir]);
+	if (spdk_unlikely(rc == -1)) {
+		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
+			    dir, strerror(errno));
+		return -errno;
+	}
+
+	return 0;
+}
+
 static void
 sto_subprocess_release(struct sto_subprocess *subp, int status)
 {
@@ -150,74 +218,6 @@ sto_subprocess_destroy(struct sto_subprocess *subp)
 	rte_free(subp);
 }
 
-static int
-__redirect_to_null(void)
-{
-	int fd, rc;
-
-	fd = open("/dev/null", O_WRONLY);
-	if (spdk_unlikely(fd == -1)) {
-		SPDK_ERRLOG("Failed to open /dev/null: %s\n",
-			    strerror(errno));
-		return errno;
-	}
-
-	rc = dup2(fd, 1);
-	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to dup2 stdout: %s\n",
-			    strerror(errno));
-		return errno;
-	}
-
-	rc = dup2(fd, 2);
-	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to dup2 stderr: %s\n",
-			    strerror(errno));
-		return errno;
-	}
-
-	rc = close(fd);
-	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to close /dev/null: %s",
-			    strerror(errno));
-		return errno;
-	}
-
-	return 0;
-}
-
-static int
-__setup_pipe(int pipefd[2], int dir)
-{
-	int rc;
-
-	/* close read/write end of pipe */
-	rc = close(pipefd[!dir]);
-	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
-			    !dir, strerror(errno));
-		return errno;
-	}
-
-	/* make 0/1 same as read/write-to end of pipe */
-	rc = dup2(pipefd[dir], dir);
-	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to child dup2 (pipefd[%d]): %s",
-			    dir, strerror(errno));
-		return errno;
-	}
-
-	/* close excess fildes */
-	rc = close(pipefd[dir]);
-	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
-			    dir, strerror(errno));
-		return errno;
-	}
-
-	return 0;
-}
-
 int
 sto_subprocess_run(struct sto_subprocess *subp,
 		   struct sto_subprocess_ctx *subp_ctx)
@@ -245,9 +245,9 @@ sto_subprocess_run(struct sto_subprocess *subp,
 	/* Child */
 	if (!pid) {
 		if (subp->capture_output) {
-			rc = __setup_pipe(pipefd, STDOUT_FILENO);
+			rc = sto_setup_pipe(pipefd, STDOUT_FILENO);
 		} else {
-			rc = __redirect_to_null();
+			rc = sto_redirect_to_null();
 		}
 
 		if (spdk_unlikely(rc)) {
@@ -269,7 +269,7 @@ sto_subprocess_run(struct sto_subprocess *subp,
 
 	/* Parent */
 	if (subp->capture_output) {
-		rc = __setup_pipe(pipefd, STDIN_FILENO);
+		rc = sto_setup_pipe(pipefd, STDIN_FILENO);
 	}
 
 	subp->pid = pid;
