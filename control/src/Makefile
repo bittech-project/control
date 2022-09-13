@@ -4,7 +4,7 @@ CONTROL_ROOT_DIR := $(abspath $(CURDIR)/../..)
 include $(CONTROL_ROOT_DIR)/spdk.mk
 
 PROGRAM = control
-SRCS_D = sto_control_app.c sto_subprocess.c sto_control.c sto_subsystem.c
+SRCS_D = sto_control_app.c sto_exec.c sto_subprocess.c sto_control.c sto_subsystem.c
 SRCS_D += rpc/sto_subprocess_rpc.c
 
 SPDK_FLAGS = -pthread -Wl,--whole-archive,-Bstatic \

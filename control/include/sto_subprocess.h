@@ -4,7 +4,7 @@
 #include <spdk/util.h>
 
 struct sto_subprocess_ctx;
-typedef void (subprocess_done_t) (struct sto_subprocess_ctx *subp_ctx);
+typedef void (subprocess_done_t)(struct sto_subprocess_ctx *subp_ctx);
 
 struct sto_subprocess {
 	struct sto_subprocess_ctx *subp_ctx;
