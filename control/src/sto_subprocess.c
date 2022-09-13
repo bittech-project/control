@@ -149,21 +149,18 @@ static void
 sto_subprocess_exec_done(void *arg)
 {
 	struct sto_subprocess *subp = arg;
-	struct sto_subprocess_ctx *subp_ctx = subp->subp_ctx;
 
-	subp_ctx->returncode = sto_exec_get_result(&subp->exec_ctx);
+	subp->returncode = sto_exec_get_result(&subp->exec_ctx);
 
 	if (subp->capture_output) {
 		ssize_t read_sz;
 
-		memset(subp_ctx->output, 0, sizeof(subp_ctx->output));
+		memset(subp->output, 0, sizeof(subp->output));
 
-		read_sz = read(0, subp_ctx->output, sizeof(subp_ctx->output) - 1);
+		read_sz = read(0, subp->output, sizeof(subp->output) - 1);
 	}
 
-	sto_subprocess_destroy(subp);
-
-	subp_ctx->subprocess_done(subp_ctx);
+	subp->subprocess_done(subp);
 }
 
 struct sto_subprocess *
@@ -171,6 +168,7 @@ sto_subprocess_create(const char *const argv[], int numargs, bool capture_output
 {
 	struct sto_subprocess *subp;
 	unsigned int data_len;
+	int real_numargs = numargs + 1; /* Plus one for the NULL terminator at the end */
 	int i;
 
 	if (spdk_unlikely(!numargs)) {
@@ -178,8 +176,8 @@ sto_subprocess_create(const char *const argv[], int numargs, bool capture_output
 		return NULL;
 	}
 
-	/* Count the number of bytes for the 'numargs' arguments to be allocated */
-	data_len = numargs * sizeof(char *);
+	/* Count the number of bytes for the 'real_numargs' arguments to be allocated */
+	data_len = real_numargs * sizeof(char *);
 
 	subp = rte_zmalloc(NULL, sizeof(*subp) + data_len, 0);
 	if (spdk_unlikely(!subp)) {
@@ -190,23 +188,25 @@ sto_subprocess_create(const char *const argv[], int numargs, bool capture_output
 	sto_exec_init_ctx(&subp->exec_ctx, &subprocess_ops, subp);
 
 	subp->capture_output = capture_output;
-	subp->numargs = numargs;
+	subp->numargs = real_numargs;
 
 	subp->file = argv[0];
 
-	for (i = 0; i < numargs; i++) {
+	for (i = 0; i < subp->numargs - 1; i++) {
 		subp->args[i] = argv[i];
 	}
+
+	subp->args[subp->numargs - 1] = NULL;
 
 	return subp;
 }
 
 void
-sto_subprocess_init_cb(struct sto_subprocess_ctx *subp_ctx,
+sto_subprocess_init_cb(struct sto_subprocess *subp,
 		       subprocess_done_t *subprocess_done, void *priv)
 {
-	subp_ctx->subprocess_done = subprocess_done;
-	subp_ctx->priv = priv;
+	subp->subprocess_done = subprocess_done;
+	subp->priv = priv;
 }
 
 void
@@ -216,12 +216,9 @@ sto_subprocess_destroy(struct sto_subprocess *subp)
 }
 
 int
-sto_subprocess_run(struct sto_subprocess *subp,
-		   struct sto_subprocess_ctx *subp_ctx)
+sto_subprocess_run(struct sto_subprocess *subp)
 {
 	int rc = 0;
-
-	subp->subp_ctx = subp_ctx;
 
 	rc = sto_exec(&subp->exec_ctx);
 

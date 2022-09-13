@@ -49,7 +49,6 @@ static const struct spdk_json_object_decoder sto_rpc_construct_subprocess_decode
 };
 
 struct sto_rpc_subprocess_ctx {
-	struct sto_subprocess_ctx subp_ctx;
 	struct sto_rpc_construct_subprocess req;
 
 	struct spdk_jsonrpc_request *request;
@@ -63,22 +62,24 @@ sto_rpc_free_subprocess_ctx(struct sto_rpc_subprocess_ctx *ctx)
 }
 
 static void
-sto_rpc_subprocess_done(struct sto_subprocess_ctx *subp_ctx)
+sto_rpc_subprocess_done(struct sto_subprocess *subp)
 {
-	struct sto_rpc_subprocess_ctx *ctx = subp_ctx->priv;
+	struct sto_rpc_subprocess_ctx *ctx = subp->priv;
 	struct spdk_json_write_ctx *w;
 
 	SPDK_DEBUGLOG(sto_control, "RPC subprocess finish: rc=%d output=%s\n",
-		      subp_ctx->returncode, subp_ctx->output);
+		      subp->returncode, subp->output);
 
 	w = spdk_jsonrpc_begin_result(ctx->request);
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_int32(w, "returncode", subp_ctx->returncode);
-	spdk_json_write_named_string(w, "output", subp_ctx->output);
+	spdk_json_write_named_int32(w, "returncode", subp->returncode);
+	spdk_json_write_named_string(w, "output", subp->output);
 
 	spdk_json_write_object_end(w);
 	spdk_jsonrpc_end_result(ctx->request, w);
+
+	sto_subprocess_destroy(subp);
 
 	sto_rpc_free_subprocess_ctx(ctx);
 }
@@ -118,9 +119,9 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 		goto free_ctx;
 	}
 
-	sto_subprocess_init_cb(&ctx->subp_ctx, sto_rpc_subprocess_done, ctx);
+	sto_subprocess_init_cb(subp, sto_rpc_subprocess_done, ctx);
 
-	rc = sto_subprocess_run(subp, &ctx->subp_ctx);
+	rc = sto_subprocess_run(subp);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to run subprocess\n");
 		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));
