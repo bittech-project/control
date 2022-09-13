@@ -4,31 +4,31 @@
       "subsystem": "sto_control",
       "config": [
         {
-          "method": "sto_exec",
+          "method": "subprocess",
           "params": {
             "cmd": ["ls", "-h"],
             "capture_output": true
           }
         },
         {
-          "method": "sto_exec",
+          "method": "subprocess",
           "params": {
             "cmd": ["echo", "Dimec and Gleban"],
-            "capture_output": true
+            "capture_output": false
           }
         },
         {
-          "method": "sto_exec",
+          "method": "subprocess",
           "params": {
             "cmd": ["ls", "-h"],
             "capture_output": false
           }
         },
         {
-          "method": "sto_exec",
+          "method": "subprocess",
           "params": {
             "cmd": ["echo", "Dimec and Gleban"],
-            "capture_output": false
+            "capture_output": true
           }
         }
       ]

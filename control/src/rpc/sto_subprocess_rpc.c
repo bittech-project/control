@@ -6,23 +6,24 @@
 
 #include "sto_subprocess.h"
 
-#define STO_EXEC_MAX_ARGS 256
-struct sto_rpc_exec_arg_list {
-	const char *args[STO_EXEC_MAX_ARGS + 1];
+#define STO_SUBPROCESS_MAX_ARGS 256
+
+struct sto_rpc_subprocess_arg_list {
+	const char *args[STO_SUBPROCESS_MAX_ARGS + 1];
 	size_t num_args;
 };
 
 static int
-sto_rpc_decode_exec_cmd(const struct spdk_json_val *val, void *out)
+sto_rpc_decode_subprocess_cmd(const struct spdk_json_val *val, void *out)
 {
-	struct sto_rpc_exec_arg_list *arg_list = out;
+	struct sto_rpc_subprocess_arg_list *arg_list = out;
 
-	return spdk_json_decode_array(val, spdk_json_decode_string, arg_list->args, STO_EXEC_MAX_ARGS,
+	return spdk_json_decode_array(val, spdk_json_decode_string, arg_list->args, STO_SUBPROCESS_MAX_ARGS,
 				      &arg_list->num_args, sizeof(char *));
 }
 
 static int
-sto_rpc_free_exec_cmd(struct sto_rpc_exec_arg_list *arg_list)
+sto_rpc_free_subprocess_cmd(struct sto_rpc_subprocess_arg_list *arg_list)
 {
 	ssize_t i;
 
@@ -31,45 +32,45 @@ sto_rpc_free_exec_cmd(struct sto_rpc_exec_arg_list *arg_list)
 	}
 }
 
-struct sto_rpc_construct_exec {
-	struct sto_rpc_exec_arg_list arg_list;
+struct sto_rpc_construct_subprocess {
+	struct sto_rpc_subprocess_arg_list arg_list;
 	bool capture_output;
 };
 
 static void
-sto_rpc_free_construct_exec(struct sto_rpc_construct_exec *req)
+sto_rpc_free_construct_subprocess(struct sto_rpc_construct_subprocess *req)
 {
-	sto_rpc_free_exec_cmd(&req->arg_list);
+	sto_rpc_free_subprocess_cmd(&req->arg_list);
 }
 
-static const struct spdk_json_object_decoder sto_rpc_construct_exec_decoders[] = {
-	{"cmd", offsetof(struct sto_rpc_construct_exec, arg_list), sto_rpc_decode_exec_cmd},
-	{"capture_output", offsetof(struct sto_rpc_construct_exec, capture_output), spdk_json_decode_bool},
+static const struct spdk_json_object_decoder sto_rpc_construct_subprocess_decoders[] = {
+	{"cmd", offsetof(struct sto_rpc_construct_subprocess, arg_list), sto_rpc_decode_subprocess_cmd},
+	{"capture_output", offsetof(struct sto_rpc_construct_subprocess, capture_output), spdk_json_decode_bool},
 };
 
-struct sto_rpc_exec_ctx {
+struct sto_rpc_subprocess_ctx {
 	struct sto_subprocess_ctx subp_ctx;
-	struct sto_rpc_construct_exec req;
+	struct sto_rpc_construct_subprocess req;
 
 	struct spdk_jsonrpc_request *request;
 };
 
 static void
-sto_rpc_free_exec_ctx(struct sto_rpc_exec_ctx *ctx)
+sto_rpc_free_subprocess_ctx(struct sto_rpc_subprocess_ctx *ctx)
 {
-	sto_rpc_free_construct_exec(&ctx->req);
+	sto_rpc_free_construct_subprocess(&ctx->req);
 	free(ctx);
 }
 
-#define to_exec_ctx(x) SPDK_CONTAINEROF(x, struct sto_rpc_exec_ctx, subp_ctx);
+#define to_subprocess_ctx(x) SPDK_CONTAINEROF(x, struct sto_rpc_subprocess_ctx, subp_ctx);
 
 static void
-sto_rpc_exec_finish(struct sto_subprocess_ctx *subp_ctx)
+sto_rpc_subprocess_finish(struct sto_subprocess_ctx *subp_ctx)
 {
-	struct sto_rpc_exec_ctx *ctx = to_exec_ctx(subp_ctx);
+	struct sto_rpc_subprocess_ctx *ctx = to_subprocess_ctx(subp_ctx);
 	struct spdk_json_write_ctx *w;
 
-	SPDK_DEBUGLOG(sto_control, "RPC exec finish: rc=%d output=%s\n",
+	SPDK_DEBUGLOG(sto_control, "RPC subprocess finish: rc=%d output=%s\n",
 		      subp_ctx->returncode, subp_ctx->output);
 
 	w = spdk_jsonrpc_begin_result(ctx->request);
@@ -81,15 +82,15 @@ sto_rpc_exec_finish(struct sto_subprocess_ctx *subp_ctx)
 	spdk_json_write_object_end(w);
 	spdk_jsonrpc_end_result(ctx->request, w);
 
-	sto_rpc_free_exec_ctx(ctx);
+	sto_rpc_free_subprocess_ctx(ctx);
 }
 
 static void
-sto_rpc_exec(struct spdk_jsonrpc_request *request,
-	     const struct spdk_json_val *params)
+sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
+		   const struct spdk_json_val *params)
 {
-	struct sto_rpc_exec_ctx *ctx;
-	struct sto_rpc_construct_exec *req;
+	struct sto_rpc_subprocess_ctx *ctx;
+	struct sto_rpc_construct_subprocess *req;
 	struct sto_subprocess *subp;
 	int rc = 0;
 
@@ -102,8 +103,8 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 
 	req = &ctx->req;
 
-	if (spdk_json_decode_object(params, sto_rpc_construct_exec_decoders,
-				    SPDK_COUNTOF(sto_rpc_construct_exec_decoders), req)) {
+	if (spdk_json_decode_object(params, sto_rpc_construct_subprocess_decoders,
+				    SPDK_COUNTOF(sto_rpc_construct_subprocess_decoders), req)) {
 		SPDK_DEBUGLOG(sto_control, "spdk_json_decode_object failed\n");
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
 						 "spdk_json_decode_object failed");
@@ -111,7 +112,7 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 	}
 
 	ctx->request = request;
-	ctx->subp_ctx.subprocess_done = sto_rpc_exec_finish;
+	ctx->subp_ctx.subprocess_done = sto_rpc_subprocess_finish;
 
 	subp = sto_subprocess_create(req->arg_list.args, req->arg_list.num_args, req->capture_output, 0);
 	if (spdk_unlikely(!subp)) {
@@ -133,8 +134,8 @@ free_subp:
 	sto_subprocess_destroy(subp);
 
 free_ctx:
-	sto_rpc_free_exec_ctx(ctx);
+	sto_rpc_free_subprocess_ctx(ctx);
 
 	return;
 }
-SPDK_RPC_REGISTER("sto_exec", sto_rpc_exec, SPDK_RPC_RUNTIME)
+SPDK_RPC_REGISTER("subprocess", sto_rpc_subprocess, SPDK_RPC_RUNTIME)
