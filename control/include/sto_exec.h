@@ -31,4 +31,10 @@ void sto_exec_init_ctx(struct sto_exec_ctx *exec_ctx, struct sto_exec_ops *ops, 
 
 int sto_exec(struct sto_exec_ctx *exec_ctx);
 
+static inline int
+sto_exec_get_result(struct sto_exec_ctx *exec_ctx)
+{
+	return exec_ctx->exitval;
+}
+
 #endif /* _STO_EXEC_H_ */

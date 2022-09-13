@@ -151,7 +151,7 @@ sto_subprocess_exec_done(void *arg)
 	struct sto_subprocess *subp = arg;
 	struct sto_subprocess_ctx *subp_ctx = subp->subp_ctx;
 
-	subp_ctx->returncode = subp->exec_ctx.exitval;
+	subp_ctx->returncode = sto_exec_get_result(&subp->exec_ctx);
 
 	if (subp->capture_output) {
 		ssize_t read_sz;
