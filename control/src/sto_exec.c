@@ -46,9 +46,13 @@ sto_exec_check_child(struct sto_exec_ctx *exec_ctx)
 }
 
 static int
-sto_exec_poll(void *arg)
+sto_exec_poll(void *ctx)
 {
 	struct sto_exec_ctx *exec_ctx, *tmp;
+
+	if (TAILQ_EMPTY(&sto_exec_list)) {
+		return SPDK_POLLER_IDLE;
+	}
 
 	TAILQ_FOREACH_SAFE(exec_ctx, &sto_exec_list, list, tmp) {
 		sto_exec_check_child(exec_ctx);
@@ -59,6 +63,8 @@ sto_exec_poll(void *arg)
 			exec_ctx->ops->exec_done(exec_ctx->priv);
 		}
 	}
+
+	return SPDK_POLLER_BUSY;
 }
 
 int
