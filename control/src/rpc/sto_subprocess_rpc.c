@@ -22,7 +22,7 @@ sto_rpc_decode_subprocess_cmd(const struct spdk_json_val *val, void *out)
 				      &arg_list->num_args, sizeof(char *));
 }
 
-static int
+static void
 sto_rpc_free_subprocess_cmd(struct sto_rpc_subprocess_arg_list *arg_list)
 {
 	ssize_t i;

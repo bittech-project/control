@@ -153,11 +153,9 @@ sto_subprocess_exec_done(void *arg)
 	subp->returncode = sto_exec_get_result(&subp->exec_ctx);
 
 	if (subp->capture_output) {
-		ssize_t read_sz;
-
 		memset(subp->output, 0, sizeof(subp->output));
 
-		read_sz = read(0, subp->output, sizeof(subp->output) - 1);
+		read(0, subp->output, sizeof(subp->output) - 1);
 	}
 
 	subp->subprocess_done(subp);
