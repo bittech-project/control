@@ -10,7 +10,7 @@ SRCS_D += rpc/sto_subprocess_rpc.c
 SPDK_FLAGS = -pthread -Wl,--whole-archive,-Bstatic \
 	$(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB)
 
-CONTROL_CFLAGS += -Wall -O2 -I../include $(SPDK_CFLAGS)
+CONTROL_CFLAGS += -Wall -g -O2 -I../include $(SPDK_CFLAGS)
 
 # Shows how to compile an external application against the SPDK archives.
 all:
