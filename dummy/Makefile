@@ -1,5 +1,5 @@
 CONTROL_ROOT_DIR := $(abspath $(CURDIR)/..)
-include $(CONTROL_ROOT_DIR)/spdk.mk
+include $(CONTROL_ROOT_DIR)/mk/spdk.mk
 
 PROGRAM = dummy
 SRCS_D = main.c
