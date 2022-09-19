@@ -3,20 +3,25 @@ SHELL = /bin/bash
 CONTROL_ROOT_DIR := $(abspath $(CURDIR)/../..)
 include $(CONTROL_ROOT_DIR)/mk/spdk.mk
 
-PROGRAM = control
-SRCS_D = sto_control_app.c sto_exec.c sto_subprocess.c sto_control.c sto_subsystem.c
-SRCS_D += rpc/sto_subprocess_rpc.c
+CFLAGS = -Wall -g -O2 -pthread -I../include $(SPDK_CFLAGS)
+LDFLAGS = -pthread $(SPDK_LDFLAGS) -Wl,--whole-archive,-Bstatic \
+	  $(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB)
 
-SPDK_FLAGS = -pthread -Wl,--whole-archive,-Bstatic \
-	$(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB)
+PROG = control
 
-CONTROL_CFLAGS += -Wall -g -O2 -I../include $(SPDK_CFLAGS)
+C_SRCS = sto_control_app.c sto_exec.c sto_subprocess.c sto_control.c \
+	 sto_subsystem.c rpc/sto_subprocess_rpc.c
+OBJS := ${C_SRCS:.c=.o}
 
-# Shows how to compile an external application against the SPDK archives.
-all:
-	$(CC) $(CONTROL_CFLAGS) $(SRCS_D) $(SPDK_FLAGS) -o $(PROGRAM)
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(CC) $(LDFLAGS) $^ -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(PROGRAM)
+	rm -f $(OBJS) $(PROG)
 
 .PHONY: all clean
