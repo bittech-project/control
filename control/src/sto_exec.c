@@ -1,6 +1,7 @@
 #include <spdk/thread.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
+#include <spdk/string.h>
 
 #include "sto_exec.h"
 
@@ -27,7 +28,7 @@ sto_exec_check_child(struct sto_exec_ctx *exec_ctx)
 				    (int) exec_ctx->pid);
 			exec_ctx->exited = true;
 		} else {
-			SPDK_ERRLOG("waitpid: %s\n", strerror(errno));
+			SPDK_ERRLOG("waitpid: %s\n", spdk_strerror(errno));
 		}
 	} else if (ret == exec_ctx->pid) {
 		if (WIFSIGNALED(status)) {
@@ -127,7 +128,7 @@ sto_exec(struct sto_exec_ctx *exec_ctx)
 
 	pid = fork();
 	if (spdk_unlikely(pid == -1)) {
-		SPDK_ERRLOG("Failed to fork: %s\n", strerror(errno));
+		SPDK_ERRLOG("Failed to fork: %s\n", spdk_strerror(errno));
 		return -errno;
 	}
 

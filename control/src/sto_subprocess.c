@@ -2,6 +2,7 @@
 
 #include <spdk/log.h>
 #include <spdk/likely.h>
+#include <spdk/string.h>
 
 #include <rte_malloc.h>
 
@@ -29,28 +30,28 @@ sto_redirect_to_null(void)
 	fd = open("/dev/null", O_WRONLY);
 	if (spdk_unlikely(fd == -1)) {
 		SPDK_ERRLOG("Failed to open /dev/null: %s\n",
-			    strerror(errno));
+			    spdk_strerror(errno));
 		return -errno;
 	}
 
 	rc = dup2(fd, 1);
 	if (spdk_unlikely(rc == -1)) {
 		SPDK_ERRLOG("Failed to dup2 stdout: %s\n",
-			    strerror(errno));
+			    spdk_strerror(errno));
 		return -errno;
 	}
 
 	rc = dup2(fd, 2);
 	if (spdk_unlikely(rc == -1)) {
 		SPDK_ERRLOG("Failed to dup2 stderr: %s\n",
-			    strerror(errno));
+			    spdk_strerror(errno));
 		return -errno;
 	}
 
 	rc = close(fd);
 	if (spdk_unlikely(rc == -1)) {
 		SPDK_ERRLOG("Failed to close /dev/null: %s",
-			    strerror(errno));
+			    spdk_strerror(errno));
 		return -errno;
 	}
 
@@ -66,7 +67,7 @@ sto_setup_pipe(int pipefd[2], int dir)
 	rc = close(pipefd[!dir]);
 	if (spdk_unlikely(rc == -1)) {
 		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
-			    !dir, strerror(errno));
+			    !dir, spdk_strerror(errno));
 		return -errno;
 	}
 
@@ -74,7 +75,7 @@ sto_setup_pipe(int pipefd[2], int dir)
 	rc = dup2(pipefd[dir], dir);
 	if (spdk_unlikely(rc == -1)) {
 		SPDK_ERRLOG("Failed to child dup2 (pipefd[%d]): %s",
-			    dir, strerror(errno));
+			    dir, spdk_strerror(errno));
 		return -errno;
 	}
 
@@ -82,7 +83,7 @@ sto_setup_pipe(int pipefd[2], int dir)
 	rc = close(pipefd[dir]);
 	if (spdk_unlikely(rc == -1)) {
 		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
-			    dir, strerror(errno));
+			    dir, spdk_strerror(errno));
 		return -errno;
 	}
 
@@ -98,7 +99,7 @@ sto_subprocess_pre_fork(void *arg)
 		int rc = pipe(subp->pipefd);
 		if (spdk_unlikely(rc == -1)) {
 			SPDK_ERRLOG("Failed to create subprocess pipe: %s\n",
-				    strerror(errno));
+				    spdk_strerror(errno));
 			return -errno;
 		}
 	}
@@ -125,7 +126,7 @@ sto_subprocess_exec(void *arg)
 	 */
 	rc = execvp(subp->file, (char *const *) subp->args);
 	if (rc == -1) {
-		SPDK_ERRLOG("Failed to execvp: %s", strerror(errno));
+		SPDK_ERRLOG("Failed to execvp: %s", spdk_strerror(errno));
 	}
 
 	return -errno;

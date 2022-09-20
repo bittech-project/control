@@ -115,7 +115,7 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 	subp = sto_subprocess_alloc(req->arg_list.args, req->arg_list.num_args, req->capture_output);
 	if (spdk_unlikely(!subp)) {
 		SPDK_ERRLOG("Failed to create subprocess\n");
-		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));
+		spdk_jsonrpc_send_error_response(request, -ENOMEM, spdk_strerror(ENOMEM));
 		goto free_ctx;
 	}
 
