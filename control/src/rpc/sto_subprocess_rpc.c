@@ -62,22 +62,30 @@ sto_rpc_free_subprocess_ctx(struct sto_rpc_subprocess_ctx *ctx)
 }
 
 static void
-sto_rpc_subprocess_done(struct sto_subprocess *subp)
+sto_rpc_subprocess_response(struct spdk_jsonrpc_request *request,
+			    struct sto_subprocess *subp)
 {
-	struct sto_rpc_subprocess_ctx *ctx = subp->priv;
 	struct spdk_json_write_ctx *w;
 
-	SPDK_DEBUGLOG(sto_control, "RPC subprocess finish: rc=%d output=%s\n",
-		      subp->returncode, subp->output);
-
-	w = spdk_jsonrpc_begin_result(ctx->request);
+	w = spdk_jsonrpc_begin_result(request);
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_int32(w, "returncode", subp->returncode);
 	spdk_json_write_named_string(w, "output", subp->output);
 
 	spdk_json_write_object_end(w);
-	spdk_jsonrpc_end_result(ctx->request, w);
+	spdk_jsonrpc_end_result(request, w);
+}
+
+static void
+sto_rpc_subprocess_done(struct sto_subprocess *subp)
+{
+	struct sto_rpc_subprocess_ctx *ctx = subp->priv;
+
+	SPDK_DEBUGLOG(sto_control, "RPC subprocess finish: rc=%d output=%s\n",
+		      subp->returncode, subp->output);
+
+	sto_rpc_subprocess_response(ctx->request, subp);
 
 	sto_subprocess_free(subp);
 
