@@ -202,7 +202,7 @@ sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output)
 
 void
 sto_subprocess_init_cb(struct sto_subprocess *subp,
-		       subprocess_done_t *subprocess_done, void *priv)
+		       subprocess_done_t subprocess_done, void *priv)
 {
 	subp->subprocess_done = subprocess_done;
 	subp->priv = priv;

@@ -6,7 +6,7 @@
 #include "sto_exec.h"
 
 struct sto_subprocess;
-typedef void (subprocess_done_t)(struct sto_subprocess *subp);
+typedef void (*subprocess_done_t)(struct sto_subprocess *subp);
 
 struct sto_subprocess {
 	struct sto_exec_ctx exec_ctx;
@@ -19,7 +19,7 @@ struct sto_subprocess {
 	int returncode;
 
 	void *priv;
-	subprocess_done_t *subprocess_done;
+	subprocess_done_t subprocess_done;
 
 	int numargs;
 	const char *file;
@@ -32,7 +32,7 @@ struct sto_subprocess {
 struct sto_subprocess *
 sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output);
 void sto_subprocess_init_cb(struct sto_subprocess *subp,
-			    subprocess_done_t *subprocess_done, void *priv);
+			    subprocess_done_t subprocess_done, void *priv);
 void sto_subprocess_free(struct sto_subprocess *subp);
 
 int sto_subprocess_run(struct sto_subprocess *subp);
