@@ -5,6 +5,7 @@
 #include <spdk/queue.h>
 #include <spdk/likely.h>
 #include <spdk/string.h>
+#include <spdk/env_dpdk.h>
 
 #include "sto_server.h"
 
@@ -33,7 +34,14 @@ struct sto_rpc_method {
 static struct sto_server g_sto_server;
 
 static SLIST_HEAD(, sto_rpc_method) g_rpc_methods = SLIST_HEAD_INITIALIZER(g_rpc_methods);
+static bool g_rpcs_correct = true;
 
+
+static bool
+sto_rpc_verify_methods(void)
+{
+	return g_rpcs_correct;
+}
 
 static struct sto_rpc_method *
 _get_rpc_method(const struct spdk_json_val *method)
@@ -69,7 +77,7 @@ sto_rpc_register_method(const char *method, sto_rpc_method_handler func)
 	m = _get_rpc_method_raw(method);
 	if (m != NULL) {
 		printf("duplicate RPC %s registered...\n", method);
-		/* g_rpcs_correct = false; */
+		g_rpcs_correct = false;
 		return;
 	}
 
@@ -251,6 +259,16 @@ sto_server_start(void)
 		return -EINVAL;
 	}
 
+	if (!sto_rpc_verify_methods()) {
+		printf("FAILED: Some RPC methods has not been registered\n");
+		return -EINVAL;
+	}
+
+	if (!spdk_env_dpdk_external_init()) {
+		printf("FAILED: SPDK has already been initialized\n");
+		return -EINVAL;
+	}
+
 	sto_server_init(&g_sto_server);
 
 	pid = fork();
@@ -269,6 +287,8 @@ sto_server_start(void)
 	g_sto_server.pid = pid;
 	g_sto_server.initialized = true;
 
+	printf("STO server started\n");
+
 	return 0;
 }
 
@@ -277,7 +297,7 @@ sto_server_fini(void)
 {
 	int rc;
 
-	printf("STO server fini\n");
+	printf("STO server start fini\n");
 
 	if (!g_sto_server.initialized) {
 		printf("FAILED: STO exec server has not been initialized yet\n");
@@ -294,4 +314,6 @@ sto_server_fini(void)
 	/* TODO: Wait for child to finish and otherwise send SIGKILL by timeout T */
 
 	g_sto_server.initialized = false;
+
+	printf("STO server end fini\n");
 }
