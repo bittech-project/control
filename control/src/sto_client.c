@@ -7,16 +7,30 @@
 
 #include "sto_client.h"
 
+#define STO_CLIENT_MAX_CONNS	64
 #define STO_CLIENT_POLL_PERIOD	100
 
 struct sto_client {
 	struct spdk_jsonrpc_client *rpc_client;
+
+	TAILQ_ENTRY(sto_client) list;
+};
+
+struct sto_client_group {
+	const char *addr;
+	int addr_family;
+
+	TAILQ_HEAD(, sto_client) free_clients;
+	TAILQ_HEAD(, sto_client) clients;
+
+	struct sto_client clients_array[STO_CLIENT_MAX_CONNS];
+
 	struct spdk_poller *req_poller;
 
 	bool initialized;
 };
 
-static struct sto_client g_sto_client;
+static struct sto_client_group g_sto_client_group;
 
 static SLIST_HEAD(, sto_rpc_request) g_rpc_req_list = SLIST_HEAD_INITIALIZER(sto_rpc_request);
 
@@ -36,36 +50,37 @@ _get_rpc_request(int id)
 }
 
 static int
-sto_client_poll(void *ctx)
+sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 {
-	struct sto_client *sto_client = ctx;
 	struct spdk_jsonrpc_client_response *resp;
 	struct sto_rpc_request *req;
-	int rc, id;
+	int rc = 0, id;
 
-	rc = spdk_jsonrpc_client_poll(sto_client->rpc_client, 0);
+	rc = spdk_jsonrpc_client_poll(client->rpc_client, 0);
 	if (rc == 0 || rc == -ENOTCONN) {
 		/* No response yet */
-		return SPDK_POLLER_BUSY;
+		return 0;
 	}
 
 	if (rc < 0) {
 		/* TODO: What should we do? */
-		return SPDK_POLLER_BUSY;
+		return rc;
 	}
 
-	resp = spdk_jsonrpc_client_get_response(sto_client->rpc_client);
+	resp = spdk_jsonrpc_client_get_response(client->rpc_client);
 	assert(resp);
 
 	/* Check for error response */
 	if (resp->error != NULL) {
 		SPDK_ERRLOG("Get error response\n");
+		rc = -EFAULT; /* FIXME */
 		goto out;
 	}
 
 	rc = spdk_json_decode_int32(resp->id, &id);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to decode request ID\n");
+		rc = -EFAULT; /* FIXME */
 		goto out;
 	}
 
@@ -78,8 +93,31 @@ sto_client_poll(void *ctx)
 
 	req->resp_handler(req, resp);
 
+	TAILQ_REMOVE(&cgroup->clients, client, list);
+	TAILQ_INSERT_HEAD(&cgroup->free_clients, client, list);
 out:
 	spdk_jsonrpc_client_free_response(resp);
+
+	return rc;
+}
+
+static int
+sto_client_group_poll(void *ctx)
+{
+	struct sto_client_group *cgroup = ctx;
+	struct sto_client *client, *tmp;
+	int rc = 0;
+
+	if (TAILQ_EMPTY(&cgroup->clients)) {
+		return SPDK_POLLER_IDLE;
+	}
+
+	TAILQ_FOREACH_SAFE(client, &cgroup->clients, list, tmp) {
+		rc = sto_client_poll(cgroup, client);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Some error during client poll, rc=%d\n", rc);
+		}
+	}
 
 	return SPDK_POLLER_BUSY;
 }
@@ -131,10 +169,14 @@ sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler)
 int
 sto_client_send(struct sto_rpc_request *req)
 {
+	struct sto_client_group *group;
+	struct sto_client *client;
 	struct spdk_jsonrpc_client_request *request;
 	struct spdk_json_write_ctx *w;
 
-	if (spdk_unlikely(!g_sto_client.initialized)) {
+	group = &g_sto_client_group;
+
+	if (spdk_unlikely(!group->initialized)) {
 		SPDK_ERRLOG("FAILED: STO client has been failed to initialize\n");
 		return -EFAULT;
 	}
@@ -162,15 +204,70 @@ sto_client_send(struct sto_rpc_request *req)
 	/* TODO: use a hash table or sorted list */
 	SLIST_INSERT_HEAD(&g_rpc_req_list, req, slist);
 
-	spdk_jsonrpc_client_send_request(g_sto_client.rpc_client, request);
+	client = TAILQ_FIRST(&group->free_clients);
+	assert(client != NULL);
+
+	spdk_jsonrpc_client_send_request(client->rpc_client, request);
+
+	TAILQ_REMOVE(&group->free_clients, client, list);
+	TAILQ_INSERT_TAIL(&group->clients, client, list);
 
 	return 0;
+}
+
+static void sto_client_group_close(struct sto_client_group *group);
+
+static int
+sto_client_group_connect(struct sto_client_group *group)
+{
+	int i;
+
+	TAILQ_INIT(&group->free_clients);
+	TAILQ_INIT(&group->clients);
+
+	for (i = 0; i < STO_CLIENT_MAX_CONNS; i++) {
+		struct spdk_jsonrpc_client *rpc_client;
+
+		rpc_client = spdk_jsonrpc_client_connect(group->addr, group->addr_family);
+		if (spdk_unlikely(!rpc_client)) {
+			SPDK_ERRLOG("spdk_jsonrpc_client_connect() failed: %s\n", spdk_strerror(errno));
+			sto_client_group_close(group);
+			return -errno;
+		}
+
+		group->clients_array[i].rpc_client = rpc_client;
+		TAILQ_INSERT_TAIL(&group->free_clients, &group->clients_array[i], list);
+	}
+
+	return 0;
+}
+
+static void
+sto_client_group_close(struct sto_client_group *group)
+{
+	int i;
+
+	for (i = 0; i < STO_CLIENT_MAX_CONNS; i++) {
+		struct spdk_jsonrpc_client *rpc_client;
+
+		rpc_client = group->clients_array[i].rpc_client;
+
+		if (spdk_unlikely(!rpc_client))
+			break;
+
+		spdk_jsonrpc_client_close(rpc_client);
+	}
 }
 
 int
 sto_client_connect(const char *addr, int addr_family)
 {
-	if (g_sto_client.initialized) {
+	struct sto_client_group *group;
+	int rc;
+
+	group = &g_sto_client_group;
+
+	if (group->initialized) {
 		SPDK_ERRLOG("FAILED: STO client has already been initialized\n");
 		return -EINVAL;
 	}
@@ -178,33 +275,57 @@ sto_client_connect(const char *addr, int addr_family)
 	SPDK_NOTICELOG("STO client connect: addr[%s] family[%d]\n",
 		       addr, addr_family);
 
-	g_sto_client.rpc_client = spdk_jsonrpc_client_connect(addr, addr_family);
-	if (!g_sto_client.rpc_client) {
-		SPDK_ERRLOG("spdk_jsonrpc_client_connect() failed: %s\n", spdk_strerror(errno));
-		return -errno;
+	memset(group, 0, sizeof(*group));
+
+	group->addr = strdup(addr);
+	if (spdk_unlikely(!group->addr)) {
+		SPDK_ERRLOG("Cannot allocate memory for addr %s\n", addr);
+		return -ENOMEM;
 	}
 
-	g_sto_client.req_poller = SPDK_POLLER_REGISTER(sto_client_poll, &g_sto_client, STO_CLIENT_POLL_PERIOD);
-	if (spdk_unlikely(!g_sto_client.req_poller)) {
+	group->addr_family = addr_family;
+
+	rc = sto_client_group_connect(group);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to connect client group: rc=%d\n", rc);
+		goto free_addr;
+	}
+
+	group->req_poller = SPDK_POLLER_REGISTER(sto_client_group_poll, group, STO_CLIENT_POLL_PERIOD);
+	if (spdk_unlikely(!group->req_poller)) {
 		SPDK_ERRLOG("Cann't register the STO client poller\n");
-		spdk_jsonrpc_client_close(g_sto_client.rpc_client);
-		return -EFAULT;
+		rc = -ENOMEM;
+		goto close_clients;
 	}
 
-	g_sto_client.initialized = true;
+	group->initialized = true;
 
 	return 0;
+
+close_clients:
+	sto_client_group_close(group);
+
+free_addr:
+	free((char *) group->addr);
+
+	return rc;
 }
 
 void
 sto_client_close(void)
 {
-	if (!g_sto_client.initialized) {
+	struct sto_client_group *group;
+
+	group = &g_sto_client_group;
+
+	if (!group->initialized) {
 		SPDK_ERRLOG("FAILED: STO client has not been initialized yet\n");
 		return;
 	}
 
-	spdk_poller_unregister(&g_sto_client.req_poller);
-	spdk_jsonrpc_client_close(g_sto_client.rpc_client);
-	g_sto_client.initialized = false;
+	spdk_poller_unregister(&group->req_poller);
+	sto_client_group_close(group);
+	free((char *) group->addr);
+
+	group->initialized = false;
 }
