@@ -9,10 +9,10 @@
 
 #define STO_CLIENT_POLL_PERIOD	100
 
-static struct spdk_poller *sto_client_poller;
-
 struct sto_client {
 	struct spdk_jsonrpc_client *rpc_client;
+	struct spdk_poller *req_poller;
+
 	bool initialized;
 };
 
@@ -184,8 +184,8 @@ sto_client_connect(const char *addr, int addr_family)
 		return -errno;
 	}
 
-	sto_client_poller = SPDK_POLLER_REGISTER(sto_client_poll, &g_sto_client, STO_CLIENT_POLL_PERIOD);
-	if (spdk_unlikely(!sto_client_poller)) {
+	g_sto_client.req_poller = SPDK_POLLER_REGISTER(sto_client_poll, &g_sto_client, STO_CLIENT_POLL_PERIOD);
+	if (spdk_unlikely(!g_sto_client.req_poller)) {
 		SPDK_ERRLOG("Cann't register the STO client poller\n");
 		spdk_jsonrpc_client_close(g_sto_client.rpc_client);
 		return -EFAULT;
@@ -204,7 +204,7 @@ sto_client_close(void)
 		return;
 	}
 
-	spdk_poller_unregister(&sto_client_poller);
+	spdk_poller_unregister(&g_sto_client.req_poller);
 	spdk_jsonrpc_client_close(g_sto_client.rpc_client);
 	g_sto_client.initialized = false;
 }
