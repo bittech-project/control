@@ -3,7 +3,8 @@
 #include <spdk/json.h>
 
 #include "sto_subsystem.h"
-#include "sto_exec.h"
+#include "sto_client.h"
+#include "sto_server.h"
 
 static spdk_sto_init_cb g_init_cb_fn = NULL;
 static void *g_init_cb_arg = NULL;
@@ -32,9 +33,9 @@ spdk_sto_init(spdk_sto_init_cb cb_fn, void *cb_arg)
 	g_init_cb_fn = cb_fn;
 	g_init_cb_arg = cb_arg;
 
-	rc = sto_exec_init();
+	rc = sto_client_connect(STO_DEFAULT_SERVER_ADDR, AF_UNIX);
 	if (rc < 0) {
-		SPDK_ERRLOG("sto_exec_init() failed, rc=%d\n", rc);
+		SPDK_ERRLOG("sto_client_connect() failed, rc=%d\n", rc);
 		sto_init_complete(-1);
 		return;
 	}
@@ -54,7 +55,7 @@ spdk_sto_fini(spdk_sto_fini_cb cb_fn, void *cb_arg)
 	g_fini_cb_fn = cb_fn;
 	g_fini_cb_arg = cb_arg;
 
-	sto_exec_exit();
+	sto_client_close();
 
 	sto_fini_done();
 }

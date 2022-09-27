@@ -1,5 +1,8 @@
 #include <spdk/event.h>
 #include <spdk/log.h>
+#include <spdk/likely.h>
+
+#include "sto_server.h"
 
 /*
  * Usage function for printing parameters that are specific to this application
@@ -33,6 +36,12 @@ main(int argc, char **argv)
 	struct spdk_app_opts opts = {};
 	int rc = 0;
 
+	rc = sto_server_start();
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to start server, rc=%d\n", rc);
+		return rc;
+	}
+
 	/* Set default values in opts structure. */
 	spdk_app_opts_init(&opts, sizeof(opts));
 	opts.name = "control";
@@ -64,5 +73,8 @@ main(int argc, char **argv)
 
 	/* Gracefully close out all of the SPDK subsystems. */
 	spdk_app_fini();
+
+	sto_server_fini();
+
 	return rc;
 }

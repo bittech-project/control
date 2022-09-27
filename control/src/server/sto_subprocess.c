@@ -1,24 +1,17 @@
 #include <spdk/stdinc.h>
 
-#include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/string.h>
-
-#include <rte_malloc.h>
 
 #include "sto_subprocess.h"
 #include "sto_exec.h"
 
-static int sto_subprocess_pre_fork(void *arg);
 static int sto_subprocess_exec(void *arg);
-static int sto_subprocess_post_fork(void *arg, pid_t pid);
-static void sto_subprocess_exec_done(void *arg);
+static void sto_subprocess_exec_done(void *arg, int rc);
 
 static struct sto_exec_ops subprocess_ops = {
 	.name = "subprocess",
-	.pre_fork = sto_subprocess_pre_fork,
 	.exec = sto_subprocess_exec,
-	.post_fork = sto_subprocess_post_fork,
 	.exec_done = sto_subprocess_exec_done,
 };
 
@@ -29,29 +22,29 @@ sto_redirect_to_null(void)
 
 	fd = open("/dev/null", O_WRONLY);
 	if (spdk_unlikely(fd == -1)) {
-		SPDK_ERRLOG("Failed to open /dev/null: %s\n",
-			    spdk_strerror(errno));
+		printf("Failed to open /dev/null: %s\n",
+		       spdk_strerror(errno));
 		return -errno;
 	}
 
 	rc = dup2(fd, 1);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to dup2 stdout: %s\n",
-			    spdk_strerror(errno));
+		printf("Failed to dup2 stdout: %s\n",
+		       spdk_strerror(errno));
 		return -errno;
 	}
 
 	rc = dup2(fd, 2);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to dup2 stderr: %s\n",
-			    spdk_strerror(errno));
+		printf("Failed to dup2 stderr: %s\n",
+		       spdk_strerror(errno));
 		return -errno;
 	}
 
 	rc = close(fd);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to close /dev/null: %s",
-			    spdk_strerror(errno));
+		printf("Failed to close /dev/null: %s",
+		       spdk_strerror(errno));
 		return -errno;
 	}
 
@@ -66,24 +59,24 @@ sto_setup_pipe(int pipefd[2], int dir)
 	/* close read/write end of pipe */
 	rc = close(pipefd[!dir]);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
-			    !dir, spdk_strerror(errno));
+		printf("Failed to child close (pipefd[%d]): %s",
+		       !dir, spdk_strerror(errno));
 		return -errno;
 	}
 
 	/* make 0/1 same as read/write-to end of pipe */
 	rc = dup2(pipefd[dir], dir);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to child dup2 (pipefd[%d]): %s",
-			    dir, spdk_strerror(errno));
+		printf("Failed to child dup2 (pipefd[%d]): %s",
+		       dir, spdk_strerror(errno));
 		return -errno;
 	}
 
 	/* close excess fildes */
 	rc = close(pipefd[dir]);
 	if (spdk_unlikely(rc == -1)) {
-		SPDK_ERRLOG("Failed to child close (pipefd[%d]): %s",
-			    dir, spdk_strerror(errno));
+		printf("Failed to child close (pipefd[%d]): %s",
+		       dir, spdk_strerror(errno));
 		return -errno;
 	}
 
@@ -91,67 +84,95 @@ sto_setup_pipe(int pipefd[2], int dir)
 }
 
 static int
-sto_subprocess_pre_fork(void *arg)
+sto_subprocess_wait(pid_t pid, int *result)
 {
-	struct sto_subprocess *subp = arg;
+	int ret, status;
 
-	if (subp->capture_output) {
-		int rc = pipe(subp->pipefd);
-		if (spdk_unlikely(rc == -1)) {
-			SPDK_ERRLOG("Failed to create subprocess pipe: %s\n",
-				    spdk_strerror(errno));
-			return -errno;
-		}
+	ret = waitpid(pid, &status, 0);
+	if (ret == -1) {
+		printf("waitpid: %s\n", strerror(errno));
+		return -errno;
 	}
 
-	return 0;
+	if (WIFSIGNALED(status)) {
+		*result = WTERMSIG(status);
+		return -EINTR;
+	}
+
+	if (WIFEXITED(status)) {
+		if (WEXITSTATUS(status)) {
+			*result = WEXITSTATUS(status);
+		}
+
+		return 0;
+	}
+
+	return -EFAULT;
 }
 
 static int
 sto_subprocess_exec(void *arg)
 {
 	struct sto_subprocess *subp = arg;
-	int rc = 0;
+	pid_t pid;
+	int rc, result = 0;
 
 	if (subp->capture_output) {
-		rc = sto_setup_pipe(subp->pipefd, STDOUT_FILENO);
-	} else {
-		sto_redirect_to_null();
+		int rc = pipe(subp->pipefd);
+		if (spdk_unlikely(rc == -1)) {
+			printf("Failed to create subprocess pipe: %s\n",
+			       spdk_strerror(errno));
+			return -errno;
+		}
 	}
 
-	/*
-	 * execvp() takes (char *const *) for backward compatibility,
-	 * but POSIX guarantees that it will not modify the strings,
-	 * so the cast is safe
-	 */
-	rc = execvp(subp->file, (char *const *) subp->args);
-	if (rc == -1) {
-		SPDK_ERRLOG("Failed to execvp: %s", spdk_strerror(errno));
+	pid = fork();
+	if (spdk_unlikely(pid == -1)) {
+		printf("Failed to fork: %s\n", spdk_strerror(errno));
+		return -errno;
 	}
 
-	return -errno;
-}
+	/* Child */
+	if (!pid) {
+		if (subp->capture_output) {
+			rc = sto_setup_pipe(subp->pipefd, STDOUT_FILENO);
+		} else {
+			sto_redirect_to_null();
+		}
 
-static int
-sto_subprocess_post_fork(void *arg, pid_t pid)
-{
-	struct sto_subprocess *subp = arg;
-	int rc = 0;
+		/*
+		 * execvp() takes (char *const *) for backward compatibility,
+		 * but POSIX guarantees that it will not modify the strings,
+		 * so the cast is safe
+		 */
+		rc = execvp(subp->file, (char *const *) subp->args);
+		if (rc == -1) {
+			printf("Failed to execvp: %s", strerror(errno));
+		}
+
+		exit(-errno);
+	}
 
 	/* Parent */
-	if (pid && subp->capture_output) {
+	if (subp->capture_output) {
 		rc = sto_setup_pipe(subp->pipefd, STDIN_FILENO);
 	}
+
+	rc = sto_subprocess_wait(pid, &result);
+	if (spdk_unlikely(rc)) {
+		printf("Failed to wait for child process pid=%d, rc=%d\n",
+		       pid, rc);
+	}
+
+	subp->returncode = result;
 
 	return rc;
 }
 
 static void
-sto_subprocess_exec_done(void *arg)
+sto_subprocess_exec_done(void *arg, int rc)
 {
 	struct sto_subprocess *subp = arg;
-
-	subp->returncode = sto_exec_get_result(&subp->exec_ctx);
 
 	if (subp->capture_output) {
 		memset(subp->output, 0, sizeof(subp->output));
@@ -171,16 +192,16 @@ sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output)
 	int i;
 
 	if (spdk_unlikely(!numargs)) {
-		SPDK_ERRLOG("Too few arguments\n");
+		printf("Too few arguments\n");
 		return NULL;
 	}
 
 	/* Count the number of bytes for the 'real_numargs' arguments to be allocated */
 	data_len = real_numargs * sizeof(char *);
 
-	subp = rte_zmalloc(NULL, sizeof(*subp) + data_len, 0);
+	subp = calloc(1, sizeof(*subp) + data_len);
 	if (spdk_unlikely(!subp)) {
-		SPDK_ERRLOG("Cann't allocate memory for subprocess\n");
+		printf("Cann't allocate memory for subprocess\n");
 		return NULL;
 	}
 
@@ -211,7 +232,7 @@ sto_subprocess_init_cb(struct sto_subprocess *subp,
 void
 sto_subprocess_free(struct sto_subprocess *subp)
 {
-	rte_free(subp);
+	free(subp);
 }
 
 int
