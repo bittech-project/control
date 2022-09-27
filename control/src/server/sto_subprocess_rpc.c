@@ -2,6 +2,7 @@
 #include <spdk/util.h>
 
 #include "sto_server.h"
+#include "sto_subprocess.h"
 
 #define STO_SUBPROCESS_MAX_ARGS 256
 
@@ -59,15 +60,32 @@ sto_rpc_free_subprocess_ctx(struct sto_rpc_subprocess_ctx *ctx)
 }
 
 static void
-sto_rpc_subprocess_response(struct spdk_jsonrpc_request *request)
+sto_rpc_subprocess_response(struct sto_subprocess *subp, struct spdk_jsonrpc_request *request)
 {
 	struct spdk_json_write_ctx *w;
 
 	w = spdk_jsonrpc_begin_result(request);
 
-	spdk_json_write_string(w, "GLEB");
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_int32(w, "returncode", subp->returncode);
+	spdk_json_write_named_string(w, "output", subp->output);
+
+	spdk_json_write_object_end(w);
 
 	spdk_jsonrpc_end_result(request, w);
+}
+
+static void
+sto_rpc_subprocess_done(struct sto_subprocess *subp)
+{
+	struct sto_rpc_subprocess_ctx *ctx = subp->priv;
+
+	sto_rpc_subprocess_response(subp, ctx->request);
+
+	sto_subprocess_free(subp);
+
+	sto_rpc_free_subprocess_ctx(ctx);
 }
 
 static void
@@ -76,6 +94,8 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 {
 	struct sto_rpc_subprocess_ctx *ctx;
 	struct sto_rpc_construct_subprocess *req;
+	struct sto_subprocess *subp;
+	int rc;
 
 	ctx = calloc(1, sizeof(*ctx));
 	if (spdk_unlikely(!ctx)) {
@@ -95,7 +115,26 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 
 	ctx->request = request;
 
-	sto_rpc_subprocess_response(ctx->request);
+	subp = sto_subprocess_alloc(req->arg_list.args, req->arg_list.num_args, req->capture_output);
+	if (spdk_unlikely(!subp)) {
+		printf("Failed to create subprocess\n");
+		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
+		goto free_ctx;
+	}
+
+	sto_subprocess_init_cb(subp, sto_rpc_subprocess_done, ctx);
+
+	rc = sto_subprocess_run(subp);
+	if (spdk_unlikely(rc)) {
+		printf("Failed to run subprocess\n");
+		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
+		goto free_subp;
+	}
+
+	return;
+
+free_subp:
+	sto_subprocess_free(subp);
 
 free_ctx:
 	sto_rpc_free_subprocess_ctx(ctx);

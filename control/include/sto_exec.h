@@ -1,6 +1,8 @@
 #ifndef _STO_EXEC_H_
 #define _STO_EXEC_H_
 
+#include <spdk/queue.h>
+
 struct sto_exec_ops {
 	const char *name;
 
