@@ -252,8 +252,9 @@ sto_client_group_close(struct sto_client_group *group)
 
 		rpc_client = group->clients_array[i].rpc_client;
 
-		if (spdk_unlikely(!rpc_client))
+		if (spdk_unlikely(!rpc_client)) {
 			break;
+		}
 
 		spdk_jsonrpc_client_close(rpc_client);
 	}

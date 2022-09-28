@@ -31,9 +31,9 @@ struct sto_subprocess {
 
 struct sto_subprocess *
 sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output);
+void sto_subprocess_free(struct sto_subprocess *subp);
 void sto_subprocess_init_cb(struct sto_subprocess *subp,
 			    subprocess_done_t subprocess_done, void *priv);
-void sto_subprocess_free(struct sto_subprocess *subp);
 
 int sto_subprocess_run(struct sto_subprocess *subp);
 

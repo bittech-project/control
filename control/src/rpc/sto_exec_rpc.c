@@ -98,7 +98,7 @@ __resp_handler(struct sto_rpc_request *req, struct spdk_jsonrpc_client_response 
 		goto out;
 	}
 
-	SPDK_NOTICELOG("GLEB: Get result from response: returncode[%d] output: %s\n",
+	SPDK_NOTICELOG("GLEB: EXEC: Get result from response: returncode[%d] output: %s\n",
 		       result.returncode, result.output);
 
 	sto_rpc_exec_response(ctx->request);

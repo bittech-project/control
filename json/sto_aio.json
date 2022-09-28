@@ -1,0 +1,17 @@
+{
+  "subsystems": [
+    {
+      "subsystem": "sto_control",
+      "config": [
+        {
+          "method": "aio",
+          "params": {
+            "filename": "/root/gleb/bittech/control/Makefile",
+            "size": 50,
+            "rw": 0
+          }
+        }
+      ]
+    }
+  ]
+}

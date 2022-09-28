@@ -13,10 +13,10 @@ void sto_server_fini(void);
 
 void sto_rpc_register_method(const char *method, sto_rpc_method_handler func);
 
-#define STO_RPC_REGISTER(method, func) \
-static void __attribute__((constructor(1000))) rpc_register_##func(void) \
-{ \
-	sto_rpc_register_method(method, func); \
+#define STO_RPC_REGISTER(method, func)					\
+static void __attribute__((constructor(1000))) rpc_register_##func(void)\
+{									\
+	sto_rpc_register_method(method, func); 				\
 }
 
 #endif /* _STO_SERVER_H_ */
