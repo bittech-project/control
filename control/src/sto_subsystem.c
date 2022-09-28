@@ -33,7 +33,7 @@ spdk_sto_init(spdk_sto_init_cb cb_fn, void *cb_arg)
 	g_init_cb_fn = cb_fn;
 	g_init_cb_arg = cb_arg;
 
-	rc = sto_client_connect(STO_DEFAULT_SERVER_ADDR, AF_UNIX);
+	rc = sto_client_connect(STO_LOCAL_SERVER_ADDR, AF_UNIX);
 	if (rc < 0) {
 		SPDK_ERRLOG("sto_client_connect() failed, rc=%d\n", rc);
 		sto_init_complete(-1);

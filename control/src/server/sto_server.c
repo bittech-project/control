@@ -32,6 +32,7 @@ struct sto_rpc_method {
 };
 
 static struct sto_server g_sto_server;
+static bool g_server_is_running;
 
 static SLIST_HEAD(, sto_rpc_method) g_rpc_methods = SLIST_HEAD_INITIALIZER(g_rpc_methods);
 static bool g_rpcs_correct = true;
@@ -204,6 +205,8 @@ spdk_server_close(struct sto_server *s)
 		unlink(s->lock_path);
 		s->lock_path[0] = '\0';
 	}
+
+	printf("STO server close\n");
 }
 
 static int
@@ -211,17 +214,68 @@ sto_server_accept_loop(struct sto_server *s)
 {
 	int rc = 0;
 
-	while (1) {
+	while (g_server_is_running) {
 		rc = spdk_jsonrpc_server_poll(s->s);
 	}
 
 	return rc;
 }
 
+static void
+sig_int(int sig)
+{
+	/* Just ignore for now */
+}
+
+static void
+sig_term(int sig)
+{
+	g_server_is_running = false;
+}
+
+static int
+set_sig_handlers(void)
+{
+	struct sigaction act;
+	int rc;
+
+	memset(&act, 0, sizeof(act));
+	act.sa_handler = sig_int;
+	act.sa_flags = SA_RESTART;
+
+	rc = sigaction(SIGINT, &act, NULL);
+	if (spdk_unlikely(rc == -1)) {
+		printf("Failed to set SIGINT handler\n");
+		return -errno;
+	}
+
+	memset(&act, 0, sizeof(act));
+	act.sa_handler = sig_term;
+	act.sa_flags = SA_RESTART;
+
+	rc = sigaction(SIGTERM, &act, NULL);
+	if (spdk_unlikely(rc == -1)) {
+		printf("Failed to set SIGTERM handler\n");
+		return -errno;
+	}
+
+	return 0;
+}
+
 static int
 sto_server_run(struct sto_server *s)
 {
 	int rc = 0;
+
+	printf("STO server run\n");
+
+	g_server_is_running = true;
+
+	rc = set_sig_handlers();
+	if (spdk_unlikely(rc)) {
+		printf("Failed to set signal handlers: %d\n", rc);
+		return rc;
+	}
 
 	rc = sto_server_listen(s);
 	if (spdk_unlikely(rc)) {
@@ -241,7 +295,7 @@ sto_server_init(struct sto_server *s)
 {
 	memset(s, 0, sizeof(*s));
 
-	s->listen_addr = STO_DEFAULT_SERVER_ADDR;
+	s->listen_addr = STO_LOCAL_SERVER_ADDR;
 	s->lock_path[0] = '\0';
 	s->lock_fd = -1;
 }
@@ -295,7 +349,7 @@ sto_server_start(void)
 void
 sto_server_fini(void)
 {
-	int rc;
+	int rc, status;
 
 	printf("STO server start fini\n");
 
@@ -307,11 +361,11 @@ sto_server_fini(void)
 	rc = kill(g_sto_server.pid, SIGTERM);
 	if (rc == -1) {
 		printf("FAILED: to send SIGTERM to the server: %s\n",
-		       spdk_strerror(errno));
+		       strerror(errno));
 		return;
 	}
 
-	/* TODO: Wait for child to finish and otherwise send SIGKILL by timeout T */
+	rc = waitpid(g_sto_server.pid, &status, 0);
 
 	g_sto_server.initialized = false;
 
