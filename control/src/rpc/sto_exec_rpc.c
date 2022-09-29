@@ -115,7 +115,7 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 	subp = sto_subprocess_alloc(exec_params->arg_list.args, exec_params->arg_list.numargs,
 				    exec_params->capture_output);
 	if (spdk_unlikely(!subp)) {
-		printf("Failed to create subprocess\n");
+		SPDK_ERRLOG("Failed to create subprocess\n");
 		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
 		goto free_req;
 	}
@@ -124,7 +124,7 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 
 	rc = sto_subprocess_run(subp);
 	if (spdk_unlikely(rc)) {
-		printf("Failed to run subprocess\n");
+		SPDK_ERRLOG("Failed to run subprocess\n");
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
 		goto free_subp;
 	}
