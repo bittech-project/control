@@ -4,7 +4,7 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include "sto_client.h"
+#include "sto_subprocess_front.h"
 
 #define STO_EXEC_MAX_ARGS 256
 
@@ -60,18 +60,8 @@ sto_exec_free_req(struct sto_exec_req *req)
 	free(req);
 }
 
-struct sto_exec_result {
-	int returncode;
-	char *output;
-};
-
-static const struct spdk_json_object_decoder sto_exec_result_decoders[] = {
-	{"returncode", offsetof(struct sto_exec_result, returncode), spdk_json_decode_int32},
-	{"output", offsetof(struct sto_exec_result, output), spdk_json_decode_string},
-};
-
 static void
-sto_exec_response(struct spdk_jsonrpc_request *request)
+sto_exec_response(struct sto_subprocess *subp, struct spdk_jsonrpc_request *request)
 {
 	struct spdk_json_write_ctx *w;
 
@@ -83,49 +73,15 @@ sto_exec_response(struct spdk_jsonrpc_request *request)
 }
 
 static void
-__resp_handler(struct sto_rpc_request *rpc_req, struct spdk_jsonrpc_client_response *resp)
+sto_subprocess_done(struct sto_subprocess *subp)
 {
-	struct sto_exec_req *req = rpc_req->priv;
-	struct sto_exec_result result;
+	struct sto_exec_req *req = subp->priv;
 
-	memset(&result, 0, sizeof(result));
+	sto_exec_response(subp, req->request);
 
-	if (spdk_json_decode_object(resp->result, sto_exec_result_decoders,
-				    SPDK_COUNTOF(sto_exec_result_decoders), &result)) {
-		spdk_jsonrpc_send_error_response(req->request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "spdk_json_decode_object failed");
-		goto out;
-	}
-
-	SPDK_NOTICELOG("GLEB: EXEC: Get result from response: returncode[%d] output: %s\n",
-		       result.returncode, result.output);
-
-	sto_exec_response(req->request);
-
-out:
-	sto_rpc_req_free(rpc_req);
+	sto_subprocess_free(subp);
 
 	sto_exec_free_req(req);
-}
-
-static void
-sto_exec_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_ctx *w)
-{
-	struct sto_exec_req *req = rpc_req->priv;
-	struct sto_exec_params *params = &req->params;
-	int i;
-
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_array_begin(w, "cmd");
-	for (i = 0; i < params->arg_list.numargs; i++) {
-		spdk_json_write_string(w, params->arg_list.args[i]);
-	}
-	spdk_json_write_array_end(w);
-
-	spdk_json_write_named_bool(w, "capture_output", params->capture_output);
-
-	spdk_json_write_object_end(w);
 }
 
 static void
@@ -134,7 +90,8 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 {
 	struct sto_exec_req *req;
 	struct sto_exec_params *exec_params;
-	struct sto_rpc_request *rpc_req;
+	struct sto_subprocess *subp;
+	int rc;
 
 	req = calloc(1, sizeof(*req));
 	if (spdk_unlikely(!req)) {
@@ -155,14 +112,27 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 
 	req->request = request;
 
-	rpc_req = sto_rpc_req_alloc("subprocess", sto_exec_info_json, req);
-	assert(rpc_req);
+	subp = sto_subprocess_alloc(exec_params->arg_list.args, exec_params->arg_list.numargs,
+				    exec_params->capture_output);
+	if (spdk_unlikely(!subp)) {
+		printf("Failed to create subprocess\n");
+		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
+		goto free_req;
+	}
 
-	sto_rpc_req_init_cb(rpc_req, __resp_handler);
+	sto_subprocess_init_cb(subp, sto_subprocess_done, req);
 
-	sto_client_send(rpc_req);
+	rc = sto_subprocess_run(subp);
+	if (spdk_unlikely(rc)) {
+		printf("Failed to run subprocess\n");
+		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
+		goto free_subp;
+	}
 
 	return;
+
+free_subp:
+	sto_subprocess_free(subp);
 
 free_req:
 	sto_exec_free_req(req);
