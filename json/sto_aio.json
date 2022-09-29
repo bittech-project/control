@@ -4,11 +4,17 @@
       "subsystem": "sto_control",
       "config": [
         {
-          "method": "aio",
+          "method": "aio_write",
           "params": {
-            "filename": "/root/gleb/bittech/control/Makefile",
-            "size": 50,
-            "rw": 0
+            "filename": "/root/gleb/bittech/control/test",
+            "buf": "Hello world"
+          }
+        },
+        {
+          "method": "aio_read",
+          "params": {
+            "filename": "/root/gleb/bittech/control/test",
+            "size": 50
           }
         }
       ]

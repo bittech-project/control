@@ -82,7 +82,7 @@ sto_read(int fd, void *data, size_t size)
 	while (size) {
 		ret = read(fd, data, size);
 		if (ret == -1) {
-			if (errno == EAGAIN || errno == EINTR) {
+			if (errno == EINTR) {
 				continue;
 			}
 
@@ -106,8 +106,31 @@ sto_read(int fd, void *data, size_t size)
 int
 sto_write(int fd, void *data, size_t size)
 {
-	/* TODO */
-	return 0;
+	ssize_t ret;
+	int rc = 0;
+
+	while (size) {
+		ret = write(fd, data, size);
+		if (ret == -1) {
+			if (errno == EINTR) {
+				continue;
+			}
+
+			printf("Failed to write to %d fd: %s\n",
+			       fd, strerror(errno));
+			rc = -errno;
+			break;
+		}
+
+		if (!ret) {
+			break;
+		}
+
+		data += ret;
+		size -= ret;
+	}
+
+	return rc;
 }
 
 int
@@ -138,7 +161,25 @@ sto_read_data(const char *filename, void *data, size_t size)
 int
 sto_write_data(const char *filename, void *data, size_t size)
 {
-	/* TODO */
+	int fd, rc;
+
+	fd = open(filename, O_WRONLY);
+	if (spdk_unlikely(fd == -1)) {
+		printf("Failed to open %s file\n", filename);
+		return -errno;
+	}
+
+	rc = sto_write(fd, data, size);
+	if (spdk_unlikely(rc)) {
+		printf("Failed to write %s file\n", filename);
+		return rc;
+	}
+
+	rc = close(fd);
+	if (spdk_unlikely(rc == -1)) {
+		printf("Failed to close %s file\n", filename);
+	}
+
 	return 0;
 }
 
