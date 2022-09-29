@@ -155,7 +155,7 @@ sto_aio_write_response(struct sto_aio *aio, struct sto_aio_write_req *req)
 static void
 sto_aio_write_end_io(struct sto_aio *aio)
 {
-	struct sto_aio_write_req *req= aio->priv;
+	struct sto_aio_write_req *req = aio->priv;
 
 	sto_aio_write_response(aio, req);
 

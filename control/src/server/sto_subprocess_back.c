@@ -1,18 +1,17 @@
 #include <spdk/stdinc.h>
 
 #include <spdk/likely.h>
-#include <spdk/string.h>
 
-#include "sto_subprocess.h"
+#include "sto_subprocess_back.h"
 #include "sto_exec.h"
 
-static int sto_subprocess_exec(void *arg);
-static void sto_subprocess_exec_done(void *arg, int rc);
+static int sto_subprocess_back_exec(void *arg);
+static void sto_subprocess_back_exec_done(void *arg, int rc);
 
-static struct sto_exec_ops subprocess_ops = {
+static struct sto_exec_ops subprocess_back_ops = {
 	.name = "subprocess",
-	.exec = sto_subprocess_exec,
-	.exec_done = sto_subprocess_exec_done,
+	.exec = sto_subprocess_back_exec,
+	.exec_done = sto_subprocess_back_exec_done,
 };
 
 static int
@@ -84,7 +83,7 @@ __setup_child_pipe(int pipefd[2])
 }
 
 static int
-sto_subprocess_wait(pid_t pid, int *result)
+sto_subprocess_back_wait(pid_t pid, int *result)
 {
 	int ret, status;
 
@@ -111,9 +110,9 @@ sto_subprocess_wait(pid_t pid, int *result)
 }
 
 static int
-sto_subprocess_exec(void *arg)
+sto_subprocess_back_exec(void *arg)
 {
-	struct sto_subprocess *subp = arg;
+	struct sto_subprocess_back *subp = arg;
 	pid_t pid;
 	int rc, result = 0;
 
@@ -154,7 +153,7 @@ sto_subprocess_exec(void *arg)
 	}
 
 	/* Parent */
-	rc = sto_subprocess_wait(pid, &result);
+	rc = sto_subprocess_back_wait(pid, &result);
 	if (spdk_unlikely(rc)) {
 		printf("Failed to wait for child process pid=%d, rc=%d\n",
 		       pid, rc);
@@ -166,9 +165,9 @@ sto_subprocess_exec(void *arg)
 }
 
 static void
-sto_subprocess_exec_done(void *arg, int rc)
+sto_subprocess_back_exec_done(void *arg, int rc)
 {
-	struct sto_subprocess *subp = arg;
+	struct sto_subprocess_back *subp = arg;
 
 	if (subp->capture_output) {
 		memset(subp->output, 0, sizeof(subp->output));
@@ -176,13 +175,13 @@ sto_subprocess_exec_done(void *arg, int rc)
 		read(subp->pipefd[STDIN_FILENO], subp->output, sizeof(subp->output) - 1);
 	}
 
-	subp->subprocess_done(subp);
+	subp->subprocess_back_done(subp);
 }
 
-struct sto_subprocess *
-sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output)
+struct sto_subprocess_back *
+sto_subprocess_back_alloc(const char *const argv[], int numargs, bool capture_output)
 {
-	struct sto_subprocess *subp;
+	struct sto_subprocess_back *subp;
 	unsigned int data_len;
 	int real_numargs = numargs + 1; /* Plus one for the NULL terminator at the end */
 	int i;
@@ -201,7 +200,7 @@ sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output)
 		return NULL;
 	}
 
-	sto_exec_init_ctx(&subp->exec_ctx, &subprocess_ops, subp);
+	sto_exec_init_ctx(&subp->exec_ctx, &subprocess_back_ops, subp);
 
 	subp->capture_output = capture_output;
 	subp->numargs = real_numargs;
@@ -218,21 +217,21 @@ sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output)
 }
 
 void
-sto_subprocess_init_cb(struct sto_subprocess *subp,
-		       subprocess_done_t subprocess_done, void *priv)
+sto_subprocess_back_init_cb(struct sto_subprocess_back *subp,
+			    subprocess_back_done_t subprocess_back_done, void *priv)
 {
-	subp->subprocess_done = subprocess_done;
+	subp->subprocess_back_done = subprocess_back_done;
 	subp->priv = priv;
 }
 
 void
-sto_subprocess_free(struct sto_subprocess *subp)
+sto_subprocess_back_free(struct sto_subprocess_back *subp)
 {
 	free(subp);
 }
 
 int
-sto_subprocess_run(struct sto_subprocess *subp)
+sto_subprocess_back_run(struct sto_subprocess_back *subp)
 {
 	int rc = 0;
 

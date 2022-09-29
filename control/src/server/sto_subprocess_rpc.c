@@ -2,7 +2,7 @@
 #include <spdk/util.h>
 
 #include "sto_server.h"
-#include "sto_subprocess.h"
+#include "sto_subprocess_back.h"
 
 #define STO_SUBPROCESS_MAX_ARGS 256
 
@@ -60,7 +60,7 @@ sto_rpc_free_subprocess_ctx(struct sto_rpc_subprocess_ctx *ctx)
 }
 
 static void
-sto_rpc_subprocess_response(struct sto_subprocess *subp, struct spdk_jsonrpc_request *request)
+sto_rpc_subprocess_response(struct sto_subprocess_back *subp, struct spdk_jsonrpc_request *request)
 {
 	struct spdk_json_write_ctx *w;
 
@@ -77,13 +77,13 @@ sto_rpc_subprocess_response(struct sto_subprocess *subp, struct spdk_jsonrpc_req
 }
 
 static void
-sto_rpc_subprocess_done(struct sto_subprocess *subp)
+sto_rpc_subprocess_done(struct sto_subprocess_back *subp)
 {
 	struct sto_rpc_subprocess_ctx *ctx = subp->priv;
 
 	sto_rpc_subprocess_response(subp, ctx->request);
 
-	sto_subprocess_free(subp);
+	sto_subprocess_back_free(subp);
 
 	sto_rpc_free_subprocess_ctx(ctx);
 }
@@ -94,7 +94,7 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 {
 	struct sto_rpc_subprocess_ctx *ctx;
 	struct sto_rpc_construct_subprocess *req;
-	struct sto_subprocess *subp;
+	struct sto_subprocess_back *subp;
 	int rc;
 
 	ctx = calloc(1, sizeof(*ctx));
@@ -115,16 +115,16 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 
 	ctx->request = request;
 
-	subp = sto_subprocess_alloc(req->arg_list.args, req->arg_list.num_args, req->capture_output);
+	subp = sto_subprocess_back_alloc(req->arg_list.args, req->arg_list.num_args, req->capture_output);
 	if (spdk_unlikely(!subp)) {
 		printf("Failed to create subprocess\n");
 		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
 		goto free_ctx;
 	}
 
-	sto_subprocess_init_cb(subp, sto_rpc_subprocess_done, ctx);
+	sto_subprocess_back_init_cb(subp, sto_rpc_subprocess_done, ctx);
 
-	rc = sto_subprocess_run(subp);
+	rc = sto_subprocess_back_run(subp);
 	if (spdk_unlikely(rc)) {
 		printf("Failed to run subprocess\n");
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
@@ -134,7 +134,7 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 	return;
 
 free_subp:
-	sto_subprocess_free(subp);
+	sto_subprocess_back_free(subp);
 
 free_ctx:
 	sto_rpc_free_subprocess_ctx(ctx);
