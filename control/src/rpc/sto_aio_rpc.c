@@ -93,7 +93,7 @@ __read_resp_handler(struct sto_rpc_request *req, struct spdk_jsonrpc_client_resp
 		goto out;
 	}
 
-	SPDK_NOTICELOG("GLEB: AIO: Get result from response: returncode[%d] buf: %s\n",
+	SPDK_NOTICELOG("GLEB: AIO: Get result from READ response: returncode[%d] buf: %s\n",
 		       result.returncode, result.buf);
 
 	sto_aio_read_response(aio_req->request);
