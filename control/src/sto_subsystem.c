@@ -4,7 +4,6 @@
 
 #include "sto_subsystem.h"
 #include "sto_client.h"
-#include "sto_server.h"
 
 static spdk_sto_init_cb g_init_cb_fn = NULL;
 static void *g_init_cb_arg = NULL;

@@ -3,6 +3,8 @@
 
 #include <spdk/jsonrpc.h>
 
+#define STO_LOCAL_SERVER_ADDR "/var/tmp/sto_server.sock"
+
 struct sto_rpc_request;
 
 typedef void (*sto_dump_params_json)(struct sto_rpc_request *req,
