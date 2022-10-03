@@ -24,8 +24,8 @@ struct sto_subprocess {
 #define STO_SUBPROCESS(ARGV)	\
 	(sto_subprocess_alloc((ARGV), SPDK_COUNTOF((ARGV)), false))
 
-struct sto_subprocess *
-sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output);
+struct sto_subprocess *sto_subprocess_alloc(const char *const argv[],
+		int numargs, bool capture_output);
 void sto_subprocess_free(struct sto_subprocess *subp);
 void sto_subprocess_init_cb(struct sto_subprocess *subp,
 			    subprocess_done_t subprocess_done, void *priv);

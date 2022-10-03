@@ -30,8 +30,8 @@ struct sto_subprocess_back {
 #define STO_SUBPROCESS_BACK(ARGV)	\
 	(sto_subprocess_back_alloc((ARGV), SPDK_COUNTOF((ARGV)), false))
 
-struct sto_subprocess_back *
-sto_subprocess_back_alloc(const char *const argv[], int numargs, bool capture_output);
+struct sto_subprocess_back *sto_subprocess_back_alloc(const char *const argv[],
+		int numargs, bool capture_output);
 void sto_subprocess_back_free(struct sto_subprocess_back *subp);
 void sto_subprocess_back_init_cb(struct sto_subprocess_back *subp,
 				 subprocess_back_done_t subprocess_back_done, void *priv);

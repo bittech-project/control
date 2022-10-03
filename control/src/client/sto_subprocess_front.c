@@ -64,7 +64,8 @@ static const struct spdk_json_object_decoder sto_subprocess_result_decoders[] = 
 };
 
 static void
-sto_subprocess_resp_handler(struct sto_rpc_request *rpc_req, struct spdk_jsonrpc_client_response *resp)
+sto_subprocess_resp_handler(struct sto_rpc_request *rpc_req,
+			    struct spdk_jsonrpc_client_response *resp)
 {
 	struct sto_subprocess *subp = rpc_req->priv;
 	struct sto_subprocess_result result;
