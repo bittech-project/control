@@ -38,6 +38,7 @@ sto_req_set_state(struct sto_req *req, enum sto_req_state new_state)
 	req->state = new_state;
 }
 
+void sto_req_process(struct sto_req *req);
 int sto_req_submit(struct sto_req *req);
 
 #endif /* _STO_CORE_H_ */

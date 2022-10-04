@@ -12,11 +12,11 @@
 
 struct spdk_poller *g_sto_req_poller;
 
-static TAILQ_HEAD(, sto_req) g_sto_req_list
+static TAILQ_HEAD(sto_req_list, sto_req) g_sto_req_list
 	= TAILQ_HEAD_INITIALIZER(g_sto_req_list);
 
 
-int sto_process_req(struct sto_req *req);
+static int sto_process_req(struct sto_req *req);
 
 static const char *const sto_req_state_names[] = {
 	[STO_REQ_STATE_PARSE]	= "STATE_PARSE",
@@ -39,6 +39,7 @@ sto_req_state_name(enum sto_req_state state)
 static int
 sto_req_poll(void *ctx)
 {
+	struct sto_req_list req_list = TAILQ_HEAD_INITIALIZER(req_list);
 	struct sto_req *req, *tmp;
 	int rc = 0;
 
@@ -46,7 +47,11 @@ sto_req_poll(void *ctx)
 		return SPDK_POLLER_IDLE;
 	}
 
-	TAILQ_FOREACH_SAFE(req, &g_sto_req_list, list, tmp) {
+	TAILQ_SWAP(&req_list, &g_sto_req_list, sto_req, list);
+
+	TAILQ_FOREACH_SAFE(req, &req_list, list, tmp) {
+		TAILQ_REMOVE(&req_list, req, list);
+
 		rc = sto_process_req(req);
 		if (spdk_unlikely(rc)) {
 			SPDK_ERRLOG("Failed to process req, rc=%d\n", rc);
@@ -96,10 +101,16 @@ sto_req_free(struct sto_req *req)
 	rte_free(req);
 }
 
+void
+sto_req_process(struct sto_req *req)
+{
+	TAILQ_INSERT_TAIL(&g_sto_req_list, req, list);
+}
+
 int
 sto_req_submit(struct sto_req *req)
 {
-	TAILQ_INSERT_TAIL(&g_sto_req_list, req, list);
+	sto_req_process(req);
 
 	return 0;
 }
@@ -136,12 +147,10 @@ sto_req_done(struct sto_req *req)
 	return rc;
 }
 
-int
+static int
 sto_process_req(struct sto_req *req)
 {
 	int rc;
-
-	TAILQ_REMOVE(&g_sto_req_list, req, list);
 
 	switch (req->state) {
 	case STO_REQ_STATE_PARSE:

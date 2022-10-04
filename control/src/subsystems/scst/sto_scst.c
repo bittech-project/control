@@ -318,7 +318,7 @@ scst_parse_req(struct sto_req *req)
 	SPDK_NOTICELOG("SCST: Parse req[%p]\n", req);
 
 	sto_req_set_state(req, STO_REQ_STATE_EXEC);
-	sto_req_submit(req);
+	sto_req_process(req);
 
 	return 0;
 }
@@ -329,7 +329,7 @@ scst_exec_req(struct sto_req *req)
 	SPDK_NOTICELOG("SCST: Exec req[%p]\n", req);
 
 	sto_req_set_state(req, STO_REQ_STATE_DONE);
-	sto_req_submit(req);
+	sto_req_process(req);
 
 	return 0;
 }
