@@ -9,12 +9,12 @@ LDFLAGS = -pthread $(SPDK_LDFLAGS) -Wl,--whole-archive,-Bstatic \
 
 PROG = control
 
-C_SRCS = main.c sto_spdk_subsystem.c sto_control.c sto_subsystem.c \
+C_SRCS = main.c sto_spdk_subsystem.c sto_control.c sto_subsystem.c sto_core.c \
 	 subsystems/scst/sto_scst.c \
 	 client/sto_client.c client/sto_subprocess_front.c \
 	 server/sto_server.c server/sto_exec.c server/sto_subprocess_back.c server/sto_subprocess_rpc.c \
 	 server/sto_aio.c server/sto_aio_rpc.c \
-	 rpc/sto_exec_rpc.c rpc/sto_aio_rpc.c rpc/sto_scst_rpc.c
+	 rpc/sto_exec_rpc.c rpc/sto_aio_rpc.c rpc/sto_scst_rpc.c rpc/sto_core_rpc.c
 OBJS := ${C_SRCS:.c=.o}
 
 all: $(PROG)

@@ -1,0 +1,15 @@
+{
+  "subsystems": [
+    {
+      "subsystem": "sto_control",
+      "config": [
+        {
+          "method": "sto_send",
+          "params": {
+            "subsystem": "scst"
+          }
+        }
+      ]
+    }
+  ]
+}

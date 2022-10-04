@@ -4,6 +4,7 @@
 
 #include "sto_control.h"
 #include "sto_client.h"
+#include "sto_core.h"
 
 static spdk_control_init_cb g_init_cb_fn = NULL;
 static void *g_init_cb_arg = NULL;
@@ -39,6 +40,13 @@ spdk_control_init(spdk_control_init_cb cb_fn, void *cb_arg)
 		return;
 	}
 
+	rc = sto_core_init();
+	if (rc < 0) {
+		SPDK_ERRLOG("sto_core_init() failed, rc=%d\n", rc);
+		sto_init_complete(-1);
+		return;
+	}
+
 	sto_init_complete(0);
 }
 
@@ -54,6 +62,7 @@ spdk_control_fini(spdk_control_fini_cb cb_fn, void *cb_arg)
 	g_fini_cb_fn = cb_fn;
 	g_fini_cb_arg = cb_arg;
 
+	sto_core_fini();
 	sto_client_close();
 
 	sto_fini_done();
