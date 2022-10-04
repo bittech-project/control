@@ -8,7 +8,7 @@
 #include "sto_core.h"
 #include "sto_subsystem.h"
 
-#define STO_REQ_POLL_PERIOD	100
+#define STO_REQ_POLL_PERIOD	1000 /* 1ms */
 
 struct spdk_poller *g_sto_req_poller;
 
