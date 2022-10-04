@@ -1,6 +1,7 @@
 #include <spdk/thread.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
+#include <spdk/util.h>
 
 #include <rte_malloc.h>
 
@@ -14,7 +15,26 @@ struct spdk_poller *g_sto_req_poller;
 static TAILQ_HEAD(, sto_req) g_sto_req_list
 	= TAILQ_HEAD_INITIALIZER(g_sto_req_list);
 
+
 int sto_process_req(struct sto_req *req);
+
+static const char *const sto_req_state_names[] = {
+	[STO_REQ_STATE_PARSE]	= "STATE_PARSE",
+	[STO_REQ_STATE_EXEC]	= "STATE_EXEC",
+	[STO_REQ_STATE_DONE]	= "STATE_DONE",
+};
+
+const char *
+sto_req_state_name(enum sto_req_state state)
+{
+	size_t index = state;
+
+	if (spdk_unlikely(index >= SPDK_COUNTOF(sto_req_state_names))) {
+		assert(0);
+	}
+
+	return sto_req_state_names[index];
+}
 
 static int
 sto_req_poll(void *ctx)
@@ -53,6 +73,8 @@ sto_req_alloc(const char *subsystem)
 		goto free_req;
 	}
 
+	sto_req_set_state(req, STO_REQ_STATE_PARSE);
+
 	return req;
 
 free_req:
@@ -82,11 +104,65 @@ sto_req_submit(struct sto_req *req)
 	return 0;
 }
 
-int sto_process_req(struct sto_req *req)
+static int
+sto_req_parse(struct sto_req *req)
 {
-	TAILQ_REMOVE(&g_sto_req_list, req, list);
+	int rc;
+
+	rc = req->subsystem->parse(req);
+
+	return rc;
+}
+
+static int
+sto_req_exec(struct sto_req *req)
+{
+	int rc;
+
+	rc = req->subsystem->exec(req);
+
+	return rc;
+}
+
+static int
+sto_req_done(struct sto_req *req)
+{
+	int rc;
+
+	rc = req->subsystem->done(req);
 
 	req->req_done(req);
+
+	return rc;
+}
+
+int
+sto_process_req(struct sto_req *req)
+{
+	int rc;
+
+	TAILQ_REMOVE(&g_sto_req_list, req, list);
+
+	switch (req->state) {
+	case STO_REQ_STATE_PARSE:
+		rc = sto_req_parse(req);
+		break;
+	case STO_REQ_STATE_EXEC:
+		rc = sto_req_exec(req);
+		break;
+	case STO_REQ_STATE_DONE:
+		rc = sto_req_done(req);
+		break;
+	default:
+		SPDK_ERRLOG("req (%p) in state %s, but shouldn't be\n",
+				req, sto_req_state_name(req->state));
+		assert(0);
+	}
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("req (%p) in state %s failed, rc=%d\n",
+				req, sto_req_state_name(req->state), rc);
+	}
 
 	return 0;
 }
