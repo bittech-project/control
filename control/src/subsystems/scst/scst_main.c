@@ -5,7 +5,7 @@
 
 #include <rte_malloc.h>
 
-#include "sto_scst.h"
+#include "scst.h"
 #include "sto_core.h"
 #include "sto_subsystem.h"
 #include "sto_subprocess_front.h"
@@ -330,10 +330,7 @@ scst_req_submit(struct scst_req *req)
 int
 scst_parse_req(struct sto_req *req)
 {
-	int rc;
-
 	SPDK_NOTICELOG("SCST: Parse req[%p]\n", req);
-
 
 	sto_req_set_state(req, STO_REQ_STATE_EXEC);
 	sto_req_process(req);

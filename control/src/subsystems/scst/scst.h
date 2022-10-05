@@ -1,5 +1,5 @@
-#ifndef _STO_SCST_H
-#define _STO_SCST_H
+#ifndef _SCST_H
+#define _SCST_H
 
 #include <spdk/util.h>
 
@@ -127,4 +127,4 @@ void scst_req_init_cb(struct scst_req *req, scst_req_done_t scst_req_done, void 
 
 int scst_req_submit(struct scst_req *req);
 
-#endif /* _STO_SCST_H */
+#endif /* _SCST_H */

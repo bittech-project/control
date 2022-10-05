@@ -4,7 +4,7 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include "sto_scst.h"
+#include "scst.h"
 
 struct sto_scst_params {
 	unsigned long modules_bitmap;
