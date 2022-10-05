@@ -4,9 +4,10 @@
       "subsystem": "sto_control",
       "config": [
         {
-          "method": "sto_send",
+          "method": "control",
           "params": {
-            "subsystem": "scst"
+            "subsystem": "scst",
+            "op": "init"
           }
         }
       ]

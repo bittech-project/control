@@ -1,4 +1,5 @@
 #include <spdk/thread.h>
+#include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
@@ -62,7 +63,7 @@ sto_req_poll(void *ctx)
 }
 
 struct sto_req *
-sto_req_alloc(const char *subsystem)
+sto_req_alloc(const struct spdk_json_val *cdb)
 {
 	struct sto_req *req;
 
@@ -72,20 +73,10 @@ sto_req_alloc(const char *subsystem)
 		return NULL;
 	}
 
-	req->subsystem = sto_subsystem_find(subsystem);
-	if (spdk_unlikely(!req->subsystem)) {
-		SPDK_ERRLOG("Failed to find %s susbsytem\n", subsystem);
-		goto free_req;
-	}
-
+	req->cdb = cdb;
 	sto_req_set_state(req, STO_REQ_STATE_PARSE);
 
 	return req;
-
-free_req:
-	rte_free(req);
-
-	return NULL;
 }
 
 void
@@ -116,9 +107,59 @@ sto_req_submit(struct sto_req *req)
 }
 
 static int
+sto_req_decode_subsystem(struct sto_req *req)
+{
+	const struct spdk_json_val *cdb = req->cdb;
+	const struct spdk_json_val *name, *subsystem_json;
+	char *subsystem_str = NULL;
+	uint32_t i;
+	int rc = 0;
+
+	if (!cdb || cdb->type != SPDK_JSON_VAL_OBJECT_BEGIN) {
+		SPDK_ERRLOG("req[%p] has wrong CDB\n", req);
+		return -EINVAL;
+	}
+
+	i = req->decoded_len;
+
+	name = &cdb[i + 1];
+	if (!spdk_json_strequal(name, "subsystem")) {
+		SPDK_ERRLOG("req[%p] doesn't have 'subsystem' field\n", req);
+		return -EINVAL;
+	}
+
+	subsystem_json = &cdb[i + 2];
+
+	if (spdk_json_decode_string(subsystem_json, &subsystem_str)) {
+		SPDK_ERRLOG("req[%p] Failed to decode 'subsystem' field\n", req);
+		return -EINVAL;
+	}
+
+	req->subsystem = sto_subsystem_find(subsystem_str);
+	if (spdk_unlikely(!req->subsystem)) {
+		SPDK_ERRLOG("Failed to find %s subsystem\n", subsystem_str);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	req->decoded_len += 1 + spdk_json_val_len(subsystem_json);
+
+out:
+	free(subsystem_str);
+
+	return rc;
+}
+
+static int
 sto_req_parse(struct sto_req *req)
 {
 	int rc;
+
+	rc = sto_req_decode_subsystem(req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to define subsystem for req[%p], rc=%d\n", req, rc);
+		return rc;
+	}
 
 	rc = req->subsystem->parse(req);
 
@@ -135,22 +176,20 @@ sto_req_exec(struct sto_req *req)
 	return rc;
 }
 
-static int
+static void
 sto_req_done(struct sto_req *req)
 {
-	int rc;
-
-	rc = req->subsystem->done(req);
+	req->subsystem->done(req);
 
 	req->req_done(req);
 
-	return rc;
+	return;
 }
 
 static int
 sto_process_req(struct sto_req *req)
 {
-	int rc;
+	int rc = 0;
 
 	switch (req->state) {
 	case STO_REQ_STATE_PARSE:
@@ -160,7 +199,7 @@ sto_process_req(struct sto_req *req)
 		rc = sto_req_exec(req);
 		break;
 	case STO_REQ_STATE_DONE:
-		rc = sto_req_done(req);
+		sto_req_done(req);
 		break;
 	default:
 		SPDK_ERRLOG("req (%p) in state %s, but shouldn't be\n",
@@ -171,6 +210,7 @@ sto_process_req(struct sto_req *req)
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("req (%p) in state %s failed, rc=%d\n",
 				req, sto_req_state_name(req->state), rc);
+		req->req_done(req);
 	}
 
 	return 0;

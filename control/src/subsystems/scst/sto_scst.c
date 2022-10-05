@@ -1,3 +1,4 @@
+#include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
@@ -312,10 +313,56 @@ scst_req_submit(struct scst_req *req)
 	return rc;
 }
 
+static int
+scst_req_decode_op(struct sto_req *req)
+{
+	const struct spdk_json_val *cdb = req->cdb;
+	const struct spdk_json_val *name, *op_json;
+	char *op_str = NULL;
+	uint32_t i;
+	int rc = 0;
+
+	if (!cdb || cdb->type != SPDK_JSON_VAL_OBJECT_BEGIN) {
+		SPDK_ERRLOG("req[%p] has wrong CDB\n", req);
+		return -EINVAL;
+	}
+
+	i = req->decoded_len;
+
+	name = &cdb[i + 1];
+	if (!spdk_json_strequal(name, "op")) {
+		SPDK_ERRLOG("req[%p] doesn't have 'subsystem' field\n", req);
+		return -EINVAL;
+	}
+
+	op_json = &cdb[i + 2];
+
+	if (spdk_json_decode_string(op_json, &op_str)) {
+		SPDK_ERRLOG("req[%p] Failed to decode 'subsystem' field\n", req);
+		return -EINVAL;
+	}
+
+	SPDK_NOTICELOG("SCST: Parse OP %s from req[%p]\n", op_str, req);
+
+	req->decoded_len += 1 + spdk_json_val_len(op_json);
+
+	free(op_str);
+
+	return rc;
+}
+
 int
 scst_parse_req(struct sto_req *req)
 {
+	int rc;
+
 	SPDK_NOTICELOG("SCST: Parse req[%p]\n", req);
+
+	rc = scst_req_decode_op(req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode SCST req OP\n");
+		return rc;
+	}
 
 	sto_req_set_state(req, STO_REQ_STATE_EXEC);
 	sto_req_process(req);
@@ -334,12 +381,12 @@ scst_exec_req(struct sto_req *req)
 	return 0;
 }
 
-int
+void
 scst_done_req(struct sto_req *req)
 {
 	SPDK_NOTICELOG("SCST: Done req[%p]\n", req);
 
-	return 0;
+	return;
 }
 
 static struct sto_subsystem g_scst_subsystem = {

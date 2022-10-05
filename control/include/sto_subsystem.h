@@ -8,7 +8,7 @@ struct sto_subsystem {
 
 	int (*parse)(struct sto_req *req);
 	int (*exec)(struct sto_req *req);
-	int (*done)(struct sto_req *req);
+	void (*done)(struct sto_req *req);
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };
