@@ -6,8 +6,6 @@
 #include <rte_malloc.h>
 
 #include "scst.h"
-#include "sto_core.h"
-#include "sto_subsystem.h"
 #include "sto_subprocess_front.h"
 
 #define SCST_ROOT "/sys/kernel/scst_tgt"
@@ -326,42 +324,3 @@ scst_req_submit(struct scst_req *req)
 
 	return rc;
 }
-
-int
-scst_parse_req(struct sto_req *req)
-{
-	SPDK_NOTICELOG("SCST: Parse req[%p]\n", req);
-
-	sto_req_set_state(req, STO_REQ_STATE_EXEC);
-	sto_req_process(req);
-
-	return 0;
-}
-
-int
-scst_exec_req(struct sto_req *req)
-{
-	SPDK_NOTICELOG("SCST: Exec req[%p]\n", req);
-
-	sto_req_set_state(req, STO_REQ_STATE_DONE);
-	sto_req_process(req);
-
-	return 0;
-}
-
-void
-scst_done_req(struct sto_req *req)
-{
-	SPDK_NOTICELOG("SCST: Done req[%p]\n", req);
-
-	return;
-}
-
-static struct sto_subsystem g_scst_subsystem = {
-	.name = "scst",
-	.parse = scst_parse_req,
-	.exec = scst_exec_req,
-	.done = scst_done_req,
-};
-
-STO_SUBSYSTEM_REGISTER(g_scst_subsystem);
