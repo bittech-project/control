@@ -18,7 +18,7 @@ struct sto_req {
 	sto_req_done_t req_done;
 
 	const struct spdk_json_val *cdb;
-	uint32_t decoded_len;
+	uint32_t cdb_offset;
 
 	enum sto_req_state state;
 	struct sto_subsystem *subsystem;
@@ -43,5 +43,7 @@ sto_req_set_state(struct sto_req *req, enum sto_req_state new_state)
 
 void sto_req_process(struct sto_req *req);
 int sto_req_submit(struct sto_req *req);
+
+int sto_req_cdb_decode_str(struct sto_req *req, const char *name, char **value);
 
 #endif /* _STO_CORE_H_ */

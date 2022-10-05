@@ -106,13 +106,12 @@ sto_req_submit(struct sto_req *req)
 	return 0;
 }
 
-static int
-sto_req_decode_subsystem(struct sto_req *req)
+int
+sto_req_cdb_decode_str(struct sto_req *req, const char *name, char **value)
 {
 	const struct spdk_json_val *cdb = req->cdb;
-	const struct spdk_json_val *name, *subsystem_json;
-	char *subsystem_str = NULL;
-	uint32_t i;
+	const struct spdk_json_val *name_json, *value_json;
+	uint32_t offset;
 	int rc = 0;
 
 	if (!cdb || cdb->type != SPDK_JSON_VAL_OBJECT_BEGIN) {
@@ -120,32 +119,24 @@ sto_req_decode_subsystem(struct sto_req *req)
 		return -EINVAL;
 	}
 
-	i = req->decoded_len;
+	offset = req->cdb_offset;
 
-	name = &cdb[i + 1];
-	if (!spdk_json_strequal(name, "subsystem")) {
-		SPDK_ERRLOG("req[%p] doesn't have 'subsystem' field\n", req);
+	name_json = &cdb[offset + 1];
+	if (!spdk_json_strequal(name_json, name)) {
+		SPDK_ERRLOG("req[%p] doesn't have '%s' object\n", req, name);
 		return -EINVAL;
 	}
 
-	subsystem_json = &cdb[i + 2];
+	value_json = &cdb[offset + 2];
 
-	if (spdk_json_decode_string(subsystem_json, &subsystem_str)) {
-		SPDK_ERRLOG("req[%p] Failed to decode 'subsystem' field\n", req);
+	if (spdk_json_decode_string(value_json, value)) {
+		SPDK_ERRLOG("req[%p] Failed to decode '%s' field\n", req, name);
 		return -EINVAL;
 	}
 
-	req->subsystem = sto_subsystem_find(subsystem_str);
-	if (spdk_unlikely(!req->subsystem)) {
-		SPDK_ERRLOG("Failed to find %s subsystem\n", subsystem_str);
-		rc = -EINVAL;
-		goto out;
-	}
+	SPDK_NOTICELOG("Parse `%s` string from req[%p] CDB\n", *value, req);
 
-	req->decoded_len += 1 + spdk_json_val_len(subsystem_json);
-
-out:
-	free(subsystem_str);
+	req->cdb_offset += 1 + spdk_json_val_len(value_json);
 
 	return rc;
 }
@@ -153,15 +144,26 @@ out:
 static int
 sto_req_parse(struct sto_req *req)
 {
+	char *subsystem = NULL;
 	int rc;
 
-	rc = sto_req_decode_subsystem(req);
+	rc = sto_req_cdb_decode_str(req, "subsystem", &subsystem);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to define subsystem for req[%p], rc=%d\n", req, rc);
 		return rc;
 	}
 
+	req->subsystem = sto_subsystem_find(subsystem);
+	if (spdk_unlikely(!req->subsystem)) {
+		SPDK_ERRLOG("Failed to find %s subsystem\n", subsystem);
+		rc = -EINVAL;
+		goto out;
+	}
+
 	rc = req->subsystem->parse(req);
+
+out:
+	free(subsystem);
 
 	return rc;
 }
