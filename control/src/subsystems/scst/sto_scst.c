@@ -120,7 +120,7 @@ scst_module_load_done(struct sto_subprocess *subp)
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Subprocess failed exec, rc=%d\n", rc);
 		sto_subprocess_free(subp);
-		req->scst_req_done(req);
+		req->req_done(req);
 		return;
 	}
 
@@ -207,7 +207,7 @@ scst_constructor(struct scst_req *req)
 		}
 	}
 
-	req->scst_req_done(req);
+	req->req_done(req);
 
 	return 0;
 }
@@ -226,7 +226,7 @@ scst_destructor(struct scst_req *req)
 		}
 	}
 
-	req->scst_req_done(req);
+	req->req_done(req);
 
 	return 0;
 }
@@ -245,25 +245,7 @@ scst_req_init(struct scst_req *req, enum scst_ops op)
 	req->op = op;
 }
 
-struct scst_req *
-scst_construct_req_alloc(unsigned long modules_bitmap)
-{
-	struct scst_construct_req *constr_req;
-
-	constr_req = rte_zmalloc(NULL, sizeof(*constr_req), 0);
-	if (spdk_unlikely(!constr_req)) {
-		SPDK_ERRLOG("Failed to alloc SCST construct req\n");
-		return NULL;
-	}
-
-	scst_req_init(&constr_req->req, SCST_CONSTRUCT);
-
-	constr_req->modules_bitmap = modules_bitmap;
-
-	return &constr_req->req;
-}
-
-void
+static void
 scst_construct_req_free(struct scst_req *req)
 {
 	struct scst_construct_req *constr_req = to_construct_req(req);
@@ -271,9 +253,39 @@ scst_construct_req_free(struct scst_req *req)
 }
 
 struct scst_req *
+scst_construct_req_alloc(unsigned long modules_bitmap)
+{
+	struct scst_construct_req *constr_req;
+	struct scst_req *req;
+
+	constr_req = rte_zmalloc(NULL, sizeof(*constr_req), 0);
+	if (spdk_unlikely(!constr_req)) {
+		SPDK_ERRLOG("Failed to alloc SCST construct req\n");
+		return NULL;
+	}
+
+	req = &constr_req->req;
+
+	scst_req_init(req, SCST_CONSTRUCT);
+	req->req_free = scst_construct_req_free;
+
+	constr_req->modules_bitmap = modules_bitmap;
+
+	return req;
+}
+
+static void
+scst_destruct_req_free(struct scst_req *req)
+{
+	struct scst_destruct_req *destr_req = to_destruct_req(req);
+	rte_free(destr_req);
+}
+
+struct scst_req *
 scst_destruct_req_alloc(void)
 {
 	struct scst_destruct_req *destr_req;
+	struct scst_req *req;
 
 	destr_req = rte_zmalloc(NULL, sizeof(*destr_req), 0);
 	if (spdk_unlikely(!destr_req)) {
@@ -281,22 +293,24 @@ scst_destruct_req_alloc(void)
 		return NULL;
 	}
 
-	scst_req_init(&destr_req->req, SCST_DESTRUCT);
+	req = &destr_req->req;
 
-	return &destr_req->req;
+	scst_req_init(req, SCST_DESTRUCT);
+	req->req_free = scst_destruct_req_free;
+
+	return req;
 }
 
 void
-scst_destruct_req_free(struct scst_req *req)
+scst_req_free(struct scst_req *req)
 {
-	struct scst_destruct_req *destr_req = to_destruct_req(req);
-	rte_free(destr_req);
+	req->req_free(req);
 }
 
 void
 scst_req_init_cb(struct scst_req *req, scst_req_done_t scst_req_done, void *priv)
 {
-	req->scst_req_done = scst_req_done;
+	req->req_done = scst_req_done;
 	req->priv = priv;
 }
 

@@ -68,6 +68,7 @@ enum scst_module_status {
 
 struct scst_req;
 typedef void (*scst_req_done_t)(struct scst_req *req);
+typedef void (*scst_req_free_t)(struct scst_req *req);
 
 struct scst {
 	uint8_t load_map[__SCST_NR_BITS];
@@ -82,9 +83,11 @@ struct scst_req {
 	struct scst *scst;
 
 	void *priv;
-	scst_req_done_t scst_req_done;
+	scst_req_done_t req_done;
 
 	enum scst_ops op;
+
+	scst_req_free_t req_free;
 };
 
 struct scst_construct_req {
@@ -117,10 +120,8 @@ to_destruct_req(struct scst_req *req)
 const char *scst_module_name(enum scst_module_bits module_bit);
 
 struct scst_req *scst_construct_req_alloc(unsigned long modules_bitmap);
-void scst_construct_req_free(struct scst_req *req);
-
 struct scst_req *scst_destruct_req_alloc(void);
-void scst_destruct_req_free(struct scst_req *req);
+void scst_req_free(struct scst_req *req);
 
 void scst_req_init_cb(struct scst_req *req, scst_req_done_t scst_req_done, void *priv);
 

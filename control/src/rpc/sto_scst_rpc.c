@@ -44,7 +44,7 @@ sto_scst_init_done(struct scst_req *init_req)
 
 	sto_scst_response(init_req, req->request);
 
-	scst_construct_req_free(init_req);
+	scst_req_free(init_req);
 
 	sto_scst_free_req(req);
 }
@@ -96,7 +96,7 @@ sto_scst_init(struct spdk_jsonrpc_request *request,
 	return;
 
 free_init_req:
-	scst_construct_req_free(init_req);
+	scst_req_free(init_req);
 
 free_req:
 	sto_scst_free_req(req);
@@ -112,7 +112,7 @@ sto_scst_deinit_done(struct scst_req *deinit_req)
 
 	sto_scst_response(deinit_req, req->request);
 
-	scst_destruct_req_free(deinit_req);
+	scst_req_free(deinit_req);
 
 	sto_scst_free_req(req);
 }
@@ -153,7 +153,7 @@ sto_scst_deinit(struct spdk_jsonrpc_request *request,
 	return;
 
 free_deinit_req:
-	scst_destruct_req_free(deinit_req);
+	scst_req_free(deinit_req);
 
 free_req:
 	sto_scst_free_req(req);
