@@ -13,6 +13,11 @@ enum sto_req_state {
 	STO_REQ_STATE_COUNT
 };
 
+struct sto_cdbops {
+	int ops;
+	const char *name;
+};
+
 struct sto_req {
 	void *priv;
 	sto_req_done_t req_done;
@@ -22,6 +27,9 @@ struct sto_req {
 
 	enum sto_req_state state;
 	struct sto_subsystem *subsystem;
+
+	const struct sto_cdbops *cdbops;
+	void *subsys_priv;
 
 	TAILQ_ENTRY(sto_req) list;
 };
@@ -43,7 +51,5 @@ sto_req_set_state(struct sto_req *req, enum sto_req_state new_state)
 
 void sto_req_process(struct sto_req *req);
 int sto_req_submit(struct sto_req *req);
-
-int sto_req_cdb_decode_str(struct sto_req *req, const char *name, char **value);
 
 #endif /* _STO_CORE_H_ */

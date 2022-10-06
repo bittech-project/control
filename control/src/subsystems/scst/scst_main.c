@@ -61,8 +61,8 @@ scst_module_name(enum scst_module_bits idx)
 }
 
 static const char *const scst_op_names[] = {
-	[SCST_CONSTRUCT]	= "construct",
-	[SCST_DESTRUCT]		= "destruct",
+	[SCST_OP_INIT]		= "init",
+	[SCST_OP_DEINIT]	= "deinit",
 };
 
 const char *
@@ -232,8 +232,8 @@ scst_destructor(struct scst_req *req)
 typedef int (*scst_op_fn_t)(struct scst_req *req);
 
 static const scst_op_fn_t scst_req_ops[] = {
-	[SCST_CONSTRUCT] = scst_constructor,
-	[SCST_DESTRUCT]  = scst_destructor,
+	[SCST_OP_INIT]		= scst_constructor,
+	[SCST_OP_DEINIT]	= scst_destructor,
 };
 
 static void
@@ -264,7 +264,7 @@ scst_construct_req_alloc(unsigned long modules_bitmap)
 
 	req = &constr_req->req;
 
-	scst_req_init(req, SCST_CONSTRUCT);
+	scst_req_init(req, SCST_OP_INIT);
 	req->req_free = scst_construct_req_free;
 
 	constr_req->modules_bitmap = modules_bitmap;
@@ -293,7 +293,7 @@ scst_destruct_req_alloc(void)
 
 	req = &destr_req->req;
 
-	scst_req_init(req, SCST_DESTRUCT);
+	scst_req_init(req, SCST_OP_DEINIT);
 	req->req_free = scst_destruct_req_free;
 
 	return req;

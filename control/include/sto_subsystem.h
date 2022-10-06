@@ -6,6 +6,8 @@ struct sto_req;
 struct sto_subsystem {
 	const char *name;
 
+	const struct sto_cdbops *(*get_cdbops)(char *op_name);
+
 	int (*parse)(struct sto_req *req);
 	int (*exec)(struct sto_req *req);
 	void (*done)(struct sto_req *req);

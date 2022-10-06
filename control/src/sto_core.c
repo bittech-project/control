@@ -106,7 +106,7 @@ sto_req_submit(struct sto_req *req)
 	return 0;
 }
 
-int
+static int
 sto_req_cdb_decode_str(struct sto_req *req, const char *name, char **value)
 {
 	const struct spdk_json_val *cdb = req->cdb;
@@ -142,28 +142,76 @@ sto_req_cdb_decode_str(struct sto_req *req, const char *name, char **value)
 }
 
 static int
-sto_req_parse(struct sto_req *req)
+sto_req_get_subsystem(struct sto_req *req)
 {
-	char *subsystem = NULL;
-	int rc;
+	char *subsystem_name = NULL;
+	int rc = 0;
 
-	rc = sto_req_cdb_decode_str(req, "subsystem", &subsystem);
+	rc = sto_req_cdb_decode_str(req, "subsystem", &subsystem_name);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to define subsystem for req[%p], rc=%d\n", req, rc);
+		SPDK_ERRLOG("Failed to decode subsystem for req[%p], rc=%d\n", req, rc);
 		return rc;
 	}
 
-	req->subsystem = sto_subsystem_find(subsystem);
+	req->subsystem = sto_subsystem_find(subsystem_name);
 	if (spdk_unlikely(!req->subsystem)) {
-		SPDK_ERRLOG("Failed to find %s subsystem\n", subsystem);
+		SPDK_ERRLOG("Failed to find %s subsystem\n", subsystem_name);
 		rc = -EINVAL;
 		goto out;
 	}
 
-	rc = req->subsystem->parse(req);
+out:
+	free(subsystem_name);
+
+	return rc;
+}
+
+static int
+sto_req_get_cdbops(struct sto_req *req)
+{
+	struct sto_subsystem *subsystem;
+	char *op_name = NULL;
+	int rc = 0;
+
+	rc = sto_req_cdb_decode_str(req, "op", &op_name);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode op for req[%p], rc=%d\n", req, rc);
+		return rc;
+	}
+
+	subsystem = req->subsystem;
+
+	req->cdbops = subsystem->get_cdbops(op_name);
+	if (spdk_unlikely(!req->cdbops)) {
+		SPDK_ERRLOG("Failed to get %s cdbops\n", op_name);
+		rc = -EINVAL;
+		goto out;
+	}
 
 out:
-	free(subsystem);
+	free(op_name);
+
+	return rc;
+}
+
+static int
+sto_req_parse(struct sto_req *req)
+{
+	int rc;
+
+	rc = sto_req_get_subsystem(req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to get subsystem for req[%p], rc=%d\n", req, rc);
+		return rc;
+	}
+
+	rc = sto_req_get_cdbops(req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to get cdbops for req[%p], rc=%d\n", req, rc);
+		return rc;
+	}
+
+	rc = req->subsystem->parse(req);
 
 	return rc;
 }

@@ -75,8 +75,9 @@ struct scst {
 };
 
 enum scst_ops {
-	SCST_CONSTRUCT,
-	SCST_DESTRUCT,
+	SCST_OP_INIT,
+	SCST_OP_DEINIT,
+	SCST_OP_COUNT,
 };
 
 struct scst_req {
@@ -118,6 +119,7 @@ to_destruct_req(struct scst_req *req)
 }
 
 const char *scst_module_name(enum scst_module_bits module_bit);
+const char *scst_op_name(enum scst_ops op);
 
 struct scst_req *scst_construct_req_alloc(unsigned long modules_bitmap);
 struct scst_req *scst_destruct_req_alloc(void);
