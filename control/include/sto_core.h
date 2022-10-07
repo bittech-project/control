@@ -22,6 +22,7 @@ struct sto_req {
 	void *priv;
 	sto_req_done_t req_done;
 
+	const struct spdk_json_val *params;
 	const struct spdk_json_val *cdb;
 	uint32_t cdb_offset;
 
@@ -29,7 +30,7 @@ struct sto_req {
 	struct sto_subsystem *subsystem;
 
 	const struct sto_cdbops *cdbops;
-	void *subsys_priv;
+	void *subsys_req;
 
 	TAILQ_ENTRY(sto_req) list;
 };
@@ -39,7 +40,7 @@ void sto_core_fini(void);
 
 const char *sto_req_state_name(enum sto_req_state state);
 
-struct sto_req *sto_req_alloc(const struct spdk_json_val *cdb);
+struct sto_req *sto_req_alloc(const struct spdk_json_val *params);
 void sto_req_free(struct sto_req *req);
 void sto_req_init_cb(struct sto_req *req, sto_req_done_t req_done, void *priv);
 
@@ -51,5 +52,8 @@ sto_req_set_state(struct sto_req *req, enum sto_req_state new_state)
 
 void sto_req_process(struct sto_req *req);
 int sto_req_submit(struct sto_req *req);
+
+const struct spdk_json_val *sto_decode_cdb(const struct spdk_json_val *params,
+					   const char *name, char **value);
 
 #endif /* _STO_CORE_H_ */

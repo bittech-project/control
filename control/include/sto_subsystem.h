@@ -1,16 +1,19 @@
 #ifndef _STO_SUBSYSTEM_H_
 #define _STO_SUBSYSTEM_H_
 
+struct spdk_json_val;
 struct sto_req;
+
+typedef void *(*sto_subsys_alloc_req_t)(const struct spdk_json_val *params);
 
 struct sto_subsystem {
 	const char *name;
 
-	const struct sto_cdbops *(*get_cdbops)(char *op_name);
+	sto_subsys_alloc_req_t alloc_req;
 
-	int (*parse)(struct sto_req *req);
-	int (*exec)(struct sto_req *req);
-	void (*done)(struct sto_req *req);
+	void (*init_req)(void *req_arg, void (*exec_done)(void *priv), void *priv);
+	int (*exec_req)(void *req_arg);
+	void (*done_req)(void *req_arg);
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };

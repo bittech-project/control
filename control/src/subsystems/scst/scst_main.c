@@ -60,23 +60,6 @@ scst_module_name(enum scst_module_bits idx)
 	return scst_module_names[index];
 }
 
-static const char *const scst_op_names[] = {
-	[SCST_OP_INIT]		= "init",
-	[SCST_OP_DEINIT]	= "deinit",
-};
-
-const char *
-scst_op_name(enum scst_ops op)
-{
-	size_t index = op;
-
-	if (spdk_unlikely(index >= SPDK_COUNTOF(scst_op_names))) {
-		assert(0);
-	}
-
-	return scst_op_names[index];
-}
-
 static int
 scst_req_subprocess(struct scst_req *req, const char *cmd[],
 		    int numargs, subprocess_done_t cmd_done)
@@ -118,7 +101,7 @@ scst_module_load_done(struct sto_subprocess *subp)
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Subprocess failed exec, rc=%d\n", rc);
 		sto_subprocess_free(subp);
-		req->req_done(req);
+		req->req_done(req->priv);
 		return;
 	}
 
@@ -186,7 +169,7 @@ scst_tag_modules(struct scst *scst, struct scst_construct_req *req)
 	}
 }
 
-static int
+int
 scst_constructor(struct scst_req *req)
 {
 	struct scst_construct_req *constr_req = to_construct_req(req);
@@ -205,12 +188,12 @@ scst_constructor(struct scst_req *req)
 		}
 	}
 
-	req->req_done(req);
+	req->req_done(req->priv);
 
 	return 0;
 }
 
-static int
+int
 scst_destructor(struct scst_req *req)
 {
 	struct scst_destruct_req *destr_req = to_destruct_req(req);
@@ -224,20 +207,13 @@ scst_destructor(struct scst_req *req)
 		}
 	}
 
-	req->req_done(req);
+	req->req_done(req->priv);
 
 	return 0;
 }
 
-typedef int (*scst_op_fn_t)(struct scst_req *req);
-
-static const scst_op_fn_t scst_req_ops[] = {
-	[SCST_OP_INIT]		= scst_constructor,
-	[SCST_OP_DEINIT]	= scst_destructor,
-};
-
 static void
-scst_req_init(struct scst_req *req, enum scst_ops op)
+scst_req_init(struct scst_req *req, const struct scst_cdbops *op)
 {
 	req->scst = &g_scst;
 	req->op = op;
@@ -251,7 +227,7 @@ scst_construct_req_free(struct scst_req *req)
 }
 
 struct scst_req *
-scst_construct_req_alloc(unsigned long modules_bitmap)
+scst_req_init_constructor(const struct scst_cdbops *op, const struct spdk_json_val *params)
 {
 	struct scst_construct_req *constr_req;
 	struct scst_req *req;
@@ -264,10 +240,10 @@ scst_construct_req_alloc(unsigned long modules_bitmap)
 
 	req = &constr_req->req;
 
-	scst_req_init(req, SCST_OP_INIT);
+	scst_req_init(req, op);
 	req->req_free = scst_construct_req_free;
 
-	constr_req->modules_bitmap = modules_bitmap;
+	constr_req->modules_bitmap = 0;
 
 	return req;
 }
@@ -280,7 +256,7 @@ scst_destruct_req_free(struct scst_req *req)
 }
 
 struct scst_req *
-scst_destruct_req_alloc(void)
+scst_req_deinit_constructor(const struct scst_cdbops *op, const struct spdk_json_val *params)
 {
 	struct scst_destruct_req *destr_req;
 	struct scst_req *req;
@@ -293,34 +269,18 @@ scst_destruct_req_alloc(void)
 
 	req = &destr_req->req;
 
-	scst_req_init(req, SCST_OP_DEINIT);
+	scst_req_init(req, op);
 	req->req_free = scst_destruct_req_free;
 
 	return req;
 }
 
-void
-scst_req_free(struct scst_req *req)
-{
-	req->req_free(req);
-}
-
-void
-scst_req_init_cb(struct scst_req *req, scst_req_done_t scst_req_done, void *priv)
-{
-	req->req_done = scst_req_done;
-	req->priv = priv;
-}
-
 int
 scst_req_submit(struct scst_req *req)
 {
-	scst_op_fn_t op;
 	int rc;
 
-	op = scst_req_ops[req->op];
-
-	rc = op(req);
+	rc = req->op->fn(req);
 
 	return rc;
 }

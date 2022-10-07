@@ -18,7 +18,7 @@ _subsystem_find(struct sto_subsystem_list *list, const char *name)
 	struct sto_subsystem *iter;
 
 	TAILQ_FOREACH(iter, list, list) {
-		if (strcmp(name, iter->name) == 0) {
+		if (!strcmp(name, iter->name)) {
 			return iter;
 		}
 	}

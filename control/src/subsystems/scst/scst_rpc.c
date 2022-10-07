@@ -5,28 +5,18 @@
 #include <spdk/string.h>
 
 #include "scst.h"
+#include "sto_core.h"
+#include "sto_subsystem.h"
 
-struct sto_scst_params {
-	unsigned long modules_bitmap;
-};
+struct scst_exec_ctx {
+	struct sto_subsystem *subsystem;
+	void *subsys_req;
 
-static const struct spdk_json_object_decoder sto_scst_decoders[] = {
-	{"modules", offsetof(struct sto_scst_params, modules_bitmap), spdk_json_decode_uint64},
-};
-
-struct sto_scst_req {
 	struct spdk_jsonrpc_request *request;
-	struct sto_scst_params params;
 };
 
 static void
-sto_scst_free_req(struct sto_scst_req *req)
-{
-	free(req);
-}
-
-static void
-sto_scst_response(struct scst_req *init_req, struct spdk_jsonrpc_request *request)
+scst_response(struct spdk_jsonrpc_request *request)
 {
 	struct spdk_json_write_ctx *w;
 
@@ -38,126 +28,75 @@ sto_scst_response(struct scst_req *init_req, struct spdk_jsonrpc_request *reques
 }
 
 static void
-sto_scst_init_done(struct scst_req *init_req)
+scst_done(void *arg)
 {
-	struct sto_scst_req *req = init_req->priv;
+	struct scst_exec_ctx *ctx = arg;
+	struct spdk_jsonrpc_request *request = ctx->request;
+	struct sto_subsystem *subsystem;
+	void *subsys_req;
 
-	sto_scst_response(init_req, req->request);
+	subsystem = ctx->subsystem;
+	subsys_req = ctx->subsys_req;
 
-	scst_req_free(init_req);
+	scst_response(request);
 
-	sto_scst_free_req(req);
+	subsystem->done_req(subsys_req);
+
+	free(ctx);
 }
 
 static void
-sto_scst_init(struct spdk_jsonrpc_request *request,
-	      const struct spdk_json_val *params)
+scst(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
-	struct sto_scst_req *req;
-	struct sto_scst_params *scst_params;
-	struct scst_req *init_req;
+	struct scst_exec_ctx *ctx;
+	struct sto_subsystem *subsystem;
+	void *subsys_req;
 	int rc;
 
-	req = calloc(1, sizeof(*req));
-	if (spdk_unlikely(!req)) {
+	ctx = calloc(1, sizeof(*ctx));
+	if (spdk_unlikely(!ctx)) {
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
 						 "Memory allocation failure");
 		return;
 	}
 
-	scst_params = &req->params;
+	ctx->request = request;
 
-	if (spdk_json_decode_object(params, sto_scst_decoders,
-				    SPDK_COUNTOF(sto_scst_decoders), scst_params)) {
-		SPDK_DEBUGLOG(sto_control, "spdk_json_decode_object failed\n");
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "spdk_json_decode_object failed");
-		goto free_req;
+	subsystem = sto_subsystem_find("scst");
+	if (spdk_unlikely(!subsystem)) {
+		SPDK_ERRLOG("failed to find SCST subsystem\n");
+		spdk_jsonrpc_send_error_response(request, -EINVAL, spdk_strerror(EINVAL));
+		goto free_ctx;
 	}
 
-	req->request = request;
+	ctx->subsystem = subsystem;
 
-	init_req = scst_construct_req_alloc(scst_params->modules_bitmap);
-	if (spdk_unlikely(!init_req)) {
-		SPDK_ERRLOG("Failed to create SCST init req\n");
-		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
-		goto free_req;
+	subsys_req = ctx->subsystem->alloc_req(params);
+	if (spdk_unlikely(!subsys_req)) {
+		SPDK_ERRLOG("Failed to alloc SCST req\n");
+		spdk_jsonrpc_send_error_response(request, -ENOMEM, spdk_strerror(ENOMEM));
+		goto free_ctx;
 	}
 
-	scst_req_init_cb(init_req, sto_scst_init_done, req);
+	ctx->subsys_req = subsys_req;
 
-	rc = scst_req_submit(init_req);
+	subsystem->init_req(subsys_req, scst_done, ctx);
+
+	rc = subsystem->exec_req(subsys_req);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to run SCST init req\n");
-		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
-		goto free_init_req;
+		SPDK_ERRLOG("Failed to exec SCST req, rc=%d\n", rc);
+		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));
+		goto free_req;
 	}
 
 	return;
-
-free_init_req:
-	scst_req_free(init_req);
 
 free_req:
-	sto_scst_free_req(req);
+	subsystem->done_req(subsys_req);
+
+free_ctx:
+	free(ctx);
 
 	return;
 }
-SPDK_RPC_REGISTER("scst_init", sto_scst_init, SPDK_RPC_RUNTIME)
-
-static void
-sto_scst_deinit_done(struct scst_req *deinit_req)
-{
-	struct sto_scst_req *req = deinit_req->priv;
-
-	sto_scst_response(deinit_req, req->request);
-
-	scst_req_free(deinit_req);
-
-	sto_scst_free_req(req);
-}
-
-static void
-sto_scst_deinit(struct spdk_jsonrpc_request *request,
-		const struct spdk_json_val *params)
-{
-	struct sto_scst_req *req;
-	struct scst_req *deinit_req;
-	int rc;
-
-	req = calloc(1, sizeof(*req));
-	if (spdk_unlikely(!req)) {
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "Memory allocation failure");
-		return;
-	}
-
-	req->request = request;
-
-	deinit_req = scst_destruct_req_alloc();
-	if (spdk_unlikely(!deinit_req)) {
-		SPDK_ERRLOG("Failed to create SCST init req\n");
-		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
-		goto free_req;
-	}
-
-	scst_req_init_cb(deinit_req, sto_scst_deinit_done, req);
-
-	rc = scst_req_submit(deinit_req);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to run SCST init req\n");
-		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
-		goto free_deinit_req;
-	}
-
-	return;
-
-free_deinit_req:
-	scst_req_free(deinit_req);
-
-free_req:
-	sto_scst_free_req(req);
-
-	return;
-}
-SPDK_RPC_REGISTER("scst_deinit", sto_scst_deinit, SPDK_RPC_RUNTIME)
+SPDK_RPC_REGISTER("scst", scst, SPDK_RPC_RUNTIME)

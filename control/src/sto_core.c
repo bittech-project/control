@@ -8,6 +8,7 @@
 
 #include "sto_core.h"
 #include "sto_subsystem.h"
+#include "err.h"
 
 #define STO_REQ_POLL_PERIOD	1000 /* 1ms */
 
@@ -63,7 +64,7 @@ sto_req_poll(void *ctx)
 }
 
 struct sto_req *
-sto_req_alloc(const struct spdk_json_val *cdb)
+sto_req_alloc(const struct spdk_json_val *params)
 {
 	struct sto_req *req;
 
@@ -73,7 +74,7 @@ sto_req_alloc(const struct spdk_json_val *cdb)
 		return NULL;
 	}
 
-	req->cdb = cdb;
+	req->params = params;
 	sto_req_set_state(req, STO_REQ_STATE_PARSE);
 
 	return req;
@@ -89,6 +90,7 @@ sto_req_init_cb(struct sto_req *req, sto_req_done_t req_done, void *priv)
 void
 sto_req_free(struct sto_req *req)
 {
+	free((struct spdk_json_val *) req->cdb);
 	rte_free(req);
 }
 
@@ -107,38 +109,75 @@ sto_req_submit(struct sto_req *req)
 }
 
 static int
-sto_req_cdb_decode_str(struct sto_req *req, const char *name, char **value)
+sto_decode_object_str(const struct spdk_json_val *values,
+		      const char *name, char **value)
 {
-	const struct spdk_json_val *cdb = req->cdb;
 	const struct spdk_json_val *name_json, *value_json;
-	uint32_t offset;
-	int rc = 0;
 
-	if (!cdb || cdb->type != SPDK_JSON_VAL_OBJECT_BEGIN) {
-		SPDK_ERRLOG("req[%p] has wrong CDB\n", req);
-		return -EINVAL;
-	}
-
-	offset = req->cdb_offset;
-
-	name_json = &cdb[offset + 1];
+	name_json = &values[0];
 	if (!spdk_json_strequal(name_json, name)) {
-		SPDK_ERRLOG("req[%p] doesn't have '%s' object\n", req, name);
-		return -EINVAL;
+		SPDK_ERRLOG("JSON object name doesn't correspond to %s\n", name);
+		return -ENOENT;
 	}
 
-	value_json = &cdb[offset + 2];
+	value_json = &values[1];
 
 	if (spdk_json_decode_string(value_json, value)) {
-		SPDK_ERRLOG("req[%p] Failed to decode '%s' field\n", req, name);
-		return -EINVAL;
+		SPDK_ERRLOG("Failed to decode string from JSON object %s\n", name);
+		return -EDOM;
 	}
 
-	SPDK_NOTICELOG("Parse `%s` string from req[%p] CDB\n", *value, req);
+	return 1 + spdk_json_val_len(value_json);
+}
 
-	req->cdb_offset += 1 + spdk_json_val_len(value_json);
+const struct spdk_json_val *
+sto_decode_cdb(const struct spdk_json_val *params, const char *name, char **value)
+{
+	struct spdk_json_val *cdb;
+	uint32_t cdb_len, size;
+	int res = 0;
+	int i;
 
-	return rc;
+	if (!params || params->type != SPDK_JSON_VAL_OBJECT_BEGIN || !params->len) {
+		SPDK_ERRLOG("Invalid JSON %p\n", params);
+		return ERR_PTR(-EINVAL);
+	}
+
+	SPDK_NOTICELOG("Start parse JSON for CDB: params_len=%u\n", params->len);
+
+	res = sto_decode_object_str(params + 1, name, value);
+	if (res < 0) {
+		SPDK_ERRLOG("Failed to decode CDB\n");
+		return ERR_PTR(res);
+	}
+
+	SPDK_NOTICELOG("Parse `%s` string from params\n", *value);
+
+	cdb_len = params->len - res;
+	if (!cdb_len) {
+		SPDK_NOTICELOG("CDB len is equal zero: offset=%u params_len=%u\n",
+				res, params->len);
+		return NULL;
+	}
+
+	size = cdb_len + 2;
+
+	cdb = calloc(size, sizeof(struct spdk_json_val));
+	if (spdk_unlikely(!cdb)) {
+		SPDK_ERRLOG("Failed to alloc CDB: size=%u\n", size);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	cdb->type = SPDK_JSON_VAL_OBJECT_BEGIN;
+	cdb->len = cdb_len;
+
+	for (i = 1; i <= cdb_len + 1; i++) {
+		cdb[i].start = params[i + res].start;
+		cdb[i].len = params[i + res].len;
+		cdb[i].type = params[i + res].type;
+	}
+
+	return cdb;
 }
 
 static int
@@ -147,10 +186,11 @@ sto_req_get_subsystem(struct sto_req *req)
 	char *subsystem_name = NULL;
 	int rc = 0;
 
-	rc = sto_req_cdb_decode_str(req, "subsystem", &subsystem_name);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to decode subsystem for req[%p], rc=%d\n", req, rc);
-		return rc;
+	req->cdb = sto_decode_cdb(req->params, "subsystem", &subsystem_name);
+	if (IS_ERR_OR_NULL(req->cdb)) {
+		SPDK_ERRLOG("Failed to decode CDB for req[%p]\n", req);
+		rc = PTR_ERR_OR_ZERO(req->cdb);
+		return rc ?: -EINVAL;
 	}
 
 	req->subsystem = sto_subsystem_find(subsystem_name);
@@ -167,36 +207,9 @@ out:
 }
 
 static int
-sto_req_get_cdbops(struct sto_req *req)
-{
-	struct sto_subsystem *subsystem;
-	char *op_name = NULL;
-	int rc = 0;
-
-	rc = sto_req_cdb_decode_str(req, "op", &op_name);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to decode op for req[%p], rc=%d\n", req, rc);
-		return rc;
-	}
-
-	subsystem = req->subsystem;
-
-	req->cdbops = subsystem->get_cdbops(op_name);
-	if (spdk_unlikely(!req->cdbops)) {
-		SPDK_ERRLOG("Failed to get %s cdbops\n", op_name);
-		rc = -EINVAL;
-		goto out;
-	}
-
-out:
-	free(op_name);
-
-	return rc;
-}
-
-static int
 sto_req_parse(struct sto_req *req)
 {
+	struct sto_subsystem *subsystem;
 	int rc;
 
 	rc = sto_req_get_subsystem(req);
@@ -205,23 +218,38 @@ sto_req_parse(struct sto_req *req)
 		return rc;
 	}
 
-	rc = sto_req_get_cdbops(req);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to get cdbops for req[%p], rc=%d\n", req, rc);
-		return rc;
+	subsystem = req->subsystem;
+
+	req->subsys_req = subsystem->alloc_req(req->cdb);
+	if (spdk_unlikely(!req->priv)) {
+		SPDK_ERRLOG("Failed to alloc %s req\n", subsystem->name);
+		return -EINVAL;
 	}
 
-	rc = req->subsystem->parse(req);
+	sto_req_set_state(req, STO_REQ_STATE_EXEC);
+	sto_req_process(req);
 
 	return rc;
+}
+
+static void
+sto_exec_done(void *arg)
+{
+	struct sto_req *req = arg;
+
+	sto_req_set_state(req, STO_REQ_STATE_DONE);
+	sto_req_process(req);
 }
 
 static int
 sto_req_exec(struct sto_req *req)
 {
+	struct sto_subsystem *subsystem = req->subsystem;
+	void *subsys_req = req->subsys_req;
 	int rc;
 
-	rc = req->subsystem->exec(req);
+	subsystem->init_req(subsys_req, sto_exec_done, req);
+	rc = subsystem->exec_req(subsys_req);
 
 	return rc;
 }
@@ -229,7 +257,10 @@ sto_req_exec(struct sto_req *req)
 static void
 sto_req_done(struct sto_req *req)
 {
-	req->subsystem->done(req);
+	struct sto_subsystem *subsystem = req->subsystem;
+
+	subsystem->done_req(req->subsys_req);
+	req->subsys_req = NULL;
 
 	req->req_done(req);
 

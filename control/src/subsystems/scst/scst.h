@@ -3,6 +3,8 @@
 
 #include <spdk/util.h>
 
+#include "sto_core.h"
+
 /* ./scst/src/scst.ko */
 /* - ./fcst/fcst.ko */
 
@@ -67,11 +69,21 @@ enum scst_module_status {
 };
 
 struct scst_req;
-typedef void (*scst_req_done_t)(struct scst_req *req);
-typedef void (*scst_req_free_t)(struct scst_req *req);
+struct scst_cdbops;
 
 struct scst {
 	uint8_t load_map[__SCST_NR_BITS];
+};
+
+typedef struct scst_req *(*req_constructor_fn_t)(const struct scst_cdbops *op,
+						 const struct spdk_json_val *params);
+typedef int (*scst_op_fn_t)(struct scst_req *req);
+
+struct scst_cdbops {
+	struct sto_cdbops op;
+
+	req_constructor_fn_t constructor;
+	scst_op_fn_t fn;
 };
 
 enum scst_ops {
@@ -80,13 +92,16 @@ enum scst_ops {
 	SCST_OP_COUNT,
 };
 
+typedef void (*scst_req_done_t)(void *priv);
+typedef void (*scst_req_free_t)(struct scst_req *req);
+
 struct scst_req {
 	struct scst *scst;
 
 	void *priv;
 	scst_req_done_t req_done;
 
-	enum scst_ops op;
+	const struct scst_cdbops *op;
 
 	scst_req_free_t req_free;
 };
@@ -119,13 +134,13 @@ to_destruct_req(struct scst_req *req)
 }
 
 const char *scst_module_name(enum scst_module_bits module_bit);
-const char *scst_op_name(enum scst_ops op);
 
-struct scst_req *scst_construct_req_alloc(unsigned long modules_bitmap);
-struct scst_req *scst_destruct_req_alloc(void);
-void scst_req_free(struct scst_req *req);
-
-void scst_req_init_cb(struct scst_req *req, scst_req_done_t scst_req_done, void *priv);
+struct scst_req *scst_req_init_constructor(const struct scst_cdbops *op,
+					   const struct spdk_json_val *params);
+struct scst_req *scst_req_deinit_constructor(const struct scst_cdbops *op,
+					     const struct spdk_json_val *params);
+int scst_constructor(struct scst_req *req);
+int scst_destructor(struct scst_req *req);
 
 int scst_req_submit(struct scst_req *req);
 

@@ -4,15 +4,12 @@
       "subsystem": "sto_control",
       "config": [
         {
-          "method": "scst_init",
+          "method": "scst",
           "params": {
-            "modules": 3
+            "op": "init",
+            "modules": "0"
           }
-        },
-        {
-          "method": "scst_deinit"
         }
-
       ]
     }
   ]
