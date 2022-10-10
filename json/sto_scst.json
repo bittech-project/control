@@ -7,7 +7,14 @@
           "method": "scst",
           "params": {
             "op": "init",
-            "modules": "0"
+            "drivers": ["isert-scst"]
+          }
+        },
+        {
+          "method": "scst",
+          "params": {
+            "op": "deinit",
+            "drivers": ["scst"]
           }
         }
       ]

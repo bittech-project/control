@@ -1,0 +1,69 @@
+#ifndef _SCST_LIB_H
+#define _SCST_LIB_H
+
+#include <spdk/util.h>
+
+#include "scst.h"
+
+/* ./scst/src/scst.ko */
+/* - ./fcst/fcst.ko */
+
+/* - ./iscsi-scst/kernel/iscsi-scst.ko */
+/* - - ./iscsi-scst/kernel/isert-scst/isert-scst.ko */
+
+/* - ./qla2x00t-32gbit/qla2xxx_scst.ko */
+/* - - ./qla2x00t-32gbit/qla2x00-target/qla2x00tgt.ko */
+
+/* - ./qla2x00t/qla2xxx_scst.ko */
+/* - ./qla2x00t/qla2x00-target/qla2x00tgt.ko */
+
+/* - ./scst/src/dev_handlers/scst_tape.ko */
+/* - ./scst/src/dev_handlers/scst_cdrom.ko */
+/* - ./scst/src/dev_handlers/scst_changer.ko */
+/* - ./scst/src/dev_handlers/scst_disk.ko */
+/* - ./scst/src/dev_handlers/scst_modisk.ko */
+/* - ./scst/src/dev_handlers/scst_processor.ko */
+/* - ./scst/src/dev_handlers/scst_raid.ko */
+/* - ./scst/src/dev_handlers/scst_user.ko */
+/* - ./scst/src/dev_handlers/scst_vdisk.ko */
+
+/* - ./scst_local/scst_local.ko */
+
+/* - ./srpt/src/ib_srpt.ko */
+
+
+struct scst_init_req {
+	struct scst_req req;
+
+	TAILQ_HEAD(, scst_driver) drivers;
+	struct scst_driver *drv;
+};
+
+struct scst_deinit_req {
+	struct scst_req req;
+
+	TAILQ_HEAD(, scst_driver) drivers;
+	struct scst_driver *drv;
+};
+
+static inline int
+scst_modprobe(struct scst_driver *driver, subprocess_done_t done, void *priv)
+{
+	const char *modprobe[] = {"modprobe", driver->name};
+
+	return scst_req_subprocess(modprobe, SPDK_COUNTOF(modprobe), done, priv);
+}
+
+static inline int
+scst_rmmod(struct scst_driver *driver, subprocess_done_t done, void *priv)
+{
+	const char *modprobe[] = {"rmmod", driver->name};
+
+	return scst_req_subprocess(modprobe, SPDK_COUNTOF(modprobe), done, priv);
+}
+
+
+SCST_REQ_DEFINE(init)
+SCST_REQ_DEFINE(deinit)
+
+#endif /* _SCST_LIB_H */

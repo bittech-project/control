@@ -7,7 +7,16 @@
           "method": "control",
           "params": {
             "subsystem": "scst",
-            "op": "init"
+            "op": "init",
+            "drivers": ["scst_local", "scst_vdisk"]
+          }
+	},
+	{
+          "method": "control",
+          "params": {
+            "subsystem": "scst",
+            "op": "deinit",
+            "drivers": ["scst_local", "scst_vdisk"]
           }
         }
       ]

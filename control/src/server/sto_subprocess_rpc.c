@@ -1,3 +1,4 @@
+#include <spdk/json.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
 

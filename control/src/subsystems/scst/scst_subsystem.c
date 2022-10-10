@@ -1,24 +1,30 @@
 #include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
+#include <spdk/util.h>
 
-#include "scst.h"
+#include "err.h"
 #include "sto_subsystem.h"
 #include "sto_core.h"
-#include "err.h"
+#include "scst.h"
+#include "scst_lib.h"
+
+enum scst_ops {
+	SCST_OP_INIT,
+	SCST_OP_DEINIT,
+	SCST_OP_COUNT,
+};
 
 static const struct scst_cdbops scst_op_table[] = {
 	{
 		.op.ops = SCST_OP_INIT,
 		.op.name = "init",
 		.constructor = scst_req_init_constructor,
-		.fn = scst_constructor,
 	},
 	{
 		.op.ops = SCST_OP_DEINIT,
 		.op.name = "deinit",
 		.constructor = scst_req_deinit_constructor,
-		.fn = scst_destructor,
 	}
 };
 
@@ -32,7 +38,7 @@ scst_get_cdbops(const char *op_name)
 	for (i = 0; i < SCST_OP_TBL_SIZE; i++) {
 		const struct scst_cdbops *op = &scst_op_table[i];
 
-		if (!strncmp(op_name, op->op.name, sizeof(op->op.name))) {
+		if (!strcmp(op_name, op->op.name)) {
 			return op;
 		}
 	}
@@ -47,6 +53,7 @@ scst_alloc_req(const struct spdk_json_val *params)
 	char *op_name = NULL;
 	const struct scst_cdbops *op;
 	struct scst_req *req = NULL;
+	int rc;
 
 	cdb = sto_decode_cdb(params, "op", &op_name);
 	if (IS_ERR(cdb)) {
@@ -61,12 +68,18 @@ scst_alloc_req(const struct spdk_json_val *params)
 		goto out;
 	}
 
-	req = op->constructor(op, cdb);
+	req = op->constructor(op);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("SCST: Failed to construct req\n");
 		goto out;
 	}
 
+	rc = req->decode_cdb(req, cdb);
+	if (rc) {
+		SPDK_ERRLOG("SCST: Failed to decode CDB, rc=%d\n", rc);
+		req->req_free(req);
+		req = NULL;
+	}
 out:
 	free(op_name);
 	free((struct spdk_json_val *) cdb);
@@ -113,6 +126,8 @@ scst_done_req(void *req_arg)
 
 static struct sto_subsystem g_scst_subsystem = {
 	.name = "scst",
+	.init = scst_subsystem_init,
+	.fini = scst_subsystem_fini,
 	.alloc_req = scst_alloc_req,
 	.init_req  = scst_init_req,
 	.exec_req  = scst_exec_req,

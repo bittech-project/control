@@ -210,7 +210,7 @@ static int
 sto_req_parse(struct sto_req *req)
 {
 	struct sto_subsystem *subsystem;
-	int rc;
+	int rc = 0;
 
 	rc = sto_req_get_subsystem(req);
 	if (spdk_unlikely(rc)) {
@@ -221,7 +221,7 @@ sto_req_parse(struct sto_req *req)
 	subsystem = req->subsystem;
 
 	req->subsys_req = subsystem->alloc_req(req->cdb);
-	if (spdk_unlikely(!req->priv)) {
+	if (spdk_unlikely(!req->subsys_req)) {
 		SPDK_ERRLOG("Failed to alloc %s req\n", subsystem->name);
 		return -EINVAL;
 	}
@@ -229,7 +229,7 @@ sto_req_parse(struct sto_req *req)
 	sto_req_set_state(req, STO_REQ_STATE_EXEC);
 	sto_req_process(req);
 
-	return rc;
+	return 0;
 }
 
 static void

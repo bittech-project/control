@@ -1,68 +1,285 @@
-#include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
-#include <spdk/util.h>
-
-#include <rte_malloc.h>
 
 #include "scst.h"
 #include "sto_subprocess_front.h"
 
-#define SCST_ROOT "/sys/kernel/scst_tgt"
-
-/* Root-level */
-#define SCST_SGV	"sgv"
-#define SCST_HANDLERS	"handlers"
-#define SCST_DEVICES	"devices"
-#define SCST_TARGETS	"targets"
-#define SCST_DEV_GROUPS	"device_groups"
-#define SCST_QUEUE_RES	"last_sysfs_mgmt_res"
-
-/* Device group specific */
-#define SCST_DG_DEVICES	"devices"
-#define SCST_DG_TGROUPS	"target_groups"
-
-/* Target specific */
-#define SCST_GROUPS	"ini_groups"
-#define SCST_INITIATORS	"initiators"
-#define SCST_SESSIONS	"sessions"
-#define SCST_LUNS	"luns"
-
-/* Files */
-#define SCST_MGMT_IO	"mgmt"
-#define SCST_VERSION_IO	"version"
-#define SCST_TRACE_IO	"trace_level"
-#define SCST_RESYNC_IO	"resync_size"
-#define SCST_T10_IO	"t10_dev_id"
-
 static struct scst g_scst;
 
-static const char *const scst_module_names[] = {
-	[__SCST_CORE]		= "scst",
-	[__SCST_LOCAL]		= "scst_local",
-	[__SCST_FCST]		= "fcst",
-	[__SCST_ISCSI]		= "iscsi-scst",
-	[__SCST_ISER]		= "isert-scst",
-	[__SCST_IB]		= "ib_srpt",
-	[__SCST_QLA]		= "qla2xxx_scst",
-	[__SCST_QLA_TARGET]	= "qla2x00tgt"
+static const char *const scst_tgt_names[] = {
+	[SCST_TGT_LOCAL]	= "scst_local",
+	[SCST_TGT_FCST]		= "fcst",
+	[SCST_TGT_ISCSI]	= "iscsi-scst",
+	[SCST_TGT_ISER]		= "isert-scst",
+	[SCST_TGT_IB]		= "ib_srpt",
+	[SCST_TGT_QLA]		= "qla2x00tgt",
 };
 
-const char *
-scst_module_name(enum scst_module_bits idx)
+static const char *
+scst_tgt_name(enum scst_tgt_type type)
 {
-	size_t index = idx;
+	size_t index = type;
 
-	if (spdk_unlikely(index >= SPDK_COUNTOF(scst_module_names))) {
+	if (spdk_unlikely(index >= SPDK_COUNTOF(scst_tgt_names))) {
 		assert(0);
 	}
 
-	return scst_module_names[index];
+	return scst_tgt_names[index];
 }
 
-static int
-scst_req_subprocess(struct scst_req *req, const char *cmd[],
-		    int numargs, subprocess_done_t cmd_done)
+struct scst_tgt *
+scst_find_tgt_by_name(struct scst *scst, const char *name)
+{
+	int i;
+
+	for (i = 0; i < SCST_TGT_COUNT; i++) {
+		const char *tgt_name = scst->tgts[i].name;
+
+		if (!strcmp(name, tgt_name)) {
+			return &scst->tgts[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void
+scst_tgt_init(struct scst_tgt *tgt, enum scst_tgt_type type)
+{
+	tgt->type = type;
+	tgt->name = scst_tgt_name(type);
+}
+
+static const char *const scst_dh_names[] = {
+	[SCST_DH_TAPE]		= "scst_tape",
+	[SCST_DH_CDROM]		= "scst_cdrom",
+	[SCST_DH_CHANGER]	= "scst_changer",
+	[SCST_DH_DISK]		= "scst_disk",
+	[SCST_DH_MODISK]	= "scst_modisk",
+	[SCST_DH_PROCESSOR]	= "scst_processor",
+	[SCST_DH_RAID]		= "scst_raid",
+	[SCST_DH_USER]		= "scst_user",
+	[SCST_DH_VDISK]		= "scst_vdisk",
+};
+
+const char *
+scst_dh_name(enum scst_dh_type type)
+{
+	size_t index = type;
+
+	if (spdk_unlikely(index >= SPDK_COUNTOF(scst_dh_names))) {
+		assert(0);
+	}
+
+	return scst_dh_names[index];
+}
+
+struct scst_dh *
+scst_find_dh_by_name(struct scst *scst, const char *name)
+{
+	int i;
+
+	for (i = 0; i < SCST_TGT_COUNT; i++) {
+		const char *dh_name = scst->dhs[i].name;
+
+		if (!strcmp(name, dh_name)) {
+			return &scst->dhs[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void
+scst_dh_init(struct scst_dh *dh, enum scst_dh_type type)
+{
+	dh->type = type;
+	dh->name = scst_dh_name(type);
+}
+
+static const char *const scst_drv_names[] = {
+	[SCST_DRV_CORE]		= "scst",
+	[SCST_DRV_LOCAL]	= "scst_local",
+	[SCST_DRV_FCST]		= "fcst",
+	[SCST_DRV_ISCSI]	= "iscsi-scst",
+	[SCST_DRV_ISER]		= "isert-scst",
+	[SCST_DRV_IB]		= "ib_srpt",
+	[SCST_DRV_QLA]		= "qla2xxx_scst",
+	[SCST_DRV_QLA_TARGET]	= "qla2x00tgt",
+	[SCST_DRV_TAPE]		= "scst_tape",
+	[SCST_DRV_CDROM]	= "scst_cdrom",
+	[SCST_DRV_CHANGER]	= "scst_changer",
+	[SCST_DRV_DISK]		= "scst_disk",
+	[SCST_DRV_MODISK]	= "scst_modisk",
+	[SCST_DRV_PROCESSOR]	= "scst_processor",
+	[SCST_DRV_RAID]		= "scst_raid",
+	[SCST_DRV_USER]		= "scst_user",
+	[SCST_DRV_VDISK]	= "scst_vdisk",
+};
+
+const char *
+scst_drv_name(enum scst_drv_type type)
+{
+	size_t index = type;
+
+	if (spdk_unlikely(index >= SPDK_COUNTOF(scst_drv_names))) {
+		assert(0);
+	}
+
+	return scst_drv_names[index];
+}
+
+struct scst_driver *
+scst_find_drv_by_name(struct scst *scst, const char *name)
+{
+	int i;
+
+	for (i = 0; i < SCST_DRV_COUNT; i++) {
+		const char *drv_name = scst->drivers[i].name;
+
+		if (!strcmp(name, drv_name)) {
+			return &scst->drivers[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void
+scst_drv_init(struct scst_driver *drv, enum scst_drv_type type)
+{
+	drv->type = type;
+	drv->name = scst_drv_name(type);
+	drv->status = DRV_UNLOADED;
+
+	TAILQ_INIT(&drv->master_list);
+	TAILQ_INIT(&drv->slave_list);
+}
+
+static void
+scst_drv_bind(struct scst_driver *master, struct scst_driver *slave)
+{
+	struct scst_driver_dep *dep;
+
+	dep = calloc(1, sizeof(*dep));
+	assert(dep != NULL);
+
+	dep->drv = master;
+	TAILQ_INSERT_TAIL(&slave->master_list, dep, list);
+
+	dep = calloc(1, sizeof(*dep));
+	assert(dep != NULL);
+
+	dep->drv = slave;
+	TAILQ_INSERT_TAIL(&master->slave_list, dep, list);
+}
+
+static void
+scst_drv_configure(struct scst *scst, struct scst_driver *drv)
+{
+	struct scst_driver *master_drv;
+
+	if (drv->type == SCST_DRV_CORE) {
+		return;
+	}
+
+	master_drv = &scst->drivers[SCST_DRV_CORE];
+
+	scst_drv_bind(master_drv, drv);
+
+	if (drv->type == SCST_DRV_ISER) {
+		master_drv = &scst->drivers[SCST_DRV_ISCSI];
+
+		scst_drv_bind(master_drv, drv);
+		return;
+	}
+
+	if (drv->type == SCST_DRV_QLA_TARGET) {
+		master_drv = &scst->drivers[SCST_DRV_QLA];
+
+		scst_drv_bind(master_drv, drv);
+		return;
+	}
+
+	return;
+}
+
+static void
+scst_drv_fini(struct scst_driver *drv)
+{
+	struct scst_driver_dep *drv_dep, *tmp;
+
+	TAILQ_FOREACH_SAFE(drv_dep, &drv->master_list, list, tmp) {
+		TAILQ_REMOVE(&drv->master_list, drv_dep, list);
+		free(drv_dep);
+	}
+
+	TAILQ_FOREACH_SAFE(drv_dep, &drv->slave_list, list, tmp) {
+		TAILQ_REMOVE(&drv->slave_list, drv_dep, list);
+		free(drv_dep);
+	}
+}
+
+void
+scst_subsystem_init(void)
+{
+	struct scst *scst = &g_scst;
+	int i;
+
+	if (spdk_unlikely(scst->initialized)) {
+		SPDK_ERRLOG("SCST: Subsystem has already been initialized\n");
+		return;
+	}
+
+	memset(scst, 0, sizeof(*scst));
+
+	for (i = 0; i < SCST_DRV_COUNT; i++) {
+		struct scst_driver *drv = &scst->drivers[i];
+
+		scst_drv_init(drv, i);
+		scst_drv_configure(scst, drv);
+	}
+
+	for (i = 0; i < SCST_TGT_COUNT; i++) {
+		struct scst_tgt *tgt = &scst->tgts[i];
+
+		scst_tgt_init(tgt, i);
+	}
+
+	for (i = 0; i < SCST_DH_COUNT; i++) {
+		struct scst_dh *dh = &scst->dhs[i];
+
+		scst_dh_init(dh, i);
+	}
+
+	scst->initialized = true;
+
+	return;
+}
+
+void
+scst_subsystem_fini(void)
+{
+	struct scst *scst = &g_scst;
+	int i;
+
+	if (spdk_unlikely(!scst->initialized)) {
+		SPDK_ERRLOG("SCST: Subsystem has not been initialized yet\n");
+		return;
+	}
+
+	for (i = 0; i < SCST_DRV_COUNT; i++) {
+		struct scst_driver *drv = &scst->drivers[i];
+
+		scst_drv_fini(drv);
+	}
+
+	scst->initialized = false;
+}
+
+int
+scst_req_subprocess(const char *cmd[], int numargs,
+		    subprocess_done_t cmd_done, struct scst_req *req)
 {
 	struct sto_subprocess *subp;
 	int rc = 0;
@@ -77,7 +294,7 @@ scst_req_subprocess(struct scst_req *req, const char *cmd[],
 
 	rc = sto_subprocess_run(subp);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to run subprocess\n");
+		SPDK_ERRLOG("Failed to run subprocess, rc=%d\n", rc);
 		goto free_subp;
 	}
 
@@ -89,198 +306,15 @@ free_subp:
 	return rc;
 }
 
-static void
-scst_module_load_done(struct sto_subprocess *subp)
-{
-	struct scst_req *req = subp->priv;
-	struct scst_construct_req *constr_req = to_construct_req(req);
-	struct scst *scst = req->scst;
-	int rc;
-
-	rc = subp->returncode;
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Subprocess failed exec, rc=%d\n", rc);
-		sto_subprocess_free(subp);
-		req->req_done(req->priv);
-		return;
-	}
-
-	scst->load_map[constr_req->module_idx] = SCST_LOADED;
-
-	sto_subprocess_free(subp);
-
-	scst_req_submit(req);
-}
-
-static void
-scst_module_unload_done(struct sto_subprocess *subp)
-{
-	struct scst_req *req = subp->priv;
-	struct scst_destruct_req *destr_req = to_destruct_req(req);
-	struct scst *scst = req->scst;
-
-	scst->load_map[destr_req->module_idx] = SCST_NOT_LOADED;
-
-	sto_subprocess_free(subp);
-
-	scst_req_submit(req);
-}
-
-static int
-scst_module_load(struct scst_req *req)
-{
-	struct scst_construct_req *constr_req = to_construct_req(req);
-	const char *modprobe[] = {"modprobe", scst_module_name(constr_req->module_idx)};
-
-	return scst_req_subprocess(req, modprobe, SPDK_COUNTOF(modprobe), scst_module_load_done);
-}
-
-static int
-scst_module_unload(struct scst_req *req)
-{
-	struct scst_destruct_req *destr_req = to_destruct_req(req);
-	const char *rmmod[] = {"rmmod", scst_module_name(destr_req->module_idx)};
-
-	return scst_req_subprocess(req, rmmod, SPDK_COUNTOF(rmmod), scst_module_unload_done);
-}
-
-static void
-scst_tag_modules(struct scst *scst, struct scst_construct_req *req)
-{
-	int i;
-
-	if (scst->load_map[SCST_CORE] != SCST_LOADED) {
-		req->modules_bitmap |= SCST_CORE;
-	}
-
-	if (req->modules_bitmap & SCST_ISER) {
-		req->modules_bitmap |= SCST_ISCSI;
-	}
-
-	if (req->modules_bitmap & SCST_QLA_TARGET) {
-		req->modules_bitmap |= SCST_QLA;
-	}
-
-	for (i = 0; i < __SCST_NR_BITS; i++) {
-		if (scst_module_test_bit(req->modules_bitmap, i) &&
-		    scst->load_map[i] != SCST_LOADED) {
-			scst->load_map[i] = SCST_NEED_LOAD;
-		}
-	}
-}
-
-int
-scst_constructor(struct scst_req *req)
-{
-	struct scst_construct_req *constr_req = to_construct_req(req);
-	struct scst *scst = req->scst;
-	int i;
-
-	if (!constr_req->is_tagged) {
-		scst_tag_modules(scst, constr_req);
-		constr_req->is_tagged = true;
-	}
-
-	for (i = 0; i < __SCST_NR_BITS; i++) {
-		if (scst->load_map[i] == SCST_NEED_LOAD) {
-			constr_req->module_idx = i;
-			return scst_module_load(req);
-		}
-	}
-
-	req->req_done(req->priv);
-
-	return 0;
-}
-
-int
-scst_destructor(struct scst_req *req)
-{
-	struct scst_destruct_req *destr_req = to_destruct_req(req);
-	struct scst *scst = req->scst;
-	int i;
-
-	for (i = __SCST_NR_BITS - 1; i >= 0; i--) {
-		if (scst->load_map[i] == SCST_LOADED) {
-			destr_req->module_idx = i;
-			return scst_module_unload(req);
-		}
-	}
-
-	req->req_done(req->priv);
-
-	return 0;
-}
-
-static void
+void
 scst_req_init(struct scst_req *req, const struct scst_cdbops *op)
 {
 	req->scst = &g_scst;
 	req->op = op;
 }
 
-static void
-scst_construct_req_free(struct scst_req *req)
-{
-	struct scst_construct_req *constr_req = to_construct_req(req);
-	rte_free(constr_req);
-}
-
-struct scst_req *
-scst_req_init_constructor(const struct scst_cdbops *op, const struct spdk_json_val *params)
-{
-	struct scst_construct_req *constr_req;
-	struct scst_req *req;
-
-	constr_req = rte_zmalloc(NULL, sizeof(*constr_req), 0);
-	if (spdk_unlikely(!constr_req)) {
-		SPDK_ERRLOG("Failed to alloc SCST construct req\n");
-		return NULL;
-	}
-
-	req = &constr_req->req;
-
-	scst_req_init(req, op);
-	req->req_free = scst_construct_req_free;
-
-	constr_req->modules_bitmap = 0;
-
-	return req;
-}
-
-static void
-scst_destruct_req_free(struct scst_req *req)
-{
-	struct scst_destruct_req *destr_req = to_destruct_req(req);
-	rte_free(destr_req);
-}
-
-struct scst_req *
-scst_req_deinit_constructor(const struct scst_cdbops *op, const struct spdk_json_val *params)
-{
-	struct scst_destruct_req *destr_req;
-	struct scst_req *req;
-
-	destr_req = rte_zmalloc(NULL, sizeof(*destr_req), 0);
-	if (spdk_unlikely(!destr_req)) {
-		SPDK_ERRLOG("Failed to alloc SCST destruct req\n");
-		return NULL;
-	}
-
-	req = &destr_req->req;
-
-	scst_req_init(req, op);
-	req->req_free = scst_destruct_req_free;
-
-	return req;
-}
-
 int
 scst_req_submit(struct scst_req *req)
 {
-	int rc;
-
-	rc = req->op->fn(req);
-
-	return rc;
+	return req->req_exec(req);
 }

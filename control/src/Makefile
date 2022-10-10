@@ -16,7 +16,7 @@ C_SRCS = main.c sto_spdk_subsystem.c sto_control.c sto_subsystem.c sto_core.c \
 	 server/sto_server.c server/sto_exec.c server/sto_subprocess_back.c server/sto_subprocess_rpc.c \
 	 server/sto_aio.c server/sto_aio_rpc.c \
 	 rpc/sto_exec_rpc.c rpc/sto_aio_rpc.c rpc/sto_control_rpc.c \
-	 $(SCST_SUBSYS)/scst_main.c $(SCST_SUBSYS)/scst_subsystem.c $(SCST_SUBSYS)/scst_rpc.c
+	 $(SCST_SUBSYS)/scst_main.c $(SCST_SUBSYS)/scst_subsystem.c $(SCST_SUBSYS)/scst_lib.c $(SCST_SUBSYS)/scst_rpc.c
 OBJS := ${C_SRCS:.c=.o}
 
 all: $(PROG)

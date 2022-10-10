@@ -1,98 +1,138 @@
-#ifndef _SCST_H
-#define _SCST_H
-
-#include <spdk/util.h>
+#ifndef _SCST_H_
+#define _SCST_H_
 
 #include "sto_core.h"
+#include "sto_subprocess_front.h"
 
-/* ./scst/src/scst.ko */
-/* - ./fcst/fcst.ko */
+#define SCST_ROOT "/sys/kernel/scst_tgt"
 
-/* - ./iscsi-scst/kernel/iscsi-scst.ko */
-/* - - ./iscsi-scst/kernel/isert-scst/isert-scst.ko */
+/* Root-level */
+#define SCST_SGV	"sgv"
+#define SCST_HANDLERS	"handlers"
+#define SCST_DEVICES	"devices"
+#define SCST_TARGETS	"targets"
+#define SCST_DEV_GROUPS	"device_groups"
+#define SCST_QUEUE_RES	"last_sysfs_mgmt_res"
 
-/* - ./qla2x00t-32gbit/qla2xxx_scst.ko */
-/* - - ./qla2x00t-32gbit/qla2x00-target/qla2x00tgt.ko */
+/* Device group specific */
+#define SCST_DG_DEVICES	"devices"
+#define SCST_DG_TGROUPS	"target_groups"
 
-/* - ./qla2x00t/qla2xxx_scst.ko */
-/* - ./qla2x00t/qla2x00-target/qla2x00tgt.ko */
+/* Target specific */
+#define SCST_GROUPS	"ini_groups"
+#define SCST_INITIATORS	"initiators"
+#define SCST_SESSIONS	"sessions"
+#define SCST_LUNS	"luns"
 
-/* - ./scst/src/dev_handlers/scst_tape.ko */
-/* - ./scst/src/dev_handlers/scst_cdrom.ko */
-/* - ./scst/src/dev_handlers/scst_changer.ko */
-/* - ./scst/src/dev_handlers/scst_disk.ko */
-/* - ./scst/src/dev_handlers/scst_modisk.ko */
-/* - ./scst/src/dev_handlers/scst_processor.ko */
-/* - ./scst/src/dev_handlers/scst_raid.ko */
-/* - ./scst/src/dev_handlers/scst_user.ko */
-/* - ./scst/src/dev_handlers/scst_vdisk.ko */
+/* Files */
+#define SCST_MGMT_IO	"mgmt"
+#define SCST_VERSION_IO	"version"
+#define SCST_TRACE_IO	"trace_level"
+#define SCST_RESYNC_IO	"resync_size"
+#define SCST_T10_IO	"t10_dev_id"
 
-/* - ./scst_local/scst_local.ko */
-
-/* - ./srpt/src/ib_srpt.ko */
-
-enum scst_module_bits {
-	__SCST_CORE,
-	__SCST_LOCAL,
-	__SCST_FCST,
-	__SCST_ISCSI,
-	__SCST_ISER,
-	__SCST_IB,
-	__SCST_QLA,
-	__SCST_QLA_TARGET,
-	__SCST_NR_BITS
+enum scst_tgt_type {
+	SCST_TGT_LOCAL,
+	SCST_TGT_FCST,
+	SCST_TGT_ISCSI,
+	SCST_TGT_ISER,
+	SCST_TGT_IB,
+	SCST_TGT_QLA,
+	SCST_TGT_COUNT,
 };
 
-#define BIT(nr) (1ULL << (nr))
-
-enum scst_module {
-	SCST_CORE	= BIT(__SCST_CORE),
-	SCST_LOCAL	= BIT(__SCST_LOCAL),
-	SCST_FCST	= BIT(__SCST_FCST),
-	SCST_ISCSI	= BIT(__SCST_ISCSI),
-	SCST_ISER	= BIT(__SCST_ISER),
-	SCST_IB		= BIT(__SCST_IB),
-	SCST_QLA	= BIT(__SCST_QLA),
-	SCST_QLA_TARGET	= BIT(__SCST_QLA_TARGET),
+enum scst_dh_type {
+	SCST_DH_TAPE,
+	SCST_DH_CDROM,
+	SCST_DH_CHANGER,
+	SCST_DH_DISK,
+	SCST_DH_MODISK,
+	SCST_DH_PROCESSOR,
+	SCST_DH_RAID,
+	SCST_DH_USER,
+	SCST_DH_VDISK,
+	SCST_DH_COUNT
 };
 
-static inline bool
-scst_module_test_bit(unsigned long bitmap, enum scst_module_bits bit)
-{
-	return bitmap & BIT(bit);
-}
+enum scst_drv_type {
+	SCST_DRV_CORE,
+	SCST_DRV_LOCAL,
+	SCST_DRV_FCST,
+	SCST_DRV_ISCSI,
+	SCST_DRV_ISER,
+	SCST_DRV_IB,
+	SCST_DRV_QLA,
+	SCST_DRV_QLA_TARGET,
+	SCST_DRV_TAPE,
+	SCST_DRV_CDROM,
+	SCST_DRV_CHANGER,
+	SCST_DRV_DISK,
+	SCST_DRV_MODISK,
+	SCST_DRV_PROCESSOR,
+	SCST_DRV_RAID,
+	SCST_DRV_USER,
+	SCST_DRV_VDISK,
+	SCST_DRV_COUNT,
+};
 
-enum scst_module_status {
-	SCST_NOT_LOADED,
-	SCST_NEED_LOAD,
-	SCST_LOADED,
+enum scst_drv_status {
+	DRV_LOADED,
+	DRV_NEED_LOAD,
+	DRV_UNLOADED,
+	DRV_NEED_UNLOAD,
+};
+
+struct scst_driver_dep {
+	struct scst_driver *drv;
+	TAILQ_ENTRY(scst_driver_dep) list;
+};
+
+struct scst_driver {
+	const char *name;
+	enum scst_drv_type type;
+
+	enum scst_drv_status status;
+
+	TAILQ_ENTRY(scst_driver) list;
+
+	TAILQ_HEAD(, scst_driver_dep) master_list;
+	TAILQ_HEAD(, scst_driver_dep) slave_list;
+};
+
+struct scst_tgt {
+	const char *name;
+	enum scst_tgt_type type;
+};
+
+struct scst_dh {
+	const char *name;
+	enum scst_dh_type type;
+};
+
+struct scst {
+	struct scst_tgt tgts[SCST_TGT_COUNT];
+	struct scst_dh dhs[SCST_DH_COUNT];
+
+	struct scst_driver drivers[SCST_DRV_COUNT];
+
+	bool initialized;
 };
 
 struct scst_req;
 struct scst_cdbops;
 
-struct scst {
-	uint8_t load_map[__SCST_NR_BITS];
-};
-
-typedef struct scst_req *(*req_constructor_fn_t)(const struct scst_cdbops *op,
-						 const struct spdk_json_val *params);
-typedef int (*scst_op_fn_t)(struct scst_req *req);
+typedef struct scst_req *(*scst_req_constructor_t)(const struct scst_cdbops *op);
 
 struct scst_cdbops {
 	struct sto_cdbops op;
 
-	req_constructor_fn_t constructor;
-	scst_op_fn_t fn;
-};
-
-enum scst_ops {
-	SCST_OP_INIT,
-	SCST_OP_DEINIT,
-	SCST_OP_COUNT,
+	scst_req_constructor_t constructor;
 };
 
 typedef void (*scst_req_done_t)(void *priv);
+
+typedef int (*scst_req_decode_cdb_t)(struct scst_req *req, const struct spdk_json_val *cdb);
+typedef int (*scst_req_exec_t)(struct scst_req *req);
 typedef void (*scst_req_free_t)(struct scst_req *req);
 
 struct scst_req {
@@ -103,45 +143,64 @@ struct scst_req {
 
 	const struct scst_cdbops *op;
 
+	scst_req_decode_cdb_t decode_cdb;
+	scst_req_exec_t req_exec;
 	scst_req_free_t req_free;
 };
 
-struct scst_construct_req {
-	struct scst_req req;
+#define SCST_REQ_DEFINE(req_type)							\
+static inline struct scst_ ## req_type ## _req *					\
+to_ ## req_type ## _req(struct scst_req *req)						\
+{											\
+	return SPDK_CONTAINEROF(req, struct scst_ ## req_type ## _req, req);		\
+}											\
+											\
+struct scst_req *scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op);
 
-	bool is_tagged;
-	unsigned long modules_bitmap;
 
-	enum scst_module_bits module_idx;
-};
-
-struct scst_destruct_req {
-	struct scst_req req;
-
-	enum scst_module_bits module_idx;
-};
-
-static inline struct scst_construct_req *
-to_construct_req(struct scst_req *req)
-{
-	return SPDK_CONTAINEROF(req, struct scst_construct_req, req);
+#define SCST_REQ_REGISTER(req_type)							\
+static void										\
+scst_ ## req_type ## _req_free(struct scst_req *req)					\
+{											\
+	struct scst_ ## req_type ## _req * req_ ## req_type =				\
+						to_ ## req_type ## _req(req);		\
+	rte_free(req_ ## req_type);							\
+}											\
+											\
+struct scst_req *									\
+scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
+{											\
+	struct scst_ ## req_type ## _req * req_ ## req_type;				\
+	struct scst_req *req;								\
+											\
+	req_ ## req_type = rte_zmalloc(NULL, sizeof(*req_ ## req_type), 0);		\
+	if (spdk_unlikely(!req_ ## req_type)) {						\
+		SPDK_ERRLOG("Failed to alloc SCST req\n");				\
+		return NULL;								\
+	}										\
+											\
+	req = &req_ ## req_type->req;							\
+											\
+	scst_req_init(req, op);								\
+											\
+	req->decode_cdb = scst_req_ ## req_type ## _decode_cdb;				\
+	req->req_exec = scst_ ## req_type;						\
+	req->req_free = scst_ ## req_type ## _req_free;					\
+											\
+	return req;									\
 }
 
-static inline struct scst_destruct_req *
-to_destruct_req(struct scst_req *req)
-{
-	return SPDK_CONTAINEROF(req, struct scst_destruct_req, req);
-}
+void scst_subsystem_init(void);
+void scst_subsystem_fini(void);
 
-const char *scst_module_name(enum scst_module_bits module_bit);
+struct scst_tgt *scst_find_tgt_by_name(struct scst *scst, const char *name);
+struct scst_dh *scst_find_dh_by_name(struct scst *scst, const char *name);
+struct scst_driver *scst_find_drv_by_name(struct scst *scst, const char *name);
 
-struct scst_req *scst_req_init_constructor(const struct scst_cdbops *op,
-					   const struct spdk_json_val *params);
-struct scst_req *scst_req_deinit_constructor(const struct scst_cdbops *op,
-					     const struct spdk_json_val *params);
-int scst_constructor(struct scst_req *req);
-int scst_destructor(struct scst_req *req);
-
+void scst_req_init(struct scst_req *req, const struct scst_cdbops *op);
 int scst_req_submit(struct scst_req *req);
 
-#endif /* _SCST_H */
+int scst_req_subprocess(const char *cmd[], int numargs,
+			subprocess_done_t cmd_done, struct scst_req *req);
+
+#endif /* _SCST_H_ */
