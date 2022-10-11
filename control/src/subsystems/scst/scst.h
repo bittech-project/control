@@ -137,7 +137,7 @@ struct scst_req {
 	struct scst *scst;
 
 	void *priv;
-	sto_response_cb_t response;
+	sto_response_cb_t resp_cb;
 
 	const struct scst_cdbops *op;
 
@@ -191,7 +191,7 @@ scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
 #define SCST_SEND_RESP(req, rc, fmt, ...)						\
 do {											\
 	struct sto_response *resp = sto_response_alloc(rc, fmt, ## __VA_ARGS__);	\
-	req->response(req->priv, resp);							\
+	req->resp_cb(req->priv, resp);							\
 } while (0)
 
 void scst_subsystem_init(void);

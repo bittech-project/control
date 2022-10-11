@@ -93,9 +93,7 @@ scst(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 
 	ctx->subsys_req = subsys_req;
 
-	subsystem->init_req(subsys_req, scst_done, ctx);
-
-	rc = subsystem->exec_req(subsys_req);
+	rc = subsystem->exec_req(subsys_req, scst_done, ctx);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to exec SCST req, rc=%d\n", rc);
 		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));

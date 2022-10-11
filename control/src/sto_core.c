@@ -301,8 +301,7 @@ sto_req_exec(struct sto_req *req)
 	void *subsys_req = req->subsys_req;
 	int rc;
 
-	subsystem->init_req(subsys_req, sto_exec_done, req);
-	rc = subsystem->exec_req(subsys_req);
+	rc = subsystem->exec_req(subsys_req, sto_exec_done, req);
 
 	return rc;
 }

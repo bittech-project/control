@@ -88,21 +88,21 @@ out:
 }
 
 static void
-scst_init_req(void *req_arg, sto_response_cb_t response, void *priv)
+scst_init_req(struct scst_req *req, sto_response_cb_t resp_cb, void *priv)
 {
-	struct scst_req *req = req_arg;
-
-	req->response = response;
+	req->resp_cb = resp_cb;
 	req->priv = priv;
 }
 
 static int
-scst_exec_req(void *req_arg)
+scst_exec_req(void *req_arg, sto_response_cb_t resp_cb, void *priv)
 {
 	struct scst_req *req = req_arg;
 	int rc = 0;
 
 	SPDK_NOTICELOG("SCST: Exec req[%p]\n", req);
+
+	scst_init_req(req, resp_cb, priv);
 
 	rc = scst_req_submit(req);
 	if (spdk_unlikely(rc)) {
@@ -129,7 +129,6 @@ static struct sto_subsystem g_scst_subsystem = {
 	.init = scst_subsystem_init,
 	.fini = scst_subsystem_fini,
 	.alloc_req = scst_alloc_req,
-	.init_req  = scst_init_req,
 	.exec_req  = scst_exec_req,
 	.done_req  = scst_done_req,
 };

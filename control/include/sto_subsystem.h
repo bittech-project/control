@@ -9,8 +9,7 @@ typedef void (*sto_subsys_init_t)(void);
 typedef void (*sto_subsys_fini_t)(void);
 
 typedef void *(*sto_subsys_alloc_req_t)(const struct spdk_json_val *params);
-typedef void (*sto_subsys_init_req_t)(void *req_arg, sto_response_cb_t resp_cb, void *priv);
-typedef int (*sto_subsys_exec_req_t)(void *req_arg);
+typedef int (*sto_subsys_exec_req_t)(void *req_arg, sto_response_cb_t resp_cb, void *priv);
 typedef void (*sto_subsys_done_req_t)(void *req_arg);
 
 struct sto_subsystem {
@@ -21,7 +20,6 @@ struct sto_subsystem {
 
 	sto_subsys_alloc_req_t alloc_req;
 
-	sto_subsys_init_req_t init_req;
 	sto_subsys_exec_req_t exec_req;
 	sto_subsys_done_req_t done_req;
 
