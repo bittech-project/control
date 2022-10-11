@@ -71,6 +71,23 @@ if __name__ == "__main__":
     p = subparsers.add_parser('spdk_get_version', help='Get SPDK version')
     p.set_defaults(func=spdk_get_version)
 
+    # scst
+    def scst_drivers_init(args):
+        rpc.scst.scst_drivers_init(args.client,
+                                   drivers=args.drivers)
+
+    p = subparsers.add_parser('scst_drivers_init', help='Load specified SCST drivers')
+    p.add_argument('-d', '--drivers', nargs='+', help='SCST driver names', required=True, type=str)
+    p.set_defaults(func=scst_drivers_init)
+
+    def scst_drivers_deinit(args):
+        rpc.scst.scst_drivers_deinit(args.client,
+                                     drivers=args.drivers)
+
+    p = subparsers.add_parser('scst_drivers_deinit', help='Unload specified SCST drivers')
+    p.add_argument('-d', '--drivers', nargs='+', help='SCST driver names', required=True, type=str)
+    p.set_defaults(func=scst_drivers_deinit)
+
     def check_called_name(name):
         if name in deprecated_aliases:
             print("{} is deprecated, use {} instead.".format(name, deprecated_aliases[name]), file=sys.stderr)
