@@ -80,10 +80,13 @@ sto_subprocess_resp_handler(struct sto_rpc_request *rpc_req,
 
 	subp->returncode = result.returncode;
 
-	subp->output = strdup(result.output);
-	if (spdk_unlikely(!subp->output)) {
-		SPDK_ERRLOG("Failed allocate output for subprocess\n");
-		goto out;
+	if (subp->capture_output) {
+		subp->output = strdup(result.output);
+		if (spdk_unlikely(!subp->output)) {
+			SPDK_ERRLOG("Failed allocate output for subprocess\n");
+			subp->returncode = -ENOMEM;
+			goto out;
+		}
 	}
 
 	SPDK_NOTICELOG("GLEB: Get result from subprocess response: returncode[%d] output: %s\n",

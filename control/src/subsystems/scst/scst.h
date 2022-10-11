@@ -129,8 +129,6 @@ struct scst_cdbops {
 	scst_req_constructor_t constructor;
 };
 
-typedef void (*scst_req_done_t)(void *priv);
-
 typedef int (*scst_req_decode_cdb_t)(struct scst_req *req, const struct spdk_json_val *cdb);
 typedef int (*scst_req_exec_t)(struct scst_req *req);
 typedef void (*scst_req_free_t)(struct scst_req *req);
@@ -139,7 +137,7 @@ struct scst_req {
 	struct scst *scst;
 
 	void *priv;
-	scst_req_done_t req_done;
+	sto_response_cb_t response;
 
 	const struct scst_cdbops *op;
 
@@ -189,6 +187,12 @@ scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
 											\
 	return req;									\
 }
+
+#define SCST_SEND_RESP(req, rc, fmt, ...)						\
+do {											\
+	struct sto_response *resp = sto_response_alloc(rc, fmt, ## __VA_ARGS__);	\
+	req->response(req->priv, resp);							\
+} while (0)
 
 void scst_subsystem_init(void);
 void scst_subsystem_fini(void);

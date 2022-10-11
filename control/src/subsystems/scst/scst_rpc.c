@@ -16,19 +16,32 @@ struct scst_exec_ctx {
 };
 
 static void
-scst_response(struct spdk_jsonrpc_request *request)
+scst_response(struct sto_response *resp, struct spdk_jsonrpc_request *request)
 {
 	struct spdk_json_write_ctx *w;
 
+	if (spdk_unlikely(!resp)) {
+		SPDK_ERRLOG("CRITICAL: Failed to get response\n");
+
+		w = spdk_jsonrpc_begin_result(request);
+
+		spdk_json_write_string(w, "ERROR: Response is NULL");
+
+		spdk_jsonrpc_end_result(request, w);
+		return;
+	}
+
 	w = spdk_jsonrpc_begin_result(request);
 
-	spdk_json_write_string(w, "GLEB");
+	sto_response_dump_json(resp, w);
 
 	spdk_jsonrpc_end_result(request, w);
+
+	sto_response_free(resp);
 }
 
 static void
-scst_done(void *arg)
+scst_done(void *arg, struct sto_response *resp)
 {
 	struct scst_exec_ctx *ctx = arg;
 	struct spdk_jsonrpc_request *request = ctx->request;
@@ -38,7 +51,7 @@ scst_done(void *arg)
 	subsystem = ctx->subsystem;
 	subsys_req = ctx->subsys_req;
 
-	scst_response(request);
+	scst_response(resp, request);
 
 	subsystem->done_req(subsys_req);
 
@@ -71,7 +84,7 @@ scst(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 
 	ctx->subsystem = subsystem;
 
-	subsys_req = ctx->subsystem->alloc_req(params);
+	subsys_req = subsystem->alloc_req(params);
 	if (spdk_unlikely(!subsys_req)) {
 		SPDK_ERRLOG("Failed to alloc SCST req\n");
 		spdk_jsonrpc_send_error_response(request, -ENOMEM, spdk_strerror(ENOMEM));

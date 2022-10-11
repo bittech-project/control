@@ -119,15 +119,27 @@ scst_init_done(struct sto_subprocess *subp)
 	struct scst_req *req = subp->priv;
 	struct scst_init_req *init_req = to_init_req(req);
 	struct scst_driver *drv = init_req->drv;
+	int rc;
 
-	SPDK_NOTICELOG("GLEB: SCST init done, driver=%s\n", drv->name);
+	rc = subp->returncode;
 
 	sto_subprocess_free(subp);
+
+	if (spdk_unlikely(rc)) {
+		SCST_SEND_RESP(req, rc, "Failed to modprobe driver %s", drv->name);
+		return;
+	}
 
 	TAILQ_REMOVE(&init_req->drivers, drv, list);
 	drv->status = DRV_LOADED;
 
-	scst_init(req);
+	rc = scst_init(req);
+	if (spdk_unlikely(rc)) {
+		SCST_SEND_RESP(req, rc, "Failed to 'scst_init' for driver %s", drv->name);
+		return;
+	}
+
+	return;
 }
 
 static int
@@ -143,7 +155,7 @@ scst_init(struct scst_req *req)
 		return scst_modprobe(drv, scst_init_done, req);
 	}
 
-	req->req_done(req->priv);
+	SCST_SEND_RESP(req, 0, NULL);
 
 	return 0;
 }
@@ -249,13 +261,25 @@ scst_deinit_done(struct sto_subprocess *subp)
 	struct scst_req *req = subp->priv;
 	struct scst_deinit_req *deinit_req = to_deinit_req(req);
 	struct scst_driver *drv = deinit_req->drv;
+	int rc;
+
+	rc = subp->returncode;
 
 	sto_subprocess_free(subp);
+
+	if (spdk_unlikely(rc)) {
+		SCST_SEND_RESP(req, rc, "Failed to rmmod driver %s", drv->name);
+		return;
+	}
 
 	TAILQ_REMOVE(&deinit_req->drivers, drv, list);
 	drv->status = DRV_UNLOADED;
 
-	scst_deinit(req);
+	rc = scst_deinit(req);
+	if (spdk_unlikely(rc)) {
+		SCST_SEND_RESP(req, rc, "Failed to 'scst_deinit' for driver %s", drv->name);
+		return;
+	}
 }
 
 static int
@@ -271,7 +295,7 @@ scst_deinit(struct scst_req *req)
 		return scst_rmmod(drv, scst_deinit_done, req);
 	}
 
-	req->req_done(req->priv);
+	SCST_SEND_RESP(req, 0, NULL);
 
 	return 0;
 }

@@ -88,11 +88,11 @@ out:
 }
 
 static void
-scst_init_req(void *req_arg, scst_req_done_t scst_req_done, void *priv)
+scst_init_req(void *req_arg, sto_response_cb_t response, void *priv)
 {
 	struct scst_req *req = req_arg;
 
-	req->req_done = scst_req_done;
+	req->response = response;
 	req->priv = priv;
 }
 

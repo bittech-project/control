@@ -3,6 +3,7 @@
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
+#include <spdk/string.h>
 
 #include <rte_malloc.h>
 
@@ -108,6 +109,56 @@ sto_req_submit(struct sto_req *req)
 	return 0;
 }
 
+struct sto_response *
+sto_response_alloc(int resultcode, const char *fmt, ...)
+{
+	struct sto_response *resp;
+	va_list args;
+
+	resp = rte_zmalloc(NULL, sizeof(*resp), 0);
+	if (spdk_unlikely(!resp)) {
+		SPDK_ERRLOG("Failed to alloc STO response\n");
+		return NULL;
+	}
+
+	resp->resultcode = resultcode;
+
+	if (!fmt) {
+		goto out;
+	}
+
+	va_start(args, fmt);
+	resp->buf = spdk_vsprintf_alloc(fmt, args);
+	va_end(args);
+
+	if (spdk_unlikely(!resp->buf)) {
+		SPDK_ERRLOG("Failed to alloc STO response buf\n");
+		rte_free(resp);
+		return NULL;
+	}
+
+out:
+	return resp;
+}
+
+void
+sto_response_free(struct sto_response *resp)
+{
+	free(resp->buf);
+	rte_free(resp);
+}
+
+void
+sto_response_dump_json(struct sto_response *resp, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_int32(w, "result", resp->resultcode);
+	spdk_json_write_named_string(w, "buf", resp->buf ?: "");
+
+	spdk_json_write_object_end(w);
+}
+
 static int
 sto_decode_object_str(const struct spdk_json_val *values,
 		      const char *name, char **value)
@@ -156,7 +207,7 @@ sto_decode_cdb(const struct spdk_json_val *params, const char *name, char **valu
 	cdb_len = params->len - res;
 	if (!cdb_len) {
 		SPDK_NOTICELOG("CDB len is equal zero: offset=%u params_len=%u\n",
-				res, params->len);
+			       res, params->len);
 		return NULL;
 	}
 
@@ -196,7 +247,7 @@ sto_req_get_subsystem(struct sto_req *req)
 	req->subsystem = sto_subsystem_find(subsystem_name);
 	if (spdk_unlikely(!req->subsystem)) {
 		SPDK_ERRLOG("Failed to find %s subsystem\n", subsystem_name);
-		rc = -EINVAL;
+		rc = -ENOENT;
 		goto out;
 	}
 
@@ -233,9 +284,11 @@ sto_req_parse(struct sto_req *req)
 }
 
 static void
-sto_exec_done(void *arg)
+sto_exec_done(void *arg, struct sto_response *resp)
 {
 	struct sto_req *req = arg;
+
+	req->resp = resp;
 
 	sto_req_set_state(req, STO_REQ_STATE_DONE);
 	sto_req_process(req);
@@ -284,13 +337,16 @@ sto_process_req(struct sto_req *req)
 		break;
 	default:
 		SPDK_ERRLOG("req (%p) in state %s, but shouldn't be\n",
-				req, sto_req_state_name(req->state));
+			    req, sto_req_state_name(req->state));
 		assert(0);
 	}
 
 	if (spdk_unlikely(rc)) {
+		struct sto_response *resp = sto_response_alloc(rc, NULL);
+		req->resp = resp;
+
 		SPDK_ERRLOG("req (%p) in state %s failed, rc=%d\n",
-				req, sto_req_state_name(req->state), rc);
+			    req, sto_req_state_name(req->state), rc);
 		req->req_done(req);
 	}
 
