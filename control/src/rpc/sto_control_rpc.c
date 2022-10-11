@@ -45,7 +45,6 @@ static void
 control(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
 	struct sto_req *req;
-	int rc;
 
 	req = sto_req_alloc(params);
 	if (spdk_unlikely(!req)) {
@@ -56,17 +55,7 @@ control(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params
 
 	sto_req_init_cb(req, sto_req_done, request);
 
-	rc = sto_req_submit(req);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to send STO req\n");
-		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
-		goto free_req;
-	}
-
-	return;
-
-free_req:
-	sto_req_free(req);
+	sto_req_submit(req);
 
 	return;
 }

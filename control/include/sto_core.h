@@ -61,7 +61,7 @@ sto_req_set_state(struct sto_req *req, enum sto_req_state new_state)
 }
 
 void sto_req_process(struct sto_req *req);
-int sto_req_submit(struct sto_req *req);
+void sto_req_submit(struct sto_req *req);
 
 const struct spdk_json_val *sto_decode_cdb(const struct spdk_json_val *params,
 					   const char *name, char **value);

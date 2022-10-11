@@ -19,7 +19,7 @@ static TAILQ_HEAD(sto_req_list, sto_req) g_sto_req_list
 	= TAILQ_HEAD_INITIALIZER(g_sto_req_list);
 
 
-static int sto_process_req(struct sto_req *req);
+static void sto_process_req(struct sto_req *req);
 
 static const char *const sto_req_state_names[] = {
 	[STO_REQ_STATE_PARSE]	= "STATE_PARSE",
@@ -44,7 +44,6 @@ sto_req_poll(void *ctx)
 {
 	struct sto_req_list req_list = TAILQ_HEAD_INITIALIZER(req_list);
 	struct sto_req *req, *tmp;
-	int rc = 0;
 
 	if (TAILQ_EMPTY(&g_sto_req_list)) {
 		return SPDK_POLLER_IDLE;
@@ -55,10 +54,7 @@ sto_req_poll(void *ctx)
 	TAILQ_FOREACH_SAFE(req, &req_list, list, tmp) {
 		TAILQ_REMOVE(&req_list, req, list);
 
-		rc = sto_process_req(req);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Failed to process req, rc=%d\n", rc);
-		}
+		sto_process_req(req);
 	}
 
 	return SPDK_POLLER_BUSY;
@@ -101,12 +97,10 @@ sto_req_process(struct sto_req *req)
 	TAILQ_INSERT_TAIL(&g_sto_req_list, req, list);
 }
 
-int
+void
 sto_req_submit(struct sto_req *req)
 {
 	sto_req_process(req);
-
-	return 0;
 }
 
 struct sto_response *
@@ -299,11 +293,8 @@ sto_req_exec(struct sto_req *req)
 {
 	struct sto_subsystem *subsystem = req->subsystem;
 	void *subsys_req = req->subsys_req;
-	int rc;
 
-	rc = subsystem->exec_req(subsys_req, sto_exec_done, req);
-
-	return rc;
+	return subsystem->exec_req(subsys_req, sto_exec_done, req);
 }
 
 static void
@@ -319,7 +310,7 @@ sto_req_done(struct sto_req *req)
 	return;
 }
 
-static int
+static void
 sto_process_req(struct sto_req *req)
 {
 	int rc = 0;
@@ -349,7 +340,7 @@ sto_process_req(struct sto_req *req)
 		req->req_done(req);
 	}
 
-	return 0;
+	return;
 }
 
 int
