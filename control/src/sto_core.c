@@ -22,9 +22,9 @@ static TAILQ_HEAD(sto_req_list, sto_req) g_sto_req_list
 static void sto_process_req(struct sto_req *req);
 
 static const char *const sto_req_state_names[] = {
-	[STO_REQ_STATE_PARSE]	= "STATE_PARSE",
-	[STO_REQ_STATE_EXEC]	= "STATE_EXEC",
-	[STO_REQ_STATE_DONE]	= "STATE_DONE",
+	[STO_REQ_STATE_PARSE]		= "STATE_PARSE",
+	[STO_REQ_STATE_EXEC]		= "STATE_EXEC",
+	[STO_REQ_STATE_RESPONSE]	= "STATE_RESPONSE",
 };
 
 const char *
@@ -78,9 +78,9 @@ sto_req_alloc(const struct spdk_json_val *params)
 }
 
 void
-sto_req_init_cb(struct sto_req *req, sto_req_done_t req_done, void *priv)
+sto_req_init_cb(struct sto_req *req, sto_req_response_t response, void *priv)
 {
-	req->req_done = req_done;
+	req->response = response;
 	req->priv = priv;
 }
 
@@ -284,7 +284,7 @@ sto_exec_done(void *arg, struct sto_response *resp)
 
 	req->resp = resp;
 
-	sto_req_set_state(req, STO_REQ_STATE_DONE);
+	sto_req_set_state(req, STO_REQ_STATE_RESPONSE);
 	sto_req_process(req);
 }
 
@@ -298,14 +298,14 @@ sto_req_exec(struct sto_req *req)
 }
 
 static void
-sto_req_done(struct sto_req *req)
+sto_req_response(struct sto_req *req)
 {
 	struct sto_subsystem *subsystem = req->subsystem;
 
 	subsystem->done_req(req->subsys_req);
 	req->subsys_req = NULL;
 
-	req->req_done(req);
+	req->response(req);
 
 	return;
 }
@@ -322,8 +322,8 @@ sto_process_req(struct sto_req *req)
 	case STO_REQ_STATE_EXEC:
 		rc = sto_req_exec(req);
 		break;
-	case STO_REQ_STATE_DONE:
-		sto_req_done(req);
+	case STO_REQ_STATE_RESPONSE:
+		sto_req_response(req);
 		break;
 	default:
 		SPDK_ERRLOG("req (%p) in state %s, but shouldn't be\n",
@@ -337,7 +337,7 @@ sto_process_req(struct sto_req *req)
 
 		SPDK_ERRLOG("req (%p) in state %s failed, rc=%d\n",
 			    req, sto_req_state_name(req->state), rc);
-		req->req_done(req);
+		req->response(req);
 	}
 
 	return;
