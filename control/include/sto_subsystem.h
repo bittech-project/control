@@ -1,15 +1,16 @@
 #ifndef _STO_SUBSYSTEM_H_
 #define _STO_SUBSYSTEM_H_
 
-#include "sto_core.h"
-
+struct sto_response;
 struct spdk_json_val;
+
+typedef void (*sto_subsys_response_t)(void *priv, struct sto_response *resp);
 
 typedef void (*sto_subsys_init_t)(void);
 typedef void (*sto_subsys_fini_t)(void);
 
 typedef void *(*sto_subsys_alloc_req_t)(const struct spdk_json_val *params);
-typedef int (*sto_subsys_exec_req_t)(void *req_arg, sto_response_cb_t resp_cb, void *priv);
+typedef int (*sto_subsys_exec_req_t)(void *req_arg, sto_subsys_response_t response, void *priv);
 typedef void (*sto_subsys_done_req_t)(void *req_arg);
 
 struct sto_subsystem {

@@ -2,6 +2,7 @@
 #define _SCST_H_
 
 #include "sto_core.h"
+#include "sto_subsystem.h"
 #include "sto_subprocess_front.h"
 
 #define SCST_ROOT "/sys/kernel/scst_tgt"
@@ -137,13 +138,13 @@ struct scst_req {
 	struct scst *scst;
 
 	void *priv;
-	sto_response_cb_t resp_cb;
+	sto_subsys_response_t response;
 
 	const struct scst_cdbops *op;
 
 	scst_req_decode_cdb_t decode_cdb;
-	scst_req_exec_t req_exec;
-	scst_req_free_t req_free;
+	scst_req_exec_t exec;
+	scst_req_free_t free;
 };
 
 #define SCST_REQ_DEFINE(req_type)							\
@@ -182,8 +183,8 @@ scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
 	scst_req_init(req, op);								\
 											\
 	req->decode_cdb = scst_req_ ## req_type ## _decode_cdb;				\
-	req->req_exec = scst_ ## req_type;						\
-	req->req_free = scst_ ## req_type ## _req_free;					\
+	req->exec = scst_ ## req_type;							\
+	req->free = scst_ ## req_type ## _req_free;					\
 											\
 	return req;									\
 }
@@ -191,7 +192,7 @@ scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
 #define SCST_SEND_RESP(req, rc, fmt, ...)						\
 do {											\
 	struct sto_response *resp = sto_response_alloc(rc, fmt, ## __VA_ARGS__);	\
-	req->resp_cb(req->priv, resp);							\
+	req->response(req->priv, resp);							\
 } while (0)
 
 void scst_subsystem_init(void);

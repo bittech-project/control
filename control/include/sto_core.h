@@ -19,8 +19,6 @@ struct sto_response {
 	char *buf;
 };
 
-typedef void (*sto_response_cb_t)(void *priv, struct sto_response *resp);
-
 struct sto_cdbops {
 	int ops;
 	const char *name;

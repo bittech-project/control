@@ -316,5 +316,5 @@ scst_req_init(struct scst_req *req, const struct scst_cdbops *op)
 int
 scst_req_submit(struct scst_req *req)
 {
-	return req->req_exec(req);
+	return req->exec(req);
 }

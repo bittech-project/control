@@ -77,7 +77,7 @@ scst_alloc_req(const struct spdk_json_val *params)
 	rc = req->decode_cdb(req, cdb);
 	if (rc) {
 		SPDK_ERRLOG("SCST: Failed to decode CDB, rc=%d\n", rc);
-		req->req_free(req);
+		req->free(req);
 		req = NULL;
 	}
 out:
@@ -88,21 +88,21 @@ out:
 }
 
 static void
-scst_init_req(struct scst_req *req, sto_response_cb_t resp_cb, void *priv)
+scst_init_req(struct scst_req *req, sto_subsys_response_t response, void *priv)
 {
-	req->resp_cb = resp_cb;
+	req->response = response;
 	req->priv = priv;
 }
 
 static int
-scst_exec_req(void *req_arg, sto_response_cb_t resp_cb, void *priv)
+scst_exec_req(void *req_arg, sto_subsys_response_t response, void *priv)
 {
 	struct scst_req *req = req_arg;
 	int rc = 0;
 
 	SPDK_NOTICELOG("SCST: Exec req[%p]\n", req);
 
-	scst_init_req(req, resp_cb, priv);
+	scst_init_req(req, response, priv);
 
 	rc = scst_req_submit(req);
 	if (spdk_unlikely(rc)) {
@@ -119,7 +119,7 @@ scst_done_req(void *req_arg)
 
 	SPDK_NOTICELOG("SCST: Done req[%p]\n", req);
 
-	req->req_free(req);
+	req->free(req);
 
 	return;
 }
