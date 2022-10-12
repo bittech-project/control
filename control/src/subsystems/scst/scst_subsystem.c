@@ -31,7 +31,7 @@ static const struct scst_cdbops scst_op_table[] = {
 #define SCST_OP_TBL_SIZE	(SPDK_COUNTOF(scst_op_table))
 
 static const struct scst_cdbops *
-scst_get_cdbops(const char *op_name)
+scst_find_cdbops(const char *op_name)
 {
 	int i;
 
@@ -46,45 +46,82 @@ scst_get_cdbops(const char *op_name)
 	return NULL;
 }
 
+static const struct scst_cdbops *
+scst_get_cdbops(const struct spdk_json_val *params)
+{
+	char *op_name = NULL;
+	const struct scst_cdbops *op;
+	int rc = 0;
+
+	rc = sto_decode_object_str(params, "op", &op_name);
+	if (rc) {
+		SPDK_ERRLOG("SCST: Failed to decode op, rc=%d\n", rc);
+		return ERR_PTR(rc);
+	}
+
+	op = scst_find_cdbops(op_name);
+	if (!op) {
+		SPDK_ERRLOG("SCST: Failed to find op %s\n", op_name);
+		free(op_name);
+		return ERR_PTR(-EINVAL);
+	}
+
+	free(op_name);
+
+	return op;
+}
+
+static int
+scst_decode_params(struct scst_req *req, const struct spdk_json_val *params)
+{
+	const struct spdk_json_val *cdb;
+	int rc = 0;
+
+	cdb = sto_decode_next_cdb(params);
+	if (IS_ERR(cdb)) {
+		SPDK_ERRLOG("SCST: Failed to decode CDB for req[%p]\n", req);
+		return PTR_ERR(cdb);
+	}
+
+	rc = req->decode_cdb(req, cdb);
+	if (rc) {
+		SPDK_ERRLOG("SCST: Failed to parse CDB for req[%p], rc=%d\n", req, rc);
+		goto out;
+	}
+
+out:
+	free((struct spdk_json_val *) cdb);
+
+	return rc;
+}
+
 static struct sto_context *
 scst_parse(const struct spdk_json_val *params)
 {
-	const struct spdk_json_val *cdb;
-	char *op_name = NULL;
 	const struct scst_cdbops *op;
 	struct scst_req *req = NULL;
 	int rc;
 
-	cdb = sto_decode_cdb(params, "op", &op_name);
-	if (IS_ERR(cdb)) {
-		int rc = PTR_ERR(cdb);
-		SPDK_ERRLOG("SCST: Failed to decode CDB, rc=%d\n", rc);
+	op = scst_get_cdbops(params);
+	if (IS_ERR(op)) {
+		SPDK_ERRLOG("SCST: Failed to decode params\n");
 		return NULL;
-	}
-
-	op = scst_get_cdbops(op_name);
-	if (!op) {
-		SPDK_ERRLOG("SCST: Failed to find op %s\n", op_name);
-		goto out;
 	}
 
 	req = op->constructor(op);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("SCST: Failed to construct req\n");
-		goto out;
+		return NULL;
 	}
 
-	rc = req->decode_cdb(req, cdb);
+	rc = scst_decode_params(req, params);
 	if (rc) {
-		SPDK_ERRLOG("SCST: Failed to decode CDB, rc=%d\n", rc);
+		SPDK_ERRLOG("SCST: Failed to decode params, rc=%d\n", rc);
 		req->free(req);
-		req = NULL;
+		return NULL;
 	}
-out:
-	free(op_name);
-	free((struct spdk_json_val *) cdb);
 
-	return req ? &req->ctx : NULL;
+	return &req->ctx;
 }
 
 static int
