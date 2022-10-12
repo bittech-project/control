@@ -1,10 +1,9 @@
 #ifndef _STO_SUBSYSTEM_H_
 #define _STO_SUBSYSTEM_H_
 
-struct sto_response;
 struct spdk_json_val;
 
-typedef void (*sto_subsys_response_t)(void *priv, struct sto_response *resp);
+typedef void (*sto_subsys_response_t)(void *priv);
 
 typedef void (*sto_subsys_init_t)(void);
 typedef void (*sto_subsys_fini_t)(void);

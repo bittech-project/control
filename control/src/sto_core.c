@@ -102,56 +102,6 @@ sto_req_submit(struct sto_req *req)
 	sto_req_process(req);
 }
 
-struct sto_response *
-sto_response_alloc(int resultcode, const char *fmt, ...)
-{
-	struct sto_response *resp;
-	va_list args;
-
-	resp = rte_zmalloc(NULL, sizeof(*resp), 0);
-	if (spdk_unlikely(!resp)) {
-		SPDK_ERRLOG("Failed to alloc STO response\n");
-		return NULL;
-	}
-
-	resp->resultcode = resultcode;
-
-	if (!fmt) {
-		goto out;
-	}
-
-	va_start(args, fmt);
-	resp->buf = spdk_vsprintf_alloc(fmt, args);
-	va_end(args);
-
-	if (spdk_unlikely(!resp->buf)) {
-		SPDK_ERRLOG("Failed to alloc STO response buf\n");
-		rte_free(resp);
-		return NULL;
-	}
-
-out:
-	return resp;
-}
-
-void
-sto_response_free(struct sto_response *resp)
-{
-	free(resp->buf);
-	rte_free(resp);
-}
-
-void
-sto_response_dump_json(struct sto_response *resp, struct spdk_json_write_ctx *w)
-{
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_int32(w, "result", resp->resultcode);
-	spdk_json_write_named_string(w, "buf", resp->buf ?: "");
-
-	spdk_json_write_object_end(w);
-}
-
 int
 sto_decode_object_str(const struct spdk_json_val *values,
 		      const char *name, char **value)
@@ -267,7 +217,7 @@ out:
 	return rc;
 }
 
-static void sto_exec_done(void *priv, struct sto_response *resp);
+static void sto_exec_done(void *priv);
 
 static void
 sto_req_init_ctx(struct sto_req *req, struct sto_context *ctx)
@@ -320,11 +270,9 @@ out:
 }
 
 static void
-sto_exec_done(void *priv, struct sto_response *resp)
+sto_exec_done(void *priv)
 {
 	struct sto_req *req = priv;
-
-	req->resp = resp;
 
 	sto_req_set_state(req, STO_REQ_STATE_RESPONSE);
 	sto_req_process(req);
@@ -373,9 +321,6 @@ sto_process_req(struct sto_req *req)
 	}
 
 	if (spdk_unlikely(rc)) {
-		struct sto_response *resp = sto_response_alloc(rc, NULL);
-		req->resp = resp;
-
 		SPDK_ERRLOG("req (%p) in state %s failed, rc=%d\n",
 			    req, sto_req_state_name(req->state), rc);
 		req->response(req);

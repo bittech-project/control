@@ -194,13 +194,6 @@ scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
 	return req;									\
 }
 
-#define SCST_SEND_RESP(req, rc, fmt, ...)						\
-do {											\
-	struct sto_response *resp = sto_response_alloc(rc, fmt, ## __VA_ARGS__);	\
-	struct sto_context *ctx = &req->ctx;						\
-	ctx->response(ctx->priv, resp);							\
-} while (0)
-
 void scst_subsystem_init(void);
 void scst_subsystem_fini(void);
 
@@ -210,6 +203,14 @@ struct scst_driver *scst_find_drv_by_name(struct scst *scst, const char *name);
 
 void scst_req_init(struct scst_req *req, const struct scst_cdbops *op);
 int scst_req_submit(struct scst_req *req);
+
+static inline void
+scst_req_response(struct scst_req *req)
+{
+	struct sto_context *ctx = &req->ctx;
+
+	ctx->response(ctx->priv);
+}
 
 int scst_req_subprocess(const char *cmd[], int numargs,
 			subprocess_done_t cmd_done, struct scst_req *req);

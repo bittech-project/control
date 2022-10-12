@@ -16,11 +16,6 @@ enum sto_req_state {
 	STO_REQ_STATE_COUNT
 };
 
-struct sto_response {
-	int resultcode;
-	char *buf;
-};
-
 struct sto_cdbops {
 	int ops;
 	const char *name;
@@ -41,8 +36,6 @@ struct sto_req {
 
 	struct sto_subsystem *subsystem;
 	struct sto_context *ctx;
-
-	struct sto_response *resp;
 
 	TAILQ_ENTRY(sto_req) list;
 };
@@ -68,10 +61,5 @@ void sto_req_process(struct sto_req *req);
 int sto_decode_object_str(const struct spdk_json_val *values,
 			  const char *name, char **value);
 const struct spdk_json_val *sto_decode_next_cdb(const struct spdk_json_val *params);
-
-struct sto_response *sto_response_alloc(int resultcode, const char *fmt, ...);
-void sto_response_free(struct sto_response *resp);
-
-void sto_response_dump_json(struct sto_response *resp, struct spdk_json_write_ctx *w);
 
 #endif /* _STO_CORE_H_ */
