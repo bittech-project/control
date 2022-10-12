@@ -1,6 +1,8 @@
 #ifndef _STO_CORE_H_
 #define _STO_CORE_H_
 
+#include "sto_subsystem.h"
+
 struct spdk_json_write_ctx;
 struct sto_req;
 typedef void (*sto_req_response_t)(struct sto_req *req);
@@ -24,6 +26,11 @@ struct sto_cdbops {
 	const char *name;
 };
 
+struct sto_context {
+	void *priv;
+	sto_subsys_response_t response;
+};
+
 struct sto_req {
 	void *priv;
 	sto_req_response_t response;
@@ -34,7 +41,7 @@ struct sto_req {
 	enum sto_req_state state;
 
 	struct sto_subsystem *subsystem;
-	void *subsys_req;
+	struct sto_context *ctx;
 
 	struct sto_response *resp;
 

@@ -251,10 +251,22 @@ out:
 	return rc;
 }
 
+static void sto_exec_done(void *priv, struct sto_response *resp);
+
+static void
+sto_req_init_ctx(struct sto_req *req, struct sto_context *ctx)
+{
+	ctx->priv = req;
+	ctx->response = sto_exec_done;
+
+	req->ctx = ctx;
+}
+
 static int
 sto_req_parse(struct sto_req *req)
 {
 	struct sto_subsystem *subsystem;
+	struct sto_context *ctx;
 	int rc = 0;
 
 	rc = sto_req_get_subsystem(req);
@@ -265,11 +277,13 @@ sto_req_parse(struct sto_req *req)
 
 	subsystem = req->subsystem;
 
-	req->subsys_req = subsystem->alloc_req(req->cdb);
-	if (spdk_unlikely(!req->subsys_req)) {
-		SPDK_ERRLOG("Failed to alloc %s req\n", subsystem->name);
+	ctx = subsystem->parse(req->cdb);
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to %s to parse req\n", subsystem->name);
 		return -EINVAL;
 	}
+
+	sto_req_init_ctx(req, ctx);
 
 	sto_req_set_state(req, STO_REQ_STATE_EXEC);
 	sto_req_process(req);
@@ -278,9 +292,9 @@ sto_req_parse(struct sto_req *req)
 }
 
 static void
-sto_exec_done(void *arg, struct sto_response *resp)
+sto_exec_done(void *priv, struct sto_response *resp)
 {
-	struct sto_req *req = arg;
+	struct sto_req *req = priv;
 
 	req->resp = resp;
 
@@ -292,9 +306,8 @@ static int
 sto_req_exec(struct sto_req *req)
 {
 	struct sto_subsystem *subsystem = req->subsystem;
-	void *subsys_req = req->subsys_req;
 
-	return subsystem->exec_req(subsys_req, sto_exec_done, req);
+	return subsystem->exec(req->ctx);
 }
 
 static void
@@ -302,8 +315,8 @@ sto_req_response(struct sto_req *req)
 {
 	struct sto_subsystem *subsystem = req->subsystem;
 
-	subsystem->done_req(req->subsys_req);
-	req->subsys_req = NULL;
+	subsystem->free(req->ctx);
+	req->ctx = NULL;
 
 	req->response(req);
 

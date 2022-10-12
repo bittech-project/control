@@ -46,8 +46,8 @@ scst_get_cdbops(const char *op_name)
 	return NULL;
 }
 
-static void *
-scst_alloc_req(const struct spdk_json_val *params)
+static struct sto_context *
+scst_parse(const struct spdk_json_val *params)
 {
 	const struct spdk_json_val *cdb;
 	char *op_name = NULL;
@@ -84,25 +84,16 @@ out:
 	free(op_name);
 	free((struct spdk_json_val *) cdb);
 
-	return (void *) req;
-}
-
-static void
-scst_init_req(struct scst_req *req, sto_subsys_response_t response, void *priv)
-{
-	req->response = response;
-	req->priv = priv;
+	return req ? &req->ctx : NULL;
 }
 
 static int
-scst_exec_req(void *req_arg, sto_subsys_response_t response, void *priv)
+scst_exec(struct sto_context *ctx)
 {
-	struct scst_req *req = req_arg;
+	struct scst_req *req = to_scst_req(ctx);
 	int rc = 0;
 
 	SPDK_NOTICELOG("SCST: Exec req[%p]\n", req);
-
-	scst_init_req(req, response, priv);
 
 	rc = scst_req_submit(req);
 	if (spdk_unlikely(rc)) {
@@ -113,9 +104,9 @@ scst_exec_req(void *req_arg, sto_subsys_response_t response, void *priv)
 }
 
 static void
-scst_done_req(void *req_arg)
+scst_free(struct sto_context *ctx)
 {
-	struct scst_req *req = req_arg;
+	struct scst_req *req = to_scst_req(ctx);
 
 	SPDK_NOTICELOG("SCST: Done req[%p]\n", req);
 
@@ -128,9 +119,9 @@ static struct sto_subsystem g_scst_subsystem = {
 	.name = "scst",
 	.init = scst_subsystem_init,
 	.fini = scst_subsystem_fini,
-	.alloc_req = scst_alloc_req,
-	.exec_req  = scst_exec_req,
-	.done_req  = scst_done_req,
+	.parse = scst_parse,
+	.exec = scst_exec,
+	.free = scst_free,
 };
 
 STO_SUBSYSTEM_REGISTER(g_scst_subsystem);

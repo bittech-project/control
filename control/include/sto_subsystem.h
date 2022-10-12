@@ -9,9 +9,9 @@ typedef void (*sto_subsys_response_t)(void *priv, struct sto_response *resp);
 typedef void (*sto_subsys_init_t)(void);
 typedef void (*sto_subsys_fini_t)(void);
 
-typedef void *(*sto_subsys_alloc_req_t)(const struct spdk_json_val *params);
-typedef int (*sto_subsys_exec_req_t)(void *req_arg, sto_subsys_response_t response, void *priv);
-typedef void (*sto_subsys_done_req_t)(void *req_arg);
+typedef struct sto_context *(*sto_subsys_parse_t)(const struct spdk_json_val *params);
+typedef int (*sto_subsys_exec_t)(struct sto_context *ctx);
+typedef void (*sto_subsys_free_t)(struct sto_context *ctx);
 
 struct sto_subsystem {
 	const char *name;
@@ -19,10 +19,9 @@ struct sto_subsystem {
 	sto_subsys_init_t init;
 	sto_subsys_fini_t fini;
 
-	sto_subsys_alloc_req_t alloc_req;
-
-	sto_subsys_exec_req_t exec_req;
-	sto_subsys_done_req_t done_req;
+	sto_subsys_parse_t parse;
+	sto_subsys_exec_t exec;
+	sto_subsys_free_t free;
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };

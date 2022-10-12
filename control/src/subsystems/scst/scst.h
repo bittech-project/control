@@ -135,10 +135,9 @@ typedef int (*scst_req_exec_t)(struct scst_req *req);
 typedef void (*scst_req_free_t)(struct scst_req *req);
 
 struct scst_req {
-	struct scst *scst;
+	struct sto_context ctx;
 
-	void *priv;
-	sto_subsys_response_t response;
+	struct scst *scst;
 
 	const struct scst_cdbops *op;
 
@@ -146,6 +145,12 @@ struct scst_req {
 	scst_req_exec_t exec;
 	scst_req_free_t free;
 };
+
+static inline struct scst_req *
+to_scst_req(struct sto_context *ctx)
+{
+	return SPDK_CONTAINEROF(ctx, struct scst_req, ctx);
+}
 
 #define SCST_REQ_DEFINE(req_type)							\
 static inline struct scst_ ## req_type ## _req *					\
@@ -192,7 +197,8 @@ scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
 #define SCST_SEND_RESP(req, rc, fmt, ...)						\
 do {											\
 	struct sto_response *resp = sto_response_alloc(rc, fmt, ## __VA_ARGS__);	\
-	req->response(req->priv, resp);							\
+	struct sto_context *ctx = &req->ctx;						\
+	ctx->response(ctx->priv, resp);							\
 } while (0)
 
 void scst_subsystem_init(void);
