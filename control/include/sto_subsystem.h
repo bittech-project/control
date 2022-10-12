@@ -2,6 +2,7 @@
 #define _STO_SUBSYSTEM_H_
 
 struct spdk_json_val;
+struct spdk_json_write_ctx;
 
 typedef void (*sto_subsys_response_t)(void *priv);
 
@@ -10,6 +11,7 @@ typedef void (*sto_subsys_fini_t)(void);
 
 typedef struct sto_context *(*sto_subsys_parse_t)(const struct spdk_json_val *params);
 typedef int (*sto_subsys_exec_t)(struct sto_context *ctx);
+typedef void (*sto_subsys_end_response_t)(struct sto_context *ctx, struct spdk_json_write_ctx *w);
 typedef void (*sto_subsys_free_t)(struct sto_context *ctx);
 
 struct sto_subsystem {
@@ -20,6 +22,7 @@ struct sto_subsystem {
 
 	sto_subsys_parse_t parse;
 	sto_subsys_exec_t exec;
+	sto_subsys_end_response_t end_response;
 	sto_subsys_free_t free;
 
 	TAILQ_ENTRY(sto_subsystem) list;

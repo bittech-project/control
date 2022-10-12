@@ -132,6 +132,7 @@ struct scst_cdbops {
 
 typedef int (*scst_req_decode_cdb_t)(struct scst_req *req, const struct spdk_json_val *cdb);
 typedef int (*scst_req_exec_t)(struct scst_req *req);
+typedef void (*scst_req_end_response_t)(struct scst_req *req, struct spdk_json_write_ctx *w);
 typedef void (*scst_req_free_t)(struct scst_req *req);
 
 struct scst_req {
@@ -143,6 +144,7 @@ struct scst_req {
 
 	scst_req_decode_cdb_t decode_cdb;
 	scst_req_exec_t exec;
+	scst_req_end_response_t end_response;
 	scst_req_free_t free;
 };
 
@@ -187,8 +189,9 @@ scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
 											\
 	scst_req_init(req, op);								\
 											\
-	req->decode_cdb = scst_req_ ## req_type ## _decode_cdb;				\
-	req->exec = scst_ ## req_type;							\
+	req->decode_cdb = scst_ ## req_type ## _req_decode_cdb;				\
+	req->exec = scst_ ## req_type ## _req_exec;					\
+	req->end_response = scst_ ## req_type ## _req_end_response;			\
 	req->free = scst_ ## req_type ## _req_free;					\
 											\
 	return req;									\

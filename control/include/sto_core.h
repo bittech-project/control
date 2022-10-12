@@ -21,9 +21,15 @@ struct sto_cdbops {
 	const char *name;
 };
 
+struct sto_err_context {
+	int rc;
+	const char *errno_msg;
+};
+
 struct sto_context {
 	void *priv;
 	sto_subsys_response_t response;
+	struct sto_err_context *err_ctx;
 };
 
 struct sto_req {
@@ -35,7 +41,9 @@ struct sto_req {
 	enum sto_req_state state;
 
 	struct sto_subsystem *subsystem;
+
 	struct sto_context *ctx;
+	struct sto_err_context err_ctx;
 
 	TAILQ_ENTRY(sto_req) list;
 };
@@ -44,6 +52,8 @@ int sto_core_init(void);
 void sto_core_fini(void);
 
 const char *sto_req_state_name(enum sto_req_state state);
+
+void sto_err(struct sto_err_context *err, int rc);
 
 struct sto_req *sto_req_alloc(const struct spdk_json_val *params);
 void sto_req_init_cb(struct sto_req *req, sto_req_response_t response, void *priv);
@@ -57,6 +67,8 @@ sto_req_set_state(struct sto_req *req, enum sto_req_state new_state)
 
 void sto_req_submit(struct sto_req *req);
 void sto_req_process(struct sto_req *req);
+
+void sto_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w);
 
 int sto_decode_object_str(const struct spdk_json_val *values,
 			  const char *name, char **value);

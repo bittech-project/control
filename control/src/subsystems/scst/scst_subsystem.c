@@ -141,6 +141,16 @@ scst_exec(struct sto_context *ctx)
 }
 
 static void
+scst_end_response(struct sto_context *ctx, struct spdk_json_write_ctx *w)
+{
+	struct scst_req *req = to_scst_req(ctx);
+
+	req->end_response(req, w);
+
+	return;
+}
+
+static void
 scst_free(struct sto_context *ctx)
 {
 	struct scst_req *req = to_scst_req(ctx);
@@ -158,6 +168,7 @@ static struct sto_subsystem g_scst_subsystem = {
 	.fini = scst_subsystem_fini,
 	.parse = scst_parse,
 	.exec = scst_exec,
+	.end_response = scst_end_response,
 	.free = scst_free,
 };
 

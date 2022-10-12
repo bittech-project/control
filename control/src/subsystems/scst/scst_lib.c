@@ -46,7 +46,7 @@ static const struct spdk_json_object_decoder scst_req_init_decoders[] = {
 };
 
 static int
-scst_req_init_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+scst_init_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_init_req *init_req = to_init_req(req);
 	struct scst_init_params *params;
@@ -111,7 +111,7 @@ free_params:
 	return rc;
 }
 
-static int scst_init(struct scst_req *req);
+static int scst_init_req_exec(struct scst_req *req);
 
 static void
 scst_init_done(struct sto_subprocess *subp)
@@ -127,6 +127,7 @@ scst_init_done(struct sto_subprocess *subp)
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to modprobe driver %s\n", drv->name);
+		sto_err(req->ctx.err_ctx, rc);
 		scst_req_response(req);
 		return;
 	}
@@ -134,9 +135,10 @@ scst_init_done(struct sto_subprocess *subp)
 	TAILQ_REMOVE(&init_req->drivers, drv, list);
 	drv->status = DRV_LOADED;
 
-	rc = scst_init(req);
+	rc = scst_init_req_exec(req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to 'scst_init' for driver %s\n", drv->name);
+		sto_err(req->ctx.err_ctx, rc);
 		scst_req_response(req);
 		return;
 	}
@@ -145,7 +147,7 @@ scst_init_done(struct sto_subprocess *subp)
 }
 
 static int
-scst_init(struct scst_req *req)
+scst_init_req_exec(struct scst_req *req)
 {
 	struct scst_init_req *init_req = to_init_req(req);
 	struct scst_driver *drv;
@@ -160,6 +162,16 @@ scst_init(struct scst_req *req)
 	scst_req_response(req);
 
 	return 0;
+}
+
+static void
+scst_init_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_int32(w, "status", 0);
+
+	spdk_json_write_object_end(w);
 }
 
 SCST_REQ_REGISTER(init)
@@ -180,7 +192,7 @@ static const struct spdk_json_object_decoder scst_req_deinit_decoders[] = {
 };
 
 static int
-scst_req_deinit_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+scst_deinit_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_deinit_req *deinit_req = to_deinit_req(req);
 	struct scst_deinit_params *params;
@@ -255,7 +267,7 @@ free_params:
 	return rc;
 }
 
-static int scst_deinit(struct scst_req *req);
+static int scst_deinit_req_exec(struct scst_req *req);
 
 static void
 scst_deinit_done(struct sto_subprocess *subp)
@@ -271,6 +283,7 @@ scst_deinit_done(struct sto_subprocess *subp)
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to rmmod driver %s\n", drv->name);
+		sto_err(req->ctx.err_ctx, rc);
 		scst_req_response(req);
 		return;
 	}
@@ -278,16 +291,17 @@ scst_deinit_done(struct sto_subprocess *subp)
 	TAILQ_REMOVE(&deinit_req->drivers, drv, list);
 	drv->status = DRV_UNLOADED;
 
-	rc = scst_deinit(req);
+	rc = scst_deinit_req_exec(req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to 'scst_deinit' for driver %s\n", drv->name);
+		sto_err(req->ctx.err_ctx, rc);
 		scst_req_response(req);
 		return;
 	}
 }
 
 static int
-scst_deinit(struct scst_req *req)
+scst_deinit_req_exec(struct scst_req *req)
 {
 	struct scst_deinit_req *deinit_req = to_deinit_req(req);
 	struct scst_driver *drv;
@@ -302,6 +316,16 @@ scst_deinit(struct scst_req *req)
 	scst_req_response(req);
 
 	return 0;
+}
+
+static void
+scst_deinit_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_int32(w, "status", 0);
+
+	spdk_json_write_object_end(w);
 }
 
 SCST_REQ_REGISTER(deinit)

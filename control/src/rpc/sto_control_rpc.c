@@ -7,25 +7,16 @@
 #include "sto_core.h"
 
 static void
-sto_control_response(struct spdk_jsonrpc_request *request)
+sto_req_done(struct sto_req *req)
 {
+	struct spdk_jsonrpc_request *request = req->priv;
 	struct spdk_json_write_ctx *w;
 
 	w = spdk_jsonrpc_begin_result(request);
 
-	spdk_json_write_string(w, "GLEB");
+	sto_req_end_response(req, w);
 
 	spdk_jsonrpc_end_result(request, w);
-
-	return;
-}
-
-static void
-sto_req_done(struct sto_req *req)
-{
-	struct spdk_jsonrpc_request *request = req->priv;
-
-	sto_control_response(request);
 
 	sto_req_free(req);
 }

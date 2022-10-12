@@ -102,6 +102,13 @@ sto_req_submit(struct sto_req *req)
 	sto_req_process(req);
 }
 
+void
+sto_err(struct sto_err_context *err, int rc)
+{
+	err->rc = rc;
+	err->errno_msg = spdk_strerror(-rc);
+}
+
 int
 sto_decode_object_str(const struct spdk_json_val *values,
 		      const char *name, char **value)
@@ -224,6 +231,7 @@ sto_req_init_ctx(struct sto_req *req, struct sto_context *ctx)
 {
 	ctx->priv = req;
 	ctx->response = sto_exec_done;
+	ctx->err_ctx = &req->err_ctx;
 
 	req->ctx = ctx;
 }
@@ -289,14 +297,34 @@ sto_req_exec(struct sto_req *req)
 static void
 sto_req_response(struct sto_req *req)
 {
-	struct sto_subsystem *subsystem = req->subsystem;
-
-	subsystem->free(req->ctx);
-	req->ctx = NULL;
-
 	req->response(req);
+}
 
-	return;
+void
+sto_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+{
+	struct sto_subsystem *subsystem = req->subsystem;
+	struct sto_err_context *err = &req->err_ctx;
+
+	SPDK_ERRLOG("req[%p] end response: rc=%d\n", req, err->rc);
+
+	if (err->rc) {
+		spdk_json_write_object_begin(w);
+
+		spdk_json_write_named_int32(w, "error", err->rc);
+		spdk_json_write_named_string(w, "errno_msg", err->errno_msg);
+
+		spdk_json_write_object_end(w);
+		goto out;
+	}
+
+	subsystem->end_response(req->ctx, w);
+
+out:
+	if (req->ctx) {
+		subsystem->free(req->ctx);
+		req->ctx = NULL;
+	}
 }
 
 static void
@@ -323,7 +351,8 @@ sto_process_req(struct sto_req *req)
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("req (%p) in state %s failed, rc=%d\n",
 			    req, sto_req_state_name(req->state), rc);
-		req->response(req);
+		sto_err(&req->err_ctx, rc);
+		sto_req_response(req);
 	}
 
 	return;
