@@ -24,3 +24,19 @@ def scst_driver_deinit(client, drivers):
         'drivers': drivers,
     }
     return client.call('control', params)
+
+def scst_dev_open(client, dev_name, handler, attributes):
+    """Adds a new device using specified handler.
+    Args:
+        dev_name: SCST device name
+        handler: SCST handler name
+        attributes: SCST dev attributes <p=v,...>
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'dev_open',
+        'dev_name': dev_name,
+        'handler': handler,
+        'attributes': attributes,
+    }
+    return client.call('control', params)

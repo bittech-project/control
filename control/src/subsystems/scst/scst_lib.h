@@ -46,6 +46,13 @@ struct scst_driver_deinit_req {
 	struct scst_driver *drv;
 };
 
+struct scst_dev_open_req {
+	struct scst_req req;
+
+	char *mgmt_path;
+	char *parsed_cmd;
+};
+
 static inline int
 scst_modprobe(struct scst_driver *driver, subprocess_done_t done, void *priv)
 {
@@ -65,5 +72,6 @@ scst_rmmod(struct scst_driver *driver, subprocess_done_t done, void *priv)
 
 SCST_REQ_DEFINE(driver_init)
 SCST_REQ_DEFINE(driver_deinit)
+SCST_REQ_DEFINE(dev_open)
 
 #endif /* _SCST_LIB_H */

@@ -166,14 +166,6 @@ struct scst_req *scst_ ## req_type ## _req_constructor(const struct scst_cdbops 
 
 
 #define SCST_REQ_REGISTER(req_type)							\
-static void										\
-scst_ ## req_type ## _req_free(struct scst_req *req)					\
-{											\
-	struct scst_ ## req_type ## _req * req_ ## req_type =				\
-						to_ ## req_type ## _req(req);		\
-	rte_free(req_ ## req_type);							\
-}											\
-											\
 struct scst_req *									\
 scst_ ## req_type ## _req_constructor(const struct scst_cdbops *op)			\
 {											\
