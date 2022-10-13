@@ -32,14 +32,14 @@
 /* - ./srpt/src/ib_srpt.ko */
 
 
-struct scst_init_req {
+struct scst_driver_init_req {
 	struct scst_req req;
 
 	TAILQ_HEAD(, scst_driver) drivers;
 	struct scst_driver *drv;
 };
 
-struct scst_deinit_req {
+struct scst_driver_deinit_req {
 	struct scst_req req;
 
 	TAILQ_HEAD(, scst_driver) drivers;
@@ -63,7 +63,7 @@ scst_rmmod(struct scst_driver *driver, subprocess_done_t done, void *priv)
 }
 
 
-SCST_REQ_DEFINE(init)
-SCST_REQ_DEFINE(deinit)
+SCST_REQ_DEFINE(driver_init)
+SCST_REQ_DEFINE(driver_deinit)
 
 #endif /* _SCST_LIB_H */

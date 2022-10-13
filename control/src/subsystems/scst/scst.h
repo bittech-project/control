@@ -162,7 +162,7 @@ to_ ## req_type ## _req(struct scst_req *req)						\
 	return SPDK_CONTAINEROF(req, struct scst_ ## req_type ## _req, req);		\
 }											\
 											\
-struct scst_req *scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op);
+struct scst_req *scst_ ## req_type ## _req_constructor(const struct scst_cdbops *op);
 
 
 #define SCST_REQ_REGISTER(req_type)							\
@@ -175,7 +175,7 @@ scst_ ## req_type ## _req_free(struct scst_req *req)					\
 }											\
 											\
 struct scst_req *									\
-scst_req_ ## req_type ## _constructor(const struct scst_cdbops *op)			\
+scst_ ## req_type ## _req_constructor(const struct scst_cdbops *op)			\
 {											\
 	struct scst_ ## req_type ## _req * req_ ## req_type;				\
 	struct scst_req *req;								\

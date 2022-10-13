@@ -72,23 +72,23 @@ if __name__ == "__main__":
     p.set_defaults(func=spdk_get_version)
 
     # scst
-    def scst_drivers_init(args):
-        json = rpc.scst.scst_drivers_init(args.client,
-                                          drivers=args.drivers)
+    def scst_driver_init(args):
+        json = rpc.scst.scst_driver_init(args.client,
+                                         drivers=args.drivers)
         print_json(json)
 
-    p = subparsers.add_parser('scst_drivers_init', help='Load specified SCST drivers')
+    p = subparsers.add_parser('scst_driver_init', help='Load specified SCST drivers')
     p.add_argument('-d', '--drivers', nargs='+', help='SCST driver names', required=True, type=str)
-    p.set_defaults(func=scst_drivers_init)
+    p.set_defaults(func=scst_driver_init)
 
-    def scst_drivers_deinit(args):
-        json = rpc.scst.scst_drivers_deinit(args.client,
-                                            drivers=args.drivers)
+    def scst_driver_deinit(args):
+        json = rpc.scst.scst_driver_deinit(args.client,
+                                           drivers=args.drivers)
         print_json(json)
 
-    p = subparsers.add_parser('scst_drivers_deinit', help='Unload specified SCST drivers')
+    p = subparsers.add_parser('scst_driver_deinit', help='Unload specified SCST driver')
     p.add_argument('-d', '--drivers', nargs='+', help='SCST driver names', required=True, type=str)
-    p.set_defaults(func=scst_drivers_deinit)
+    p.set_defaults(func=scst_driver_deinit)
 
     def check_called_name(name):
         if name in deprecated_aliases:

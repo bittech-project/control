@@ -10,21 +10,21 @@
 #include "scst_lib.h"
 
 enum scst_ops {
-	SCST_OP_INIT,
-	SCST_OP_DEINIT,
+	SCST_OP_DRIVER_INIT,
+	SCST_OP_DRIVER_DEINIT,
 	SCST_OP_COUNT,
 };
 
 static const struct scst_cdbops scst_op_table[] = {
 	{
-		.op.ops = SCST_OP_INIT,
-		.op.name = "init",
-		.constructor = scst_req_init_constructor,
+		.op.ops = SCST_OP_DRIVER_INIT,
+		.op.name = "driver_init",
+		.constructor = scst_driver_init_req_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DEINIT,
-		.op.name = "deinit",
-		.constructor = scst_req_deinit_constructor,
+		.op.ops = SCST_OP_DRIVER_DEINIT,
+		.op.name = "driver_deinit",
+		.constructor = scst_driver_deinit_req_constructor,
 	}
 };
 
