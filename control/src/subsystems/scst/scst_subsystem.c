@@ -5,7 +5,7 @@
 
 #include "err.h"
 #include "sto_subsystem.h"
-#include "sto_core.h"
+#include "sto_lib.h"
 #include "scst.h"
 #include "scst_lib.h"
 
