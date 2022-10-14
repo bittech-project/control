@@ -85,8 +85,7 @@ sto_subprocess_done(struct sto_subprocess *subp)
 }
 
 static void
-sto_rpc_exec(struct spdk_jsonrpc_request *request,
-	     const struct spdk_json_val *params)
+sto_exec(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
 	struct sto_exec_req *req;
 	struct sto_exec_params *exec_params;
@@ -104,7 +103,6 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 
 	if (spdk_json_decode_object(params, sto_exec_decoders,
 				    SPDK_COUNTOF(sto_exec_decoders), exec_params)) {
-		SPDK_DEBUGLOG(sto_control, "spdk_json_decode_object failed\n");
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
 						 "spdk_json_decode_object failed");
 		goto free_req;
@@ -115,16 +113,14 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 	subp = sto_subprocess_alloc(exec_params->arg_list.args, exec_params->arg_list.numargs,
 				    exec_params->capture_output);
 	if (spdk_unlikely(!subp)) {
-		SPDK_ERRLOG("Failed to create subprocess\n");
 		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
-		goto free_req;
+		goto free_params;
 	}
 
 	sto_subprocess_init_cb(subp, sto_subprocess_done, req);
 
 	rc = sto_subprocess_run(subp);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to run subprocess\n");
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
 		goto free_subp;
 	}
@@ -134,9 +130,12 @@ sto_rpc_exec(struct spdk_jsonrpc_request *request,
 free_subp:
 	sto_subprocess_free(subp);
 
+free_params:
+	sto_exec_free_params(&req->params);
+
 free_req:
-	sto_exec_free_req(req);
+	free(req);
 
 	return;
 }
-SPDK_RPC_REGISTER("exec", sto_rpc_exec, SPDK_RPC_RUNTIME)
+SPDK_RPC_REGISTER("exec", sto_exec, SPDK_RPC_RUNTIME)
