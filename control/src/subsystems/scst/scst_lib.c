@@ -49,43 +49,36 @@ static int
 scst_init_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_init_req *init_req = to_init_req(req);
-	struct scst_init_params *params;
+	struct scst_init_params params = {};
 	struct scst_driver *drv;
 	struct scst *scst;
 	int rc = 0, i;
 
-	params = calloc(1, sizeof(*params));
-	if (spdk_unlikely(!params)) {
-		SPDK_ERRLOG("SCST: Failed to alloc init req params\n");
-		return -ENOMEM;
-	}
-
 	if (spdk_json_decode_object(cdb, scst_req_init_decoders,
-				    SPDK_COUNTOF(scst_req_init_decoders), params)) {
+				    SPDK_COUNTOF(scst_req_init_decoders), &params)) {
 		SPDK_ERRLOG("Failed to decode init req params\n");
-		rc = -EINVAL;
-		goto free_params;
+		return -EINVAL;
 	}
 
-	if (!params->drv_list.cnt) {
+	if (!params.drv_list.cnt) {
 		SPDK_ERRLOG("Driver list is empty\n");
 		rc = -EINVAL;
-		goto free_params;
+		goto out;
 	}
 
 	scst = req->scst;
 
 	TAILQ_INIT(&init_req->drivers);
 
-	for (i = 0; i < params->drv_list.cnt; i++) {
+	for (i = 0; i < params.drv_list.cnt; i++) {
 		struct scst_driver_dep *master;
-		const char *drv_name = params->drv_list.names[i];
+		const char *drv_name = params.drv_list.names[i];
 
 		drv = scst_find_drv_by_name(scst, drv_name);
 		if (spdk_unlikely(!drv)) {
 			SPDK_ERRLOG("Failed to find `%s` SCST driver\n", drv_name);
 			rc = -ENOENT;
-			goto free_params;
+			goto out;
 		}
 
 		if (drv->status == DRV_LOADED) {
@@ -105,8 +98,8 @@ scst_init_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 		drv->status = DRV_NEED_LOAD;
 	}
 
-free_params:
-	scst_init_params_free(params);
+out:
+	scst_init_params_free(&params);
 
 	return rc;
 }
@@ -195,43 +188,36 @@ static int
 scst_deinit_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_deinit_req *deinit_req = to_deinit_req(req);
-	struct scst_deinit_params *params;
+	struct scst_deinit_params params = {};
 	struct scst_driver *drv;
 	struct scst *scst;
 	int rc = 0, i;
 
-	params = calloc(1, sizeof(*params));
-	if (spdk_unlikely(!params)) {
-		SPDK_ERRLOG("SCST: Failed to alloc deinit req params\n");
-		return -ENOMEM;
-	}
-
 	if (spdk_json_decode_object(cdb, scst_req_deinit_decoders,
-				    SPDK_COUNTOF(scst_req_deinit_decoders), params)) {
+				    SPDK_COUNTOF(scst_req_deinit_decoders), &params)) {
 		SPDK_ERRLOG("Failed to decode deinit req params\n");
-		rc = -EINVAL;
-		goto free_params;
+		return -EINVAL;
 	}
 
-	if (!params->drv_list.cnt) {
+	if (!params.drv_list.cnt) {
 		SPDK_ERRLOG("Driver list is empty\n");
 		rc = -EINVAL;
-		goto free_params;
+		goto out;
 	}
 
 	scst = req->scst;
 
 	TAILQ_INIT(&deinit_req->drivers);
 
-	for (i = 0; i < params->drv_list.cnt; i++) {
+	for (i = 0; i < params.drv_list.cnt; i++) {
 		struct scst_driver_dep *slave;
-		const char *drv_name = params->drv_list.names[i];
+		const char *drv_name = params.drv_list.names[i];
 
 		drv = scst_find_drv_by_name(scst, drv_name);
 		if (spdk_unlikely(!drv)) {
 			SPDK_ERRLOG("Failed to find %s SCST driver\n", drv_name);
 			rc = -ENOENT;
-			goto free_params;
+			goto out;
 		}
 
 		if (drv->status == DRV_UNLOADED) {
@@ -261,8 +247,8 @@ scst_deinit_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb
 		drv->status = DRV_NEED_UNLOAD;
 	}
 
-free_params:
-	scst_deinit_params_free(params);
+out:
+	scst_deinit_params_free(&params);
 
 	return rc;
 }

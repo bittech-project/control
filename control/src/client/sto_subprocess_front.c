@@ -58,6 +58,12 @@ struct sto_subprocess_result {
 	char *output;
 };
 
+static void
+sto_subprocess_result_free(struct sto_subprocess_result *result)
+{
+	free(result->output);
+}
+
 static const struct spdk_json_object_decoder sto_subprocess_result_decoders[] = {
 	{"returncode", offsetof(struct sto_subprocess_result, returncode), spdk_json_decode_int32},
 	{"output", offsetof(struct sto_subprocess_result, output), spdk_json_decode_string},
@@ -91,6 +97,8 @@ sto_subprocess_resp_handler(struct sto_rpc_request *rpc_req,
 
 	SPDK_NOTICELOG("GLEB: Get result from subprocess response: returncode[%d] output: %s\n",
 		       subp->returncode, subp->output);
+
+	sto_subprocess_result_free(&result);
 
 out:
 	sto_rpc_req_free(rpc_req);

@@ -9,43 +9,51 @@ struct sto_aio_read_params {
 	uint64_t size;
 };
 
-struct sto_aio_write_params {
-	char *filename;
-	uint64_t size;
-	char *buf;
-};
+static void
+sto_aio_read_params_free(struct sto_aio_read_params *params)
+{
+	free(params->filename);
+}
 
 static const struct spdk_json_object_decoder sto_aio_read_decoders[] = {
 	{"filename", offsetof(struct sto_aio_read_params, filename), spdk_json_decode_string},
 	{"size", offsetof(struct sto_aio_read_params, size), spdk_json_decode_uint64},
 };
 
-static const struct spdk_json_object_decoder sto_aio_write_decoders[] = {
-	{"filename", offsetof(struct sto_aio_write_params, filename), spdk_json_decode_string},
-	{"buf", offsetof(struct sto_aio_write_params, buf), spdk_json_decode_string},
-};
-
 struct sto_aio_read_req {
 	struct spdk_jsonrpc_request *request;
-
-	struct sto_aio_read_params params;
 	char *buf;
 };
+
+static struct sto_aio_read_req *
+sto_aio_read_req_alloc(uint64_t size)
+{
+	struct sto_aio_read_req *req;
+
+	req = calloc(1, sizeof(*req));
+	if (spdk_unlikely(!req)) {
+		printf("Failed to alloc AIO read req\n");
+		return NULL;
+	}
+
+	req->buf = calloc(1, size);
+	if (spdk_unlikely(!req->buf)) {
+		printf("Failed to alloc AIO read req buf\n");
+		goto free_req;
+	}
+
+	return req;
+
+free_req:
+	free(req);
+
+	return NULL;
+}
 
 static void
 sto_aio_read_req_free(struct sto_aio_read_req *req)
 {
-	free(req);
-}
-
-struct sto_aio_write_req {
-	struct spdk_jsonrpc_request *request;
-	struct sto_aio_write_params params;
-};
-
-static void
-sto_aio_write_req_free(struct sto_aio_write_req *req)
-{
+	free(req->buf);
 	free(req);
 }
 
@@ -73,11 +81,9 @@ sto_aio_read_end_io(struct sto_aio *aio)
 
 	sto_aio_read_response(aio, req);
 
-	free(req->buf);
+	sto_aio_read_req_free(req);
 
 	sto_aio_free(aio);
-
-	sto_aio_read_req_free(req);
 }
 
 static void
@@ -85,41 +91,29 @@ sto_aio_read(struct spdk_jsonrpc_request *request,
 	     const struct spdk_json_val *params)
 {
 	struct sto_aio_read_req *req;
-	struct sto_aio_read_params *aio_params;
+	struct sto_aio_read_params aio_params = {};
 	struct sto_aio *aio;
 
-	req = calloc(1, sizeof(*req));
-	if (spdk_unlikely(!req)) {
+	if (spdk_json_decode_object(params, sto_aio_read_decoders,
+				    SPDK_COUNTOF(sto_aio_read_decoders), &aio_params)) {
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "Memory allocation failure");
+						 "spdk_json_decode_object failed");
 		return;
 	}
 
-	aio_params = &req->params;
-
-	if (spdk_json_decode_object(params, sto_aio_read_decoders,
-				    SPDK_COUNTOF(sto_aio_read_decoders), aio_params)) {
-		printf("spdk_json_decode_object failed\n");
+	req = sto_aio_read_req_alloc(aio_params.size);
+	if (spdk_unlikely(!req)) {
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "spdk_json_decode_object failed");
-		goto free_req;
+						 "Memory allocation failure");
+		goto out;
 	}
 
 	req->request = request;
 
-	req->buf = calloc(1, aio_params->size);
-	if (spdk_unlikely(!req->buf)) {
-		printf("Failed to allocate buffer for AIO READ\n");
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "Allocation failure");
-		goto free_req;
-	}
-
-	aio = sto_aio_alloc(aio_params->filename, req->buf, aio_params->size, STO_READ);
+	aio = sto_aio_alloc(aio_params.filename, req->buf, aio_params.size, STO_READ);
 	if (spdk_unlikely(!aio)) {
-		printf("Failed to allocate AIO request\n");
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "Allocation failure");
+						 "Memory allocation failure");
 		goto free_req;
 	}
 
@@ -127,14 +121,71 @@ sto_aio_read(struct spdk_jsonrpc_request *request,
 
 	sto_aio_submit(aio);
 
+out:
+	sto_aio_read_params_free(&aio_params);
+
 	return;
 
 free_req:
 	sto_aio_read_req_free(req);
 
-	return;
+	goto out;
 }
 STO_RPC_REGISTER("aio_read", sto_aio_read)
+
+struct sto_aio_write_params {
+	char *filename;
+	char *buf;
+};
+
+static void
+sto_aio_write_params_free(struct sto_aio_write_params *params)
+{
+	free(params->filename);
+	free(params->buf);
+}
+
+static const struct spdk_json_object_decoder sto_aio_write_decoders[] = {
+	{"filename", offsetof(struct sto_aio_write_params, filename), spdk_json_decode_string},
+	{"buf", offsetof(struct sto_aio_write_params, buf), spdk_json_decode_string},
+};
+
+struct sto_aio_write_req {
+	struct spdk_jsonrpc_request *request;
+	char *buf;
+};
+
+static struct sto_aio_write_req *
+sto_aio_write_req_alloc(char *buf)
+{
+	struct sto_aio_write_req *req;
+
+	req = calloc(1, sizeof(*req));
+	if (spdk_unlikely(!req)) {
+		printf("Failed to alloc AIO write req\n");
+		return NULL;
+	}
+
+	req->buf = strdup(buf);
+	if (spdk_unlikely(!req->buf)) {
+		printf("Failed to copy AIO write req buf\n");
+		goto free_req;
+	}
+
+	return req;
+
+free_req:
+	free(req);
+
+	return NULL;
+}
+
+static void
+sto_aio_write_req_free(struct sto_aio_write_req *req)
+{
+	free(req->buf);
+	free(req);
+}
 
 static void
 sto_aio_write_response(struct sto_aio *aio, struct sto_aio_write_req *req)
@@ -159,9 +210,9 @@ sto_aio_write_end_io(struct sto_aio *aio)
 
 	sto_aio_write_response(aio, req);
 
-	sto_aio_free(aio);
-
 	sto_aio_write_req_free(req);
+
+	sto_aio_free(aio);
 }
 
 static void
@@ -169,33 +220,29 @@ sto_aio_write(struct spdk_jsonrpc_request *request,
 	      const struct spdk_json_val *params)
 {
 	struct sto_aio_write_req *req;
-	struct sto_aio_write_params *aio_params;
+	struct sto_aio_write_params aio_params = {};
 	struct sto_aio *aio;
 
-	req = calloc(1, sizeof(*req));
-	if (spdk_unlikely(!req)) {
+	if (spdk_json_decode_object(params, sto_aio_write_decoders,
+				    SPDK_COUNTOF(sto_aio_write_decoders), &aio_params)) {
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "Memory allocation failure");
+						 "spdk_json_decode_object failed");
 		return;
 	}
 
-	aio_params = &req->params;
-
-	if (spdk_json_decode_object(params, sto_aio_write_decoders,
-				    SPDK_COUNTOF(sto_aio_write_decoders), aio_params)) {
-		printf("spdk_json_decode_object failed\n");
+	req = sto_aio_write_req_alloc(aio_params.buf);
+	if (spdk_unlikely(!req)) {
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "spdk_json_decode_object failed");
-		goto free_req;
+						 "Memory allocation failure");
+		goto out;
 	}
 
 	req->request = request;
 
-	aio = sto_aio_alloc(aio_params->filename, aio_params->buf, strlen(aio_params->buf), STO_WRITE);
+	aio = sto_aio_alloc(aio_params.filename, req->buf, strlen(req->buf), STO_WRITE);
 	if (spdk_unlikely(!aio)) {
-		printf("Failed to allocate AIO request\n");
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "Allocation failure");
+						 "Memory allocation failure");
 		goto free_req;
 	}
 
@@ -203,11 +250,14 @@ sto_aio_write(struct spdk_jsonrpc_request *request,
 
 	sto_aio_submit(aio);
 
+out:
+	sto_aio_write_params_free(&aio_params);
+
 	return;
 
 free_req:
 	sto_aio_write_req_free(req);
 
-	return;
+	goto out;
 }
 STO_RPC_REGISTER("aio_write", sto_aio_write)
