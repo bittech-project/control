@@ -66,7 +66,7 @@ sto_aio_read_response(struct sto_aio_back *aio, struct sto_aio_read_req *req)
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_int32(w, "returncode", aio->rc);
+	spdk_json_write_named_int32(w, "returncode", aio->returncode);
 	spdk_json_write_named_string(w, "buf", req->buf);
 
 	spdk_json_write_object_end(w);
@@ -93,6 +93,7 @@ sto_aio_read(struct spdk_jsonrpc_request *request,
 	struct sto_aio_read_req *req;
 	struct sto_aio_read_params aio_params = {};
 	struct sto_aio_back *aio;
+	int rc;
 
 	if (spdk_json_decode_object(params, sto_aio_read_decoders,
 				    SPDK_COUNTOF(sto_aio_read_decoders), &aio_params)) {
@@ -119,12 +120,19 @@ sto_aio_read(struct spdk_jsonrpc_request *request,
 
 	sto_aio_back_init_cb(aio, sto_aio_read_end_io, req);
 
-	sto_aio_back_submit(aio);
+	rc = sto_aio_back_submit(aio);
+	if (spdk_unlikely(rc)) {
+		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
+		goto free_aio;
+	}
 
 out:
 	sto_aio_read_params_free(&aio_params);
 
 	return;
+
+free_aio:
+	sto_aio_back_free(aio);
 
 free_req:
 	sto_aio_read_req_free(req);
@@ -196,7 +204,7 @@ sto_aio_write_response(struct sto_aio_back *aio, struct sto_aio_write_req *req)
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_int32(w, "returncode", aio->rc);
+	spdk_json_write_named_int32(w, "returncode", aio->returncode);
 
 	spdk_json_write_object_end(w);
 
@@ -222,6 +230,7 @@ sto_aio_write(struct spdk_jsonrpc_request *request,
 	struct sto_aio_write_req *req;
 	struct sto_aio_write_params aio_params = {};
 	struct sto_aio_back *aio;
+	int rc;
 
 	if (spdk_json_decode_object(params, sto_aio_write_decoders,
 				    SPDK_COUNTOF(sto_aio_write_decoders), &aio_params)) {
@@ -248,12 +257,19 @@ sto_aio_write(struct spdk_jsonrpc_request *request,
 
 	sto_aio_back_init_cb(aio, sto_aio_write_end_io, req);
 
-	sto_aio_back_submit(aio);
+	rc = sto_aio_back_submit(aio);
+	if (spdk_unlikely(rc)) {
+		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
+		goto free_aio;
+	}
 
 out:
 	sto_aio_write_params_free(&aio_params);
 
 	return;
+
+free_aio:
+	sto_aio_back_free(aio);
 
 free_req:
 	sto_aio_write_req_free(req);

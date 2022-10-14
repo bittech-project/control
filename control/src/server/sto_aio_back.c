@@ -208,7 +208,7 @@ sto_aio_back_exec_done(void *arg, int rc)
 {
 	struct sto_aio_back *aio = arg;
 
-	aio->rc = rc;
+	aio->returncode = rc;
 	aio->aio_back_end_io(aio);
 }
 

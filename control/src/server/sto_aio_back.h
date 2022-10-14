@@ -13,14 +13,15 @@ typedef void (*aio_back_end_io_t)(struct sto_aio_back *aio);
 struct sto_aio_back {
 	struct sto_exec_ctx exec_ctx;
 
+	int dir;
+
 	struct {
 		const char *filename;
 		char *buf;
 		size_t size;
 	};
 
-	int dir;
-	int rc;
+	int returncode;
 
 	void *priv;
 	aio_back_end_io_t aio_back_end_io;
