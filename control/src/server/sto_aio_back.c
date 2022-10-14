@@ -1,14 +1,14 @@
 #include <spdk/likely.h>
 
-#include "sto_aio.h"
+#include "sto_aio_back.h"
 
-static int sto_aio_exec(void *arg);
-static void sto_aio_exec_done(void *arg, int rc);
+static int sto_aio_back_exec(void *arg);
+static void sto_aio_back_exec_done(void *arg, int rc);
 
 static struct sto_exec_ops aio_ops = {
 	.name = "aio",
-	.exec = sto_aio_exec,
-	.exec_done = sto_aio_exec_done,
+	.exec = sto_aio_back_exec,
+	.exec_done = sto_aio_back_exec_done,
 };
 
 static void
@@ -184,9 +184,9 @@ sto_write_data(const char *filename, void *data, size_t size)
 }
 
 static int
-sto_aio_exec(void *arg)
+sto_aio_back_exec(void *arg)
 {
-	struct sto_aio *aio = arg;
+	struct sto_aio_back *aio = arg;
 	int rc = 0;
 
 	if (aio->dir == STO_WRITE) {
@@ -204,18 +204,18 @@ sto_aio_exec(void *arg)
 }
 
 static void
-sto_aio_exec_done(void *arg, int rc)
+sto_aio_back_exec_done(void *arg, int rc)
 {
-	struct sto_aio *aio = arg;
+	struct sto_aio_back *aio = arg;
 
 	aio->rc = rc;
-	aio->aio_end_io(aio);
+	aio->aio_back_end_io(aio);
 }
 
-struct sto_aio *
-sto_aio_alloc(const char *filename, void *buf, size_t size, int dir)
+struct sto_aio_back *
+sto_aio_back_alloc(const char *filename, void *buf, size_t size, int dir)
 {
-	struct sto_aio *aio;
+	struct sto_aio_back *aio;
 
 	aio = calloc(1, sizeof(*aio));
 	if (spdk_unlikely(!aio)) {
@@ -244,21 +244,21 @@ free_aio:
 }
 
 void
-sto_aio_init_cb(struct sto_aio *aio, aio_end_io_t aio_end_io, void *priv)
+sto_aio_back_init_cb(struct sto_aio_back *aio, aio_back_end_io_t aio_back_end_io, void *priv)
 {
-	aio->aio_end_io = aio_end_io;
+	aio->aio_back_end_io = aio_back_end_io;
 	aio->priv = priv;
 }
 
 void
-sto_aio_free(struct sto_aio *aio)
+sto_aio_back_free(struct sto_aio_back *aio)
 {
 	free((char *) aio->filename);
 	free(aio);
 }
 
 int
-sto_aio_submit(struct sto_aio *aio)
+sto_aio_back_submit(struct sto_aio_back *aio)
 {
 	int rc;
 

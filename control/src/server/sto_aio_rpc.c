@@ -2,7 +2,7 @@
 #include <spdk/likely.h>
 
 #include "sto_server.h"
-#include "sto_aio.h"
+#include "sto_aio_back.h"
 
 struct sto_aio_read_params {
 	char *filename;
@@ -58,7 +58,7 @@ sto_aio_read_req_free(struct sto_aio_read_req *req)
 }
 
 static void
-sto_aio_read_response(struct sto_aio *aio, struct sto_aio_read_req *req)
+sto_aio_read_response(struct sto_aio_back *aio, struct sto_aio_read_req *req)
 {
 	struct spdk_json_write_ctx *w;
 
@@ -75,7 +75,7 @@ sto_aio_read_response(struct sto_aio *aio, struct sto_aio_read_req *req)
 }
 
 static void
-sto_aio_read_end_io(struct sto_aio *aio)
+sto_aio_read_end_io(struct sto_aio_back *aio)
 {
 	struct sto_aio_read_req *req = aio->priv;
 
@@ -83,7 +83,7 @@ sto_aio_read_end_io(struct sto_aio *aio)
 
 	sto_aio_read_req_free(req);
 
-	sto_aio_free(aio);
+	sto_aio_back_free(aio);
 }
 
 static void
@@ -92,7 +92,7 @@ sto_aio_read(struct spdk_jsonrpc_request *request,
 {
 	struct sto_aio_read_req *req;
 	struct sto_aio_read_params aio_params = {};
-	struct sto_aio *aio;
+	struct sto_aio_back *aio;
 
 	if (spdk_json_decode_object(params, sto_aio_read_decoders,
 				    SPDK_COUNTOF(sto_aio_read_decoders), &aio_params)) {
@@ -110,16 +110,16 @@ sto_aio_read(struct spdk_jsonrpc_request *request,
 
 	req->request = request;
 
-	aio = sto_aio_alloc(aio_params.filename, req->buf, aio_params.size, STO_READ);
+	aio = sto_aio_back_alloc(aio_params.filename, req->buf, aio_params.size, STO_READ);
 	if (spdk_unlikely(!aio)) {
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
 						 "Memory allocation failure");
 		goto free_req;
 	}
 
-	sto_aio_init_cb(aio, sto_aio_read_end_io, req);
+	sto_aio_back_init_cb(aio, sto_aio_read_end_io, req);
 
-	sto_aio_submit(aio);
+	sto_aio_back_submit(aio);
 
 out:
 	sto_aio_read_params_free(&aio_params);
@@ -188,7 +188,7 @@ sto_aio_write_req_free(struct sto_aio_write_req *req)
 }
 
 static void
-sto_aio_write_response(struct sto_aio *aio, struct sto_aio_write_req *req)
+sto_aio_write_response(struct sto_aio_back *aio, struct sto_aio_write_req *req)
 {
 	struct spdk_json_write_ctx *w;
 
@@ -204,7 +204,7 @@ sto_aio_write_response(struct sto_aio *aio, struct sto_aio_write_req *req)
 }
 
 static void
-sto_aio_write_end_io(struct sto_aio *aio)
+sto_aio_write_end_io(struct sto_aio_back *aio)
 {
 	struct sto_aio_write_req *req = aio->priv;
 
@@ -212,7 +212,7 @@ sto_aio_write_end_io(struct sto_aio *aio)
 
 	sto_aio_write_req_free(req);
 
-	sto_aio_free(aio);
+	sto_aio_back_free(aio);
 }
 
 static void
@@ -221,7 +221,7 @@ sto_aio_write(struct spdk_jsonrpc_request *request,
 {
 	struct sto_aio_write_req *req;
 	struct sto_aio_write_params aio_params = {};
-	struct sto_aio *aio;
+	struct sto_aio_back *aio;
 
 	if (spdk_json_decode_object(params, sto_aio_write_decoders,
 				    SPDK_COUNTOF(sto_aio_write_decoders), &aio_params)) {
@@ -239,16 +239,16 @@ sto_aio_write(struct spdk_jsonrpc_request *request,
 
 	req->request = request;
 
-	aio = sto_aio_alloc(aio_params.filename, req->buf, strlen(req->buf), STO_WRITE);
+	aio = sto_aio_back_alloc(aio_params.filename, req->buf, strlen(req->buf), STO_WRITE);
 	if (spdk_unlikely(!aio)) {
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
 						 "Memory allocation failure");
 		goto free_req;
 	}
 
-	sto_aio_init_cb(aio, sto_aio_write_end_io, req);
+	sto_aio_back_init_cb(aio, sto_aio_write_end_io, req);
 
-	sto_aio_submit(aio);
+	sto_aio_back_submit(aio);
 
 out:
 	sto_aio_write_params_free(&aio_params);
