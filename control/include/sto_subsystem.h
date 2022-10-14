@@ -1,6 +1,8 @@
 #ifndef _STO_SUBSYSTEM_H_
 #define _STO_SUBSYSTEM_H_
 
+#include <spdk/queue.h>
+
 struct spdk_json_val;
 struct spdk_json_write_ctx;
 

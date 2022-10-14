@@ -1,8 +1,9 @@
 #ifndef _SCST_H_
 #define _SCST_H_
 
-#include "sto_core.h"
-#include "sto_subsystem.h"
+#include <spdk/queue.h>
+
+#include "sto_lib.h"
 #include "sto_subprocess_front.h"
 
 #define SCST_ROOT "/sys/kernel/scst_tgt"

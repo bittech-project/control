@@ -36,8 +36,6 @@ void sto_core_fini(void);
 
 const char *sto_req_state_name(enum sto_req_state state);
 
-void sto_err(struct sto_err_context *err, int rc);
-
 struct sto_req *sto_req_alloc(const struct spdk_json_val *params);
 void sto_req_init_cb(struct sto_req *req, sto_req_response_t response, void *priv);
 void sto_req_free(struct sto_req *req);

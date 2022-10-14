@@ -23,6 +23,7 @@ int sto_decode_object_str(const struct spdk_json_val *values,
 			  const char *name, char **value);
 const struct spdk_json_val *sto_decode_next_cdb(const struct spdk_json_val *params);
 
+void sto_err(struct sto_err_context *err, int rc);
 
 #endif /* _STO_LIB_H_ */
 

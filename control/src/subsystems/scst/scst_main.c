@@ -117,7 +117,7 @@ static const char *const scst_drv_names[] = {
 	[SCST_DRV_VDISK]	= "scst_vdisk",
 };
 
-const char *
+static const char *
 scst_drv_name(enum scst_drv_type type)
 {
 	size_t index = type;
