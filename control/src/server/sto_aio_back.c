@@ -195,11 +195,6 @@ sto_aio_back_exec(void *arg)
 		rc = sto_read_data(aio->filename, aio->buf, aio->size);
 	}
 
-	if (spdk_unlikely(rc)) {
-		printf("Failed to write/read %zu to/from %s file\n",
-		       aio->size, aio->filename);
-	}
-
 	return rc;
 }
 
