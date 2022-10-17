@@ -50,53 +50,6 @@ scst_tgt_init(struct scst_tgt *tgt, enum scst_tgt_type type)
 	tgt->name = scst_tgt_name(type);
 }
 
-static const char *const scst_dh_names[] = {
-	[SCST_DH_TAPE]		= "scst_tape",
-	[SCST_DH_CDROM]		= "scst_cdrom",
-	[SCST_DH_CHANGER]	= "scst_changer",
-	[SCST_DH_DISK]		= "scst_disk",
-	[SCST_DH_MODISK]	= "scst_modisk",
-	[SCST_DH_PROCESSOR]	= "scst_processor",
-	[SCST_DH_RAID]		= "scst_raid",
-	[SCST_DH_USER]		= "scst_user",
-	[SCST_DH_VDISK]		= "scst_vdisk",
-};
-
-const char *
-scst_dh_name(enum scst_dh_type type)
-{
-	size_t index = type;
-
-	if (spdk_unlikely(index >= SPDK_COUNTOF(scst_dh_names))) {
-		assert(0);
-	}
-
-	return scst_dh_names[index];
-}
-
-struct scst_dh *
-scst_find_dh_by_name(struct scst *scst, const char *name)
-{
-	int i;
-
-	for (i = 0; i < SCST_TGT_COUNT; i++) {
-		const char *dh_name = scst->dhs[i].name;
-
-		if (!strcmp(name, dh_name)) {
-			return &scst->dhs[i];
-		}
-	}
-
-	return NULL;
-}
-
-static void
-scst_dh_init(struct scst_dh *dh, enum scst_dh_type type)
-{
-	dh->type = type;
-	dh->name = scst_dh_name(type);
-}
-
 static const char *const scst_drv_names[] = {
 	[SCST_DRV_CORE]		= "scst",
 	[SCST_DRV_LOCAL]	= "scst_local",
@@ -244,12 +197,6 @@ scst_subsystem_init(void)
 		struct scst_tgt *tgt = &scst->tgts[i];
 
 		scst_tgt_init(tgt, i);
-	}
-
-	for (i = 0; i < SCST_DH_COUNT; i++) {
-		struct scst_dh *dh = &scst->dhs[i];
-
-		scst_dh_init(dh, i);
 	}
 
 	scst->initialized = true;

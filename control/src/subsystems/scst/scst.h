@@ -43,19 +43,6 @@ enum scst_tgt_type {
 	SCST_TGT_COUNT,
 };
 
-enum scst_dh_type {
-	SCST_DH_TAPE,
-	SCST_DH_CDROM,
-	SCST_DH_CHANGER,
-	SCST_DH_DISK,
-	SCST_DH_MODISK,
-	SCST_DH_PROCESSOR,
-	SCST_DH_RAID,
-	SCST_DH_USER,
-	SCST_DH_VDISK,
-	SCST_DH_COUNT
-};
-
 enum scst_drv_type {
 	SCST_DRV_CORE,
 	SCST_DRV_LOCAL,
@@ -106,14 +93,8 @@ struct scst_tgt {
 	enum scst_tgt_type type;
 };
 
-struct scst_dh {
-	const char *name;
-	enum scst_dh_type type;
-};
-
 struct scst {
 	struct scst_tgt tgts[SCST_TGT_COUNT];
-	struct scst_dh dhs[SCST_DH_COUNT];
 
 	struct scst_driver drivers[SCST_DRV_COUNT];
 
@@ -194,7 +175,6 @@ void scst_subsystem_init(void);
 void scst_subsystem_fini(void);
 
 struct scst_tgt *scst_find_tgt_by_name(struct scst *scst, const char *name);
-struct scst_dh *scst_find_dh_by_name(struct scst *scst, const char *name);
 struct scst_driver *scst_find_drv_by_name(struct scst *scst, const char *name);
 
 void scst_req_init(struct scst_req *req, const struct scst_cdbops *op);
