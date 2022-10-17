@@ -632,3 +632,117 @@ scst_dev_close_req_free(struct scst_req *req)
 }
 
 SCST_REQ_REGISTER(dev_close)
+
+
+struct scst_dev_resync_params {
+	char *name;
+};
+
+static void
+scst_dev_resync_params_free(struct scst_dev_resync_params *params)
+{
+	free(params->name);
+}
+
+static const struct spdk_json_object_decoder scst_dev_resync_req_decoders[] = {
+	{"name", offsetof(struct scst_dev_resync_params, name), spdk_json_decode_string},
+};
+
+static int
+scst_dev_resync_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_dev_resync_req *dev_resync_req = to_dev_resync_req(req);
+	struct scst_dev_resync_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_dev_resync_req_decoders,
+				    SPDK_COUNTOF(scst_dev_resync_req_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dev_resync req params\n");
+		return -EINVAL;
+	}
+
+	dev_resync_req->mgmt_path = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEVICES,
+						        params.name, "resync_size");
+	if (spdk_unlikely(!dev_resync_req->mgmt_path)) {
+		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	dev_resync_req->parsed_cmd = "1";
+
+out:
+	scst_dev_resync_params_free(&params);
+
+	return rc;
+}
+
+static void
+scst_dev_resync_done(struct sto_aio *aio)
+{
+	struct scst_req *req = aio->priv;
+	int rc;
+
+	rc = aio->returncode;
+
+	sto_aio_free(aio);
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to CLOSE dev\n");
+		sto_err(req->ctx.err_ctx, rc);
+	}
+
+	scst_req_response(req);
+}
+
+static int
+scst_dev_resync_req_exec(struct scst_req *req)
+{
+	struct scst_dev_resync_req *dev_resync_req = to_dev_resync_req(req);
+	struct sto_aio *aio;
+	int rc;
+
+	aio = sto_aio_alloc(dev_resync_req->mgmt_path, dev_resync_req->parsed_cmd,
+			    strlen(dev_resync_req->parsed_cmd), STO_WRITE);
+	if (spdk_unlikely(!aio)) {
+		SPDK_ERRLOG("Failed to alloc memory for AIO\n");
+		return -ENOMEM;
+	}
+
+	sto_aio_init_cb(aio, scst_dev_resync_done, req);
+
+	rc = sto_aio_submit(aio);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to submit AIO, rc=%d\n", rc);
+		goto free_aio;
+	}
+
+	return 0;
+
+free_aio:
+	sto_aio_free(aio);
+
+	return rc;
+}
+
+static void
+scst_dev_resync_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_int32(w, "status", 0);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
+scst_dev_resync_req_free(struct scst_req *req)
+{
+	struct scst_dev_resync_req *dev_resync_req = to_dev_resync_req(req);
+
+	free(dev_resync_req->mgmt_path);
+
+	rte_free(dev_resync_req);
+}
+
+SCST_REQ_REGISTER(dev_resync)

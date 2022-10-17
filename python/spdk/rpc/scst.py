@@ -54,3 +54,15 @@ def scst_dev_close(client, name, handler):
         'handler': handler,
     }
     return client.call('control', params)
+
+def scst_dev_resync(client, name):
+    """Resync the device size with the initiator(s).
+    Args:
+        name: SCST device name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'dev_resync',
+        'name': name,
+    }
+    return client.call('control', params)

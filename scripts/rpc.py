@@ -114,6 +114,15 @@ if __name__ == "__main__":
     p.add_argument('-dh', '--handler', help='SCST handler name', required=True, type=str)
     p.set_defaults(func=scst_dev_close)
 
+    def scst_dev_resync(args):
+        json = rpc.scst.scst_dev_resync(args.client,
+                                        name=args.name)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_dev_resync', help='Resync the device size with the initiator(s)')
+    p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
+    p.set_defaults(func=scst_dev_resync)
+
     def check_called_name(name):
         if name in deprecated_aliases:
             print("{} is deprecated, use {} instead.".format(name, deprecated_aliases[name]), file=sys.stderr)

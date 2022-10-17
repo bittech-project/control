@@ -14,6 +14,7 @@ enum scst_ops {
 	SCST_OP_DRIVER_DEINIT,
 	SCST_OP_DEV_OPEN,
 	SCST_OP_DEV_CLOSE,
+	SCST_OP_DEV_RESYNC,
 	SCST_OP_COUNT,
 };
 
@@ -37,6 +38,11 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.ops = SCST_OP_DEV_CLOSE,
 		.op.name = "dev_close",
 		.constructor = scst_dev_close_req_constructor,
+	},
+	{
+		.op.ops = SCST_OP_DEV_RESYNC,
+		.op.name = "dev_resync",
+		.constructor = scst_dev_resync_req_constructor,
 	}
 };
 
