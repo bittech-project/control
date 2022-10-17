@@ -162,11 +162,7 @@ scst_driver_init_req_exec(struct scst_req *req)
 static void
 scst_driver_init_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
 {
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_int32(w, "status", 0);
-
-	spdk_json_write_object_end(w);
+	sto_status_ok(w);
 }
 
 static void
@@ -317,11 +313,7 @@ scst_driver_deinit_req_exec(struct scst_req *req)
 static void
 scst_driver_deinit_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
 {
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_int32(w, "status", 0);
-
-	spdk_json_write_object_end(w);
+	sto_status_ok(w);
 }
 
 static void
@@ -485,11 +477,7 @@ free_aio:
 static void
 scst_dev_open_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
 {
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_int32(w, "status", 0);
-
-	spdk_json_write_object_end(w);
+	sto_status_ok(w);
 }
 
 static void
@@ -613,11 +601,7 @@ free_aio:
 static void
 scst_dev_close_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
 {
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_int32(w, "status", 0);
-
-	spdk_json_write_object_end(w);
+	sto_status_ok(w);
 }
 
 static void
@@ -728,11 +712,7 @@ free_aio:
 static void
 scst_dev_resync_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
 {
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_int32(w, "status", 0);
-
-	spdk_json_write_object_end(w);
+	sto_status_ok(w);
 }
 
 static void

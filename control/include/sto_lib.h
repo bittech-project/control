@@ -25,5 +25,8 @@ const struct spdk_json_val *sto_decode_next_cdb(const struct spdk_json_val *para
 
 void sto_err(struct sto_err_context *err, int rc);
 
+void sto_status_ok(struct spdk_json_write_ctx *w);
+void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err);
+
 #endif /* _STO_LIB_H_ */
 

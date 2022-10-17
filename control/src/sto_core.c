@@ -212,12 +212,7 @@ sto_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 	SPDK_ERRLOG("req[%p] end response: rc=%d\n", req, err->rc);
 
 	if (err->rc) {
-		spdk_json_write_object_begin(w);
-
-		spdk_json_write_named_int32(w, "error", err->rc);
-		spdk_json_write_named_string(w, "errno_msg", err->errno_msg);
-
-		spdk_json_write_object_end(w);
+		sto_status_failed(w, err);
 		goto out;
 	}
 

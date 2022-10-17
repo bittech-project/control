@@ -102,3 +102,26 @@ sto_decode_next_cdb(const struct spdk_json_val *params)
 
 	return cdb;
 }
+
+void
+sto_status_ok(struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_string(w, "status", "OK");
+
+	spdk_json_write_object_end(w);
+}
+
+void
+sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
+{
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_string(w, "status", "FAILED");
+	spdk_json_write_named_int32(w, "error", err->rc);
+	spdk_json_write_named_string(w, "msg", err->errno_msg);
+
+	spdk_json_write_object_end(w);
+}
+
