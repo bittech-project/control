@@ -224,35 +224,6 @@ scst_subsystem_fini(void)
 	scst->initialized = false;
 }
 
-int
-scst_req_subprocess(const char *cmd[], int numargs,
-		    subprocess_done_t cmd_done, struct scst_req *req)
-{
-	struct sto_subprocess *subp;
-	int rc = 0;
-
-	subp = sto_subprocess_alloc(cmd, numargs, false);
-	if (spdk_unlikely(!subp)) {
-		SPDK_ERRLOG("Failed to create subprocess\n");
-		return -ENOMEM;
-	}
-
-	sto_subprocess_init_cb(subp, cmd_done, req);
-
-	rc = sto_subprocess_run(subp);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to run subprocess, rc=%d\n", rc);
-		goto free_subp;
-	}
-
-	return 0;
-
-free_subp:
-	sto_subprocess_free(subp);
-
-	return rc;
-}
-
 void
 scst_req_init(struct scst_req *req, const struct scst_cdbops *op)
 {

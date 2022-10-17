@@ -188,7 +188,4 @@ scst_req_response(struct scst_req *req)
 	ctx->response(ctx->priv);
 }
 
-int scst_req_subprocess(const char *cmd[], int numargs,
-			subprocess_done_t cmd_done, struct scst_req *req);
-
 #endif /* _SCST_H_ */

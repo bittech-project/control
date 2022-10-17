@@ -67,23 +67,6 @@ struct scst_dev_resync_req {
 	char *parsed_cmd;
 };
 
-static inline int
-scst_modprobe(struct scst_driver *driver, subprocess_done_t done, void *priv)
-{
-	const char *modprobe[] = {"modprobe", driver->name};
-
-	return scst_req_subprocess(modprobe, SPDK_COUNTOF(modprobe), done, priv);
-}
-
-static inline int
-scst_rmmod(struct scst_driver *driver, subprocess_done_t done, void *priv)
-{
-	const char *modprobe[] = {"rmmod", driver->name};
-
-	return scst_req_subprocess(modprobe, SPDK_COUNTOF(modprobe), done, priv);
-}
-
-
 SCST_REQ_DEFINE(driver_init)
 SCST_REQ_DEFINE(driver_deinit)
 SCST_REQ_DEFINE(dev_open)

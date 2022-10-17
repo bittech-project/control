@@ -149,9 +149,12 @@ scst_driver_init_req_exec(struct scst_req *req)
 
 	drv = TAILQ_FIRST(&driver_init_req->drivers);
 	if (drv) {
+		const char *modprobe[] = {"modprobe", drv->name};
+
 		SPDK_NOTICELOG("GLEB: modprobe driver=%s\n", drv->name);
 		driver_init_req->drv = drv;
-		return scst_modprobe(drv, scst_driver_init_done, req);
+
+		return STO_SUBPROCESS_EXEC(modprobe, scst_driver_init_done, req);
 	}
 
 	scst_req_response(req);
@@ -300,9 +303,12 @@ scst_driver_deinit_req_exec(struct scst_req *req)
 
 	drv = TAILQ_FIRST(&driver_deinit_req->drivers);
 	if (drv) {
+		const char *rmmod[] = {"rmmod", drv->name};
+
 		SPDK_NOTICELOG("GLEB: rmmod driver=%s\n", drv->name);
 		driver_deinit_req->drv = drv;
-		return scst_rmmod(drv, scst_driver_deinit_done, req);
+
+		return STO_SUBPROCESS_EXEC(rmmod, scst_driver_deinit_done, req);
 	}
 
 	scst_req_response(req);

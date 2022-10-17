@@ -148,3 +148,32 @@ sto_subprocess_run(struct sto_subprocess *subp)
 
 	return rc;
 }
+
+int
+sto_subprocess_exec(const char *const cmd[], int numargs,
+		    subprocess_done_t cmd_done, void *priv)
+{
+	struct sto_subprocess *subp;
+	int rc = 0;
+
+	subp = sto_subprocess_alloc(cmd, numargs, false);
+	if (spdk_unlikely(!subp)) {
+		SPDK_ERRLOG("Failed to create subprocess\n");
+		return -ENOMEM;
+	}
+
+	sto_subprocess_init_cb(subp, cmd_done, priv);
+
+	rc = sto_subprocess_run(subp);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to run subprocess, rc=%d\n", rc);
+		goto free_subp;
+	}
+
+	return 0;
+
+free_subp:
+	sto_subprocess_free(subp);
+
+	return rc;
+}
