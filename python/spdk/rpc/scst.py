@@ -25,18 +25,32 @@ def scst_driver_deinit(client, drivers):
     }
     return client.call('control', params)
 
-def scst_dev_open(client, dev_name, handler, attributes):
+def scst_dev_open(client, name, handler, attributes):
     """Adds a new device using specified handler.
     Args:
-        dev_name: SCST device name
+        name: SCST device name
         handler: SCST handler name
         attributes: SCST dev attributes <p=v,...>
     """
     params = {
         'subsystem': 'scst',
         'op': 'dev_open',
-        'dev_name': dev_name,
+        'name': name,
         'handler': handler,
         'attributes': attributes,
+    }
+    return client.call('control', params)
+
+def scst_dev_close(client, name, handler):
+    """Closes a device belonging to handler <handler>.
+    Args:
+        name: SCST device name
+        handler: SCST handler name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'dev_close',
+        'name': name,
+        'handler': handler,
     }
     return client.call('control', params)

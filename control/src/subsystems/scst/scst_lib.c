@@ -360,7 +360,7 @@ scst_attr_list_free(struct scst_attr_name_list *attr_list)
 }
 
 struct scst_dev_open_params {
-	char *dev_name;
+	char *name;
 	char *handler;
 	struct scst_attr_name_list attr_list;
 };
@@ -368,13 +368,13 @@ struct scst_dev_open_params {
 static void
 scst_dev_open_params_free(struct scst_dev_open_params *params)
 {
-	free(params->dev_name);
+	free(params->name);
 	free(params->handler);
 	scst_attr_list_free(&params->attr_list);
 }
 
 static const struct spdk_json_object_decoder scst_dev_open_req_decoders[] = {
-	{"dev_name", offsetof(struct scst_dev_open_params, dev_name), spdk_json_decode_string},
+	{"name", offsetof(struct scst_dev_open_params, name), spdk_json_decode_string},
 	{"handler", offsetof(struct scst_dev_open_params, handler), spdk_json_decode_string},
 	{"attributes", offsetof(struct scst_dev_open_params, attr_list), scst_attr_list_decode, true},
 };
@@ -401,7 +401,7 @@ scst_dev_open_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *c
 		goto out;
 	}
 
-	dev_open_req->parsed_cmd = spdk_sprintf_alloc("add_device %s", params.dev_name);
+	dev_open_req->parsed_cmd = spdk_sprintf_alloc("add_device %s", params.name);
 	if (spdk_unlikely(!dev_open_req->parsed_cmd)) {
 		SPDK_ERRLOG("Failed to alloc memory for parsed_cmd\n");
 		rc = -ENOMEM;
@@ -429,7 +429,7 @@ free_cmd:
 	free(dev_open_req->parsed_cmd);
 
 free_mgmt_path:
-	free (dev_open_req->mgmt_path);
+	free(dev_open_req->mgmt_path);
 
 	goto out;
 }
@@ -504,3 +504,131 @@ scst_dev_open_req_free(struct scst_req *req)
 }
 
 SCST_REQ_REGISTER(dev_open)
+
+
+struct scst_dev_close_params {
+	char *name;
+	char *handler;
+};
+
+static void
+scst_dev_close_params_free(struct scst_dev_close_params *params)
+{
+	free(params->name);
+	free(params->handler);
+}
+
+static const struct spdk_json_object_decoder scst_dev_close_req_decoders[] = {
+	{"name", offsetof(struct scst_dev_close_params, name), spdk_json_decode_string},
+	{"handler", offsetof(struct scst_dev_close_params, handler), spdk_json_decode_string},
+};
+
+static int
+scst_dev_close_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_dev_close_req *dev_close_req = to_dev_close_req(req);
+	struct scst_dev_close_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_dev_close_req_decoders,
+				    SPDK_COUNTOF(scst_dev_close_req_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dev_close req params\n");
+		return -EINVAL;
+	}
+
+	dev_close_req->mgmt_path = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+						     params.handler, SCST_MGMT_IO);
+	if (spdk_unlikely(!dev_close_req->mgmt_path)) {
+		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	dev_close_req->parsed_cmd = spdk_sprintf_alloc("del_device %s", params.name);
+	if (spdk_unlikely(!dev_close_req->parsed_cmd)) {
+		SPDK_ERRLOG("Failed to alloc memory for parsed_cmd\n");
+		rc = -ENOMEM;
+		goto free_mgmt_path;
+	}
+
+out:
+	scst_dev_close_params_free(&params);
+
+	return rc;
+
+free_mgmt_path:
+	free(dev_close_req->mgmt_path);
+
+	goto out;
+}
+
+static void
+scst_dev_close_done(struct sto_aio *aio)
+{
+	struct scst_req *req = aio->priv;
+	int rc;
+
+	rc = aio->returncode;
+
+	sto_aio_free(aio);
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to CLOSE dev\n");
+		sto_err(req->ctx.err_ctx, rc);
+	}
+
+	scst_req_response(req);
+}
+
+static int
+scst_dev_close_req_exec(struct scst_req *req)
+{
+	struct scst_dev_close_req *dev_close_req = to_dev_close_req(req);
+	struct sto_aio *aio;
+	int rc;
+
+	aio = sto_aio_alloc(dev_close_req->mgmt_path, dev_close_req->parsed_cmd,
+			    strlen(dev_close_req->parsed_cmd), STO_WRITE);
+	if (spdk_unlikely(!aio)) {
+		SPDK_ERRLOG("Failed to alloc memory for AIO\n");
+		return -ENOMEM;
+	}
+
+	sto_aio_init_cb(aio, scst_dev_close_done, req);
+
+	rc = sto_aio_submit(aio);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to submit AIO, rc=%d\n", rc);
+		goto free_aio;
+	}
+
+	return 0;
+
+free_aio:
+	sto_aio_free(aio);
+
+	return rc;
+}
+
+static void
+scst_dev_close_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_int32(w, "status", 0);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
+scst_dev_close_req_free(struct scst_req *req)
+{
+	struct scst_dev_close_req *dev_close_req = to_dev_close_req(req);
+
+	free(dev_close_req->mgmt_path);
+	free(dev_close_req->parsed_cmd);
+
+	rte_free(dev_close_req);
+}
+
+SCST_REQ_REGISTER(dev_close)

@@ -92,16 +92,27 @@ if __name__ == "__main__":
 
     def scst_dev_open(args):
         json = rpc.scst.scst_dev_open(args.client,
-                                      dev_name=args.dev_name,
+                                      name=args.name,
                                       handler=args.handler,
                                       attributes=args.attributes)
         print_json(json)
 
-    p = subparsers.add_parser('scst_dev_open', help='Adds a new device using specified handler')
-    p.add_argument('-d', '--dev-name',help='SCST device name', required=True, type=str)
-    p.add_argument('-dh', '--handler',help='SCST handler name', required=True, type=str)
+    p = subparsers.add_parser('scst_dev_open', help='Adds a new device using handler <handler>')
+    p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
+    p.add_argument('-dh', '--handler', help='SCST handler name', required=True, type=str)
     p.add_argument('-attrs', '--attributes', nargs='+', help='SCST dev attributes <p=v,...>', required=False, type=str)
     p.set_defaults(func=scst_dev_open)
+
+    def scst_dev_close(args):
+        json = rpc.scst.scst_dev_close(args.client,
+                                       name=args.name,
+                                       handler=args.handler)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_dev_close', help='Closes a device belonging to handler <handler>')
+    p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
+    p.add_argument('-dh', '--handler', help='SCST handler name', required=True, type=str)
+    p.set_defaults(func=scst_dev_close)
 
     def check_called_name(name):
         if name in deprecated_aliases:
