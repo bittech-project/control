@@ -448,30 +448,9 @@ static int
 scst_dev_open_req_exec(struct scst_req *req)
 {
 	struct scst_dev_open_req *dev_open_req = to_dev_open_req(req);
-	struct sto_aio *aio;
-	int rc;
 
-	aio = sto_aio_alloc(dev_open_req->mgmt_path, dev_open_req->parsed_cmd,
-			    strlen(dev_open_req->parsed_cmd), STO_WRITE);
-	if (spdk_unlikely(!aio)) {
-		SPDK_ERRLOG("Failed to alloc memory for AIO\n");
-		return -ENOMEM;
-	}
-
-	sto_aio_init_cb(aio, scst_dev_open_done, req);
-
-	rc = sto_aio_submit(aio);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to submit AIO, rc=%d\n", rc);
-		goto free_aio;
-	}
-
-	return 0;
-
-free_aio:
-	sto_aio_free(aio);
-
-	return rc;
+	return sto_aio_write_string(dev_open_req->mgmt_path, dev_open_req->parsed_cmd,
+				    scst_dev_open_done, req);
 }
 
 static void
@@ -572,30 +551,9 @@ static int
 scst_dev_close_req_exec(struct scst_req *req)
 {
 	struct scst_dev_close_req *dev_close_req = to_dev_close_req(req);
-	struct sto_aio *aio;
-	int rc;
 
-	aio = sto_aio_alloc(dev_close_req->mgmt_path, dev_close_req->parsed_cmd,
-			    strlen(dev_close_req->parsed_cmd), STO_WRITE);
-	if (spdk_unlikely(!aio)) {
-		SPDK_ERRLOG("Failed to alloc memory for AIO\n");
-		return -ENOMEM;
-	}
-
-	sto_aio_init_cb(aio, scst_dev_close_done, req);
-
-	rc = sto_aio_submit(aio);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to submit AIO, rc=%d\n", rc);
-		goto free_aio;
-	}
-
-	return 0;
-
-free_aio:
-	sto_aio_free(aio);
-
-	return rc;
+	return sto_aio_write_string(dev_close_req->mgmt_path, dev_close_req->parsed_cmd,
+				    scst_dev_close_done, req);
 }
 
 static void
@@ -683,30 +641,9 @@ static int
 scst_dev_resync_req_exec(struct scst_req *req)
 {
 	struct scst_dev_resync_req *dev_resync_req = to_dev_resync_req(req);
-	struct sto_aio *aio;
-	int rc;
 
-	aio = sto_aio_alloc(dev_resync_req->mgmt_path, dev_resync_req->parsed_cmd,
-			    strlen(dev_resync_req->parsed_cmd), STO_WRITE);
-	if (spdk_unlikely(!aio)) {
-		SPDK_ERRLOG("Failed to alloc memory for AIO\n");
-		return -ENOMEM;
-	}
-
-	sto_aio_init_cb(aio, scst_dev_resync_done, req);
-
-	rc = sto_aio_submit(aio);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to submit AIO, rc=%d\n", rc);
-		goto free_aio;
-	}
-
-	return 0;
-
-free_aio:
-	sto_aio_free(aio);
-
-	return rc;
+	return sto_aio_write_string(dev_resync_req->mgmt_path, dev_resync_req->parsed_cmd,
+				    scst_dev_resync_done, req);
 }
 
 static void
