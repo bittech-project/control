@@ -233,9 +233,5 @@ sto_subprocess_back_free(struct sto_subprocess_back *subp)
 int
 sto_subprocess_back_run(struct sto_subprocess_back *subp)
 {
-	int rc = 0;
-
-	rc = sto_exec(&subp->exec_ctx);
-
-	return rc;
+	return sto_exec(&subp->exec_ctx);
 }

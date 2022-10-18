@@ -255,11 +255,7 @@ sto_aio_back_free(struct sto_aio_back *aio)
 int
 sto_aio_back_submit(struct sto_aio_back *aio)
 {
-	int rc;
-
-	rc = sto_exec(&aio->exec_ctx);
-
-	return rc;
+	return sto_exec(&aio->exec_ctx);
 }
 
 int
