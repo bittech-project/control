@@ -49,7 +49,7 @@ _get_rpc_request(int id)
 	return NULL;
 }
 
-static int
+static void
 sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 {
 	struct spdk_jsonrpc_client_response *resp;
@@ -59,12 +59,13 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 	rc = spdk_jsonrpc_client_poll(client->rpc_client, 0);
 	if (rc == 0 || rc == -ENOTCONN) {
 		/* No response yet */
-		return 0;
+		return;
 	}
 
 	if (rc < 0) {
 		/* TODO: What should we do? */
-		return rc;
+		SPDK_ERRLOG("CRIT: GLEB\n");
+		return;
 	}
 
 	resp = spdk_jsonrpc_client_get_response(client->rpc_client);
@@ -73,14 +74,12 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 	/* Check for error response */
 	if (resp->error != NULL) {
 		SPDK_ERRLOG("Get error response\n");
-		rc = -EFAULT; /* FIXME */
 		goto out;
 	}
 
 	rc = spdk_json_decode_int32(resp->id, &id);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to decode request ID\n");
-		rc = -EFAULT; /* FIXME */
 		goto out;
 	}
 
@@ -95,10 +94,9 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 
 	TAILQ_REMOVE(&cgroup->clients, client, list);
 	TAILQ_INSERT_HEAD(&cgroup->free_clients, client, list);
+
 out:
 	spdk_jsonrpc_client_free_response(resp);
-
-	return rc;
 }
 
 static int
@@ -106,17 +104,13 @@ sto_client_group_poll(void *ctx)
 {
 	struct sto_client_group *cgroup = ctx;
 	struct sto_client *client, *tmp;
-	int rc = 0;
 
 	if (TAILQ_EMPTY(&cgroup->clients)) {
 		return SPDK_POLLER_IDLE;
 	}
 
 	TAILQ_FOREACH_SAFE(client, &cgroup->clients, list, tmp) {
-		rc = sto_client_poll(cgroup, client);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Some error during client poll, rc=%d\n", rc);
-		}
+		sto_client_poll(cgroup, client);
 	}
 
 	return SPDK_POLLER_BUSY;
