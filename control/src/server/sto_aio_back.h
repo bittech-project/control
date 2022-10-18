@@ -37,10 +37,12 @@ int sto_write_data(const char *filename, void *data, size_t size);
 int sto_read_data(const char *filename, void *data, size_t size);
 
 struct sto_aio_back *sto_aio_back_alloc(const char *filename, void *buf, size_t size, int dir);
-void sto_aio_back_free(struct sto_aio_back *aio);
 void sto_aio_back_init_cb(struct sto_aio_back *aio, aio_back_end_io_t aio_back_end_io, void *priv);
+void sto_aio_back_free(struct sto_aio_back *aio);
 
 int sto_aio_back_submit(struct sto_aio_back *aio);
 
+int sto_aio_back_write_string(const char *filename, char *str,
+			      aio_back_end_io_t aio_back_end_io, void *priv);
 
 #endif /* _STO_AIO_BACK_H_ */

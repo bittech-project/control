@@ -261,3 +261,32 @@ sto_aio_back_submit(struct sto_aio_back *aio)
 
 	return rc;
 }
+
+int
+sto_aio_back_write_string(const char *filename, char *str,
+			  aio_back_end_io_t aio_back_end_io, void *priv)
+{
+	struct sto_aio_back *aio;
+	int rc;
+
+	aio = sto_aio_back_alloc(filename, str, strlen(str), STO_WRITE);
+	if (spdk_unlikely(!aio)) {
+		printf("server: Failed to alloc memory for back AIO\n");
+		return -ENOMEM;
+	}
+
+	sto_aio_back_init_cb(aio, aio_back_end_io, priv);
+
+	rc = sto_aio_back_submit(aio);
+	if (spdk_unlikely(rc)) {
+		printf("server: Failed to submit back AIO, rc=%d\n", rc);
+		goto free_aio;
+	}
+
+	return 0;
+
+free_aio:
+	sto_aio_back_free(aio);
+
+	return rc;
+}
