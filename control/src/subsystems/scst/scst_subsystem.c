@@ -12,9 +12,12 @@
 enum scst_ops {
 	SCST_OP_DRIVER_INIT,
 	SCST_OP_DRIVER_DEINIT,
+
 	SCST_OP_DEV_OPEN,
 	SCST_OP_DEV_CLOSE,
 	SCST_OP_DEV_RESYNC,
+
+	SCST_OP_HANDLER_LIST,
 	SCST_OP_COUNT,
 };
 
@@ -43,7 +46,12 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.ops = SCST_OP_DEV_RESYNC,
 		.op.name = "dev_resync",
 		.constructor = scst_dev_resync_req_constructor,
-	}
+	},
+	{
+		.op.ops = SCST_OP_HANDLER_LIST,
+		.op.name = "handler_list",
+		.constructor = scst_handler_list_req_constructor,
+	},
 };
 
 #define SCST_OP_TBL_SIZE	(SPDK_COUNTOF(scst_op_table))

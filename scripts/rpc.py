@@ -123,6 +123,13 @@ if __name__ == "__main__":
     p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
     p.set_defaults(func=scst_dev_resync)
 
+    def scst_handler_list(args):
+        json = rpc.scst.scst_handler_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_handler_list', help='List all available handlers')
+    p.set_defaults(func=scst_handler_list)
+
     def check_called_name(name):
         if name in deprecated_aliases:
             print("{} is deprecated, use {} instead.".format(name, deprecated_aliases[name]), file=sys.stderr)

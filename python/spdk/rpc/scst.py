@@ -66,3 +66,13 @@ def scst_dev_resync(client, name):
         'name': name,
     }
     return client.call('control', params)
+
+def scst_handler_list(client):
+    """List all available handlers.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'handler_list',
+    }
+    return client.call('control', params)

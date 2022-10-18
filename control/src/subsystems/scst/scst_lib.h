@@ -4,6 +4,7 @@
 #include <spdk/util.h>
 
 #include "scst.h"
+#include "sto_readdir_front.h"
 
 /* ./scst/src/scst.ko */
 /* - ./fcst/fcst.ko */
@@ -67,10 +68,20 @@ struct scst_dev_resync_req {
 	char *parsed_cmd;
 };
 
+struct scst_handler_list_req {
+	struct scst_req req;
+
+	char *mgmt_path;
+	struct sto_dirents dirents;
+};
+
 SCST_REQ_DEFINE(driver_init)
 SCST_REQ_DEFINE(driver_deinit)
+
 SCST_REQ_DEFINE(dev_open)
 SCST_REQ_DEFINE(dev_close)
 SCST_REQ_DEFINE(dev_resync)
+
+SCST_REQ_DEFINE(handler_list)
 
 #endif /* _SCST_LIB_H */
