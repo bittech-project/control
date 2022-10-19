@@ -76,3 +76,13 @@ def scst_handler_list(client):
         'op': 'handler_list',
     }
     return client.call('control', params)
+
+def scst_device_list(client):
+    """List all open devices.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'device_list',
+    }
+    return client.call('control', params)

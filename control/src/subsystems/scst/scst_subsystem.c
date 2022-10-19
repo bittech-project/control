@@ -18,6 +18,8 @@ enum scst_ops {
 	SCST_OP_DEV_RESYNC,
 
 	SCST_OP_HANDLER_LIST,
+	SCST_OP_DEVICE_LIST,
+
 	SCST_OP_COUNT,
 };
 
@@ -51,6 +53,11 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.ops = SCST_OP_HANDLER_LIST,
 		.op.name = "handler_list",
 		.constructor = scst_handler_list_req_constructor,
+	},
+	{
+		.op.ops = SCST_OP_DEVICE_LIST,
+		.op.name = "device_list",
+		.constructor = scst_device_list_req_constructor,
 	},
 };
 
