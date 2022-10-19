@@ -16,6 +16,8 @@ struct sto_dirent {
 struct sto_readdir_back_ctx {
 	struct sto_exec_ctx exec_ctx;
 
+	bool skip_hidden;
+
 	struct {
 		const char *dirname;
 	};
@@ -31,7 +33,8 @@ struct sto_readdir_back_ctx {
 	readdir_back_done_t readdir_back_done;
 };
 
-int sto_readdir_back(const char *dirname, readdir_back_done_t readdir_back_done, void *priv);
+int sto_readdir_back(const char *dirname, bool skip_hidden,
+		     readdir_back_done_t readdir_back_done, void *priv);
 void sto_readdir_back_free(struct sto_readdir_back_ctx *ctx);
 
 #endif /* _STO_READDIR_BACK_H_ */

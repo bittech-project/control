@@ -24,6 +24,8 @@ sto_readdir_ctx_alloc(const char *dirname)
 		goto free_ctx;
 	}
 
+	ctx->skip_hidden = true;
+
 	return ctx;
 
 free_ctx:
@@ -198,6 +200,7 @@ sto_readdir_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_ct
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_string(w, "dirname", ctx->dirname);
+	spdk_json_write_named_bool(w, "skip_hidden", ctx->skip_hidden);
 
 	spdk_json_write_object_end(w);
 }

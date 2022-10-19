@@ -7,6 +7,7 @@
 
 struct sto_readdir_params {
 	char *dirname;
+	bool skip_hidden;
 };
 
 static void
@@ -17,6 +18,7 @@ sto_readdir_params_free(struct sto_readdir_params *params)
 
 static const struct spdk_json_object_decoder sto_readdir_decoders[] = {
 	{"dirname", offsetof(struct sto_readdir_params, dirname), spdk_json_decode_string},
+	{"skip_hidden", offsetof(struct sto_readdir_params, skip_hidden), spdk_json_decode_bool},
 };
 
 static void
@@ -69,7 +71,8 @@ sto_readdir(struct spdk_jsonrpc_request *request, const struct spdk_json_val *pa
 		return;
 	}
 
-	rc = sto_readdir_back(rd_params.dirname, sto_readdir_done, request);
+	rc = sto_readdir_back(rd_params.dirname, rd_params.skip_hidden,
+			      sto_readdir_done, request);
 	if (spdk_unlikely(rc)) {
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
 		goto out;

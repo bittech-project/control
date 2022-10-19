@@ -79,6 +79,11 @@ sto_readdir_exec(void *arg)
 	while (entry != NULL) {
 		struct sto_dirent *d;
 
+		if (ctx->skip_hidden && entry->d_name[0] == '.') {
+			entry = readdir(dir);
+			continue;
+		}
+
 		d = sto_readdir_alloc_dirent(entry->d_name);
 		if (spdk_unlikely(!d)) {
 			sto_readdir_dirents_free(ctx);
@@ -101,7 +106,7 @@ sto_readdir_exec(void *arg)
 }
 
 static struct sto_readdir_back_ctx *
-sto_readdir_back_alloc(const char *dirname)
+sto_readdir_back_alloc(const char *dirname, bool skip_hidden)
 {
 	struct sto_readdir_back_ctx *ctx;
 
@@ -116,6 +121,8 @@ sto_readdir_back_alloc(const char *dirname)
 		printf("Cann't allocate memory for dirname: %s\n", dirname);
 		goto free_ctx;
 	}
+
+	ctx->skip_hidden = skip_hidden;
 
 	sto_exec_init_ctx(&ctx->exec_ctx, &readdir_ops, ctx);
 
@@ -153,12 +160,13 @@ sto_readdir_back_submit(struct sto_readdir_back_ctx *ctx)
 }
 
 int
-sto_readdir_back(const char *dirname, readdir_back_done_t readdir_back_done, void *priv)
+sto_readdir_back(const char *dirname, bool skip_hidden,
+		 readdir_back_done_t readdir_back_done, void *priv)
 {
 	struct sto_readdir_back_ctx *ctx;
 	int rc;
 
-	ctx = sto_readdir_back_alloc(dirname);
+	ctx = sto_readdir_back_alloc(dirname, skip_hidden);
 	if (spdk_unlikely(!ctx)) {
 		printf("server: Failed to alloc memory for back readdir\n");
 		return -ENOMEM;

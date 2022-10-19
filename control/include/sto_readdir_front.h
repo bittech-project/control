@@ -12,6 +12,8 @@ struct sto_dirent {
 };
 
 struct sto_readdir_ctx {
+	bool skip_hidden;
+
 	struct {
 		const char *dirname;
 	};
