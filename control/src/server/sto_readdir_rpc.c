@@ -41,8 +41,6 @@ sto_readdir_response(struct sto_readdir_back_ctx *ctx, struct spdk_jsonrpc_reque
 
 	spdk_json_write_array_end(w);
 
-	spdk_json_write_named_int32(w, "dirent_cnt", ctx->dirent_cnt);
-
 	spdk_json_write_object_end(w);
 
 	spdk_jsonrpc_end_result(request, w);

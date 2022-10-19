@@ -23,8 +23,11 @@ static const struct spdk_json_object_decoder sto_readdir_decoders[] = {
 static void
 sto_readdir_response(struct sto_readdir_ctx *ctx, struct spdk_jsonrpc_request *request)
 {
+	struct sto_dirents *dirents;
 	struct spdk_json_write_ctx *w;
 	int i;
+
+	dirents = &ctx->dirents;
 
 	w = spdk_jsonrpc_begin_result(request);
 
@@ -34,13 +37,11 @@ sto_readdir_response(struct sto_readdir_ctx *ctx, struct spdk_jsonrpc_request *r
 
 	spdk_json_write_named_array_begin(w, "dirents");
 
-	for (i = 0; i < ctx->dirent_cnt; i++) {
-		spdk_json_write_string(w, ctx->dirents[i]);
+	for (i = 0; i < dirents->cnt; i++) {
+		spdk_json_write_string(w, dirents->dirents[i]);
 	}
 
 	spdk_json_write_array_end(w);
-
-	spdk_json_write_named_int32(w, "dirent_cnt", ctx->dirent_cnt);
 
 	spdk_json_write_object_end(w);
 

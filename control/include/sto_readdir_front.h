@@ -6,9 +6,9 @@
 struct sto_readdir_ctx;
 typedef void (*readdir_done_t)(struct sto_readdir_ctx *ctx);
 
-struct sto_dirent {
-	char *name;
-	TAILQ_ENTRY(sto_dirent) list;
+struct sto_dirents {
+	const char **dirents;
+	int cnt;
 };
 
 struct sto_readdir_ctx {
@@ -21,13 +21,15 @@ struct sto_readdir_ctx {
 	struct {
 		int returncode;
 
-		char **dirents;
-		int dirent_cnt;
+		struct sto_dirents dirents;
 	};
 
 	void *priv;
 	readdir_done_t readdir_done;
 };
+
+int sto_dirents_init(struct sto_dirents *dirents, const char **dirent_list, int cnt);
+void sto_dirents_free(struct sto_dirents *dirents);
 
 int sto_readdir(const char *dirname, readdir_done_t readdir_done, void *priv);
 void sto_readdir_free(struct sto_readdir_ctx *ctx);

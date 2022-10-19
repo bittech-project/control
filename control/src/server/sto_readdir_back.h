@@ -26,7 +26,6 @@ struct sto_readdir_back_ctx {
 		int returncode;
 
 		TAILQ_HEAD(, sto_dirent) dirent_list;
-		int dirent_cnt;
 	};
 
 	void *priv;

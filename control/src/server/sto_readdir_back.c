@@ -56,8 +56,6 @@ sto_readdir_dirents_free(struct sto_readdir_back_ctx *ctx)
 		free(d->name);
 		free(d);
 	}
-
-	ctx->dirent_cnt = 0;
 }
 
 static int
@@ -92,7 +90,6 @@ sto_readdir_exec(void *arg)
 		}
 
 		TAILQ_INSERT_TAIL(&ctx->dirent_list, d, list);
-		ctx->dirent_cnt++;
 
 		entry = readdir(dir);
 	}
