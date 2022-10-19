@@ -831,3 +831,84 @@ scst_device_list_req_free(struct scst_req *req)
 }
 
 SCST_REQ_REGISTER(device_list)
+
+
+static int
+scst_target_list_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_target_list_req *target_list_req = to_target_list_req(req);
+
+	target_list_req->mgmt_path = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
+	if (spdk_unlikely(!target_list_req->mgmt_path)) {
+		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static void
+scst_target_list_done(struct sto_readdir_ctx *ctx)
+{
+	struct scst_req *req = ctx->priv;
+	struct scst_target_list_req *target_list_req = to_target_list_req(req);
+	int rc;
+
+	rc = ctx->returncode;
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to target_list\n");
+		sto_err(req->ctx.err_ctx, rc);
+		goto out;
+	}
+
+	sto_dirents_init(&target_list_req->dirents, ctx->dirents.dirents, ctx->dirents.cnt);
+
+out:
+	sto_readdir_free(ctx);
+
+	scst_req_response(req);
+}
+
+static int
+scst_target_list_req_exec(struct scst_req *req)
+{
+	struct scst_target_list_req *target_list_req = to_target_list_req(req);
+
+	return sto_readdir(target_list_req->mgmt_path, scst_target_list_done, req);
+}
+
+static void
+scst_target_list_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+{
+	struct scst_target_list_req *target_list_req = to_target_list_req(req);
+	struct sto_dirents *dirents;
+	int i;
+
+	dirents = &target_list_req->dirents;
+
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_string(w, "status", "OK");
+
+	spdk_json_write_named_array_begin(w, "targets");
+
+	for (i = 0; i < dirents->cnt; i++) {
+		spdk_json_write_string(w, dirents->dirents[i]);
+	}
+
+	spdk_json_write_array_end(w);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
+scst_target_list_req_free(struct scst_req *req)
+{
+	struct scst_target_list_req *target_list_req = to_target_list_req(req);
+
+	free(target_list_req->mgmt_path);
+	sto_dirents_free(&target_list_req->dirents);
+}
+
+SCST_REQ_REGISTER(target_list)

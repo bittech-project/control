@@ -137,6 +137,13 @@ if __name__ == "__main__":
     p = subparsers.add_parser('scst_device_list', help='List all open devices')
     p.set_defaults(func=scst_device_list)
 
+    def scst_target_list(args):
+        json = rpc.scst.scst_target_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_list', help='List all available targets')
+    p.set_defaults(func=scst_target_list)
+
     def check_called_name(name):
         if name in deprecated_aliases:
             print("{} is deprecated, use {} instead.".format(name, deprecated_aliases[name]), file=sys.stderr)

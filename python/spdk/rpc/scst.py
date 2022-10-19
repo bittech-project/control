@@ -86,3 +86,13 @@ def scst_device_list(client):
         'op': 'device_list',
     }
     return client.call('control', params)
+
+def scst_target_list(client):
+    """List all available targets.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'target_list',
+    }
+    return client.call('control', params)
