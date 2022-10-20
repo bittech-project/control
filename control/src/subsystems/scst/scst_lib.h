@@ -32,6 +32,21 @@
 
 /* - ./srpt/src/ib_srpt.ko */
 
+struct scst_write_file_req {
+	struct scst_req req;
+
+	const char *file;
+	char *data;
+};
+SCST_REQ_DEFINE(write_file)
+
+struct scst_readdir_req {
+	struct scst_req req;
+
+	const char *dirname;
+	struct sto_dirents dirents;
+};
+SCST_REQ_DEFINE(readdir)
 
 struct scst_driver_init_req {
 	struct scst_req req;
@@ -47,66 +62,17 @@ struct scst_driver_deinit_req {
 	struct scst_driver *drv;
 };
 
-struct scst_dev_open_req {
-	struct scst_req req;
-
-	char *mgmt_path;
-	char *parsed_cmd;
-};
-
-struct scst_dev_close_req {
-	struct scst_req req;
-
-	char *mgmt_path;
-	char *parsed_cmd;
-};
-
-struct scst_dev_resync_req {
-	struct scst_req req;
-
-	char *mgmt_path;
-	char *parsed_cmd;
-};
-
-struct scst_handler_list_req {
-	struct scst_req req;
-
-	char *mgmt_path;
-	struct sto_dirents dirents;
-};
-
-struct scst_device_list_req {
-	struct scst_req req;
-
-	char *mgmt_path;
-	struct sto_dirents dirents;
-};
-
-struct scst_target_list_req {
-	struct scst_req req;
-
-	char *mgmt_path;
-	struct sto_dirents dirents;
-};
-
-struct scst_dgrp_add_req {
-	struct scst_req req;
-
-	char *mgmt_path;
-	char *parsed_cmd;
-};
-
 SCST_REQ_DEFINE(driver_init)
 SCST_REQ_DEFINE(driver_deinit)
 
-SCST_REQ_DEFINE(dev_open)
-SCST_REQ_DEFINE(dev_close)
-SCST_REQ_DEFINE(dev_resync)
-
-SCST_REQ_DEFINE(handler_list)
-SCST_REQ_DEFINE(device_list)
-SCST_REQ_DEFINE(target_list)
-
-SCST_REQ_DEFINE(dgrp_add)
+int scst_driver_init_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_driver_deinit_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_dev_open_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_dev_close_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_dev_resync_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_device_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 
 #endif /* _SCST_LIB_H */

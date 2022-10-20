@@ -9,6 +9,113 @@
 #include "scst_lib.h"
 #include "sto_aio_front.h"
 
+static void
+scst_write_file_done(struct sto_aio *aio)
+{
+	struct scst_req *req = aio->priv;
+	int rc;
+
+	rc = aio->returncode;
+
+	sto_aio_free(aio);
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to device group add\n");
+		sto_err(req->ctx.err_ctx, rc);
+	}
+
+	scst_req_response(req);
+}
+
+static int
+scst_write_file_req_exec(struct scst_req *req)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+
+	return sto_aio_write_string(write_file_req->file, write_file_req->data,
+				    scst_write_file_done, req);
+}
+
+static void
+scst_write_file_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+{
+	sto_status_ok(w);
+}
+
+static void
+scst_write_file_req_free(struct scst_req *req)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+
+	free((char *) write_file_req->file);
+	free(write_file_req->data);
+
+	rte_free(write_file_req);
+}
+SCST_REQ_REGISTER(write_file)
+
+
+static void
+scst_readdir_done(struct sto_readdir_req *rd_req)
+{
+	struct scst_req *req = rd_req->priv;
+	struct scst_readdir_req *scst_rd_req = to_readdir_req(req);
+	int rc;
+
+	rc = rd_req->returncode;
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to readdir\n");
+		sto_err(req->ctx.err_ctx, rc);
+		goto out;
+	}
+
+	sto_dirents_init(&scst_rd_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
+
+out:
+	sto_readdir_free(rd_req);
+
+	scst_req_response(req);
+}
+
+static int
+scst_readdir_req_exec(struct scst_req *req)
+{
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+
+	return sto_readdir(readdir_req->dirname, scst_readdir_done, req);
+}
+
+static void
+scst_readdir_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+{
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+	struct sto_dirents *dirents;
+
+	dirents = &readdir_req->dirents;
+
+	spdk_json_write_array_begin(w);
+
+	sto_status_ok(w);
+	sto_dirents_dump_json(dirents, "targets", w);
+
+	spdk_json_write_array_end(w);
+}
+
+static void
+scst_readdir_req_free(struct scst_req *req)
+{
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+
+	free((char *) readdir_req->dirname);
+	sto_dirents_free(&readdir_req->dirents);
+
+	rte_free(readdir_req);
+}
+
+SCST_REQ_REGISTER(readdir)
+
+
 struct scst_drv_name_list {
 	const char *names[SCST_DRV_COUNT];
 	size_t cnt;
@@ -47,8 +154,8 @@ static const struct spdk_json_object_decoder scst_driver_init_req_decoders[] = {
 	{"drivers", offsetof(struct scst_driver_init_params, drv_list), scst_drv_list_decode},
 };
 
-static int
-scst_driver_init_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+int
+scst_driver_init_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_driver_init_req *driver_init_req = to_driver_init_req(req);
 	struct scst_driver_init_params params = {};
@@ -193,8 +300,8 @@ static const struct spdk_json_object_decoder scst_driver_deinit_req_decoders[] =
 	{"drivers", offsetof(struct scst_driver_deinit_params, drv_list), scst_drv_list_decode},
 };
 
-static int
-scst_driver_deinit_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+int
+scst_driver_deinit_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_driver_deinit_req *driver_deinit_req = to_driver_deinit_req(req);
 	struct scst_driver_deinit_params params = {};
@@ -377,10 +484,10 @@ static const struct spdk_json_object_decoder scst_dev_open_req_decoders[] = {
 	{"attributes", offsetof(struct scst_dev_open_params, attr_list), scst_attr_list_decode, true},
 };
 
-static int
-scst_dev_open_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+int
+scst_dev_open_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_dev_open_req *dev_open_req = to_dev_open_req(req);
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
 	struct scst_dev_open_params params = {};
 	char *parsed_cmd;
 	int i, rc = 0;
@@ -391,31 +498,31 @@ scst_dev_open_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *c
 		return -EINVAL;
 	}
 
-	dev_open_req->mgmt_path = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
-						     params.handler, SCST_MGMT_IO);
-	if (spdk_unlikely(!dev_open_req->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+						  params.handler, SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
 		rc = -ENOMEM;
 		goto out;
 	}
 
-	dev_open_req->parsed_cmd = spdk_sprintf_alloc("add_device %s", params.name);
-	if (spdk_unlikely(!dev_open_req->parsed_cmd)) {
-		SPDK_ERRLOG("Failed to alloc memory for parsed_cmd\n");
+	write_file_req->data = spdk_sprintf_alloc("add_device %s", params.name);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
 		rc = -ENOMEM;
-		goto free_mgmt_path;
+		goto free_file;
 	}
 
 	for (i = 0; i < params.attr_list.cnt; i++) {
-		parsed_cmd = spdk_sprintf_append_realloc(dev_open_req->parsed_cmd, " %s;",
+		parsed_cmd = spdk_sprintf_append_realloc(write_file_req->data, " %s;",
 							 params.attr_list.names[i]);
 		if (spdk_unlikely(!parsed_cmd)) {
-			SPDK_ERRLOG("Failed to realloc memory for parsed_cmd\n");
+			SPDK_ERRLOG("Failed to realloc memory for data\n");
 			rc = -ENOMEM;
-			goto free_cmd;
+			goto free_data;
 		}
 
-		dev_open_req->parsed_cmd = parsed_cmd;
+		write_file_req->data = parsed_cmd;
 	}
 
 out:
@@ -423,61 +530,14 @@ out:
 
 	return rc;
 
-free_cmd:
-	free(dev_open_req->parsed_cmd);
+free_data:
+	free(write_file_req->data);
 
-free_mgmt_path:
-	free(dev_open_req->mgmt_path);
+free_file:
+	free((char *) write_file_req->file);
 
 	goto out;
 }
-
-static void
-scst_dev_open_done(struct sto_aio *aio)
-{
-	struct scst_req *req = aio->priv;
-	int rc;
-
-	rc = aio->returncode;
-
-	sto_aio_free(aio);
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to OPEN dev\n");
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	scst_req_response(req);
-}
-
-static int
-scst_dev_open_req_exec(struct scst_req *req)
-{
-	struct scst_dev_open_req *dev_open_req = to_dev_open_req(req);
-
-	return sto_aio_write_string(dev_open_req->mgmt_path, dev_open_req->parsed_cmd,
-				    scst_dev_open_done, req);
-}
-
-static void
-scst_dev_open_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
-{
-	sto_status_ok(w);
-}
-
-static void
-scst_dev_open_req_free(struct scst_req *req)
-{
-	struct scst_dev_open_req *dev_open_req = to_dev_open_req(req);
-
-	free(dev_open_req->mgmt_path);
-	free(dev_open_req->parsed_cmd);
-
-	rte_free(dev_open_req);
-}
-
-SCST_REQ_REGISTER(dev_open)
-
 
 struct scst_dev_close_params {
 	char *name;
@@ -496,10 +556,10 @@ static const struct spdk_json_object_decoder scst_dev_close_req_decoders[] = {
 	{"handler", offsetof(struct scst_dev_close_params, handler), spdk_json_decode_string},
 };
 
-static int
-scst_dev_close_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+int
+scst_dev_close_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_dev_close_req *dev_close_req = to_dev_close_req(req);
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
 	struct scst_dev_close_params params = {};
 	int rc = 0;
 
@@ -509,19 +569,19 @@ scst_dev_close_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *
 		return -EINVAL;
 	}
 
-	dev_close_req->mgmt_path = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
-						     params.handler, SCST_MGMT_IO);
-	if (spdk_unlikely(!dev_close_req->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+						  params.handler, SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
 		rc = -ENOMEM;
 		goto out;
 	}
 
-	dev_close_req->parsed_cmd = spdk_sprintf_alloc("del_device %s", params.name);
-	if (spdk_unlikely(!dev_close_req->parsed_cmd)) {
-		SPDK_ERRLOG("Failed to alloc memory for parsed_cmd\n");
+	write_file_req->data = spdk_sprintf_alloc("del_device %s", params.name);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
 		rc = -ENOMEM;
-		goto free_mgmt_path;
+		goto free_file;
 	}
 
 out:
@@ -529,58 +589,11 @@ out:
 
 	return rc;
 
-free_mgmt_path:
-	free(dev_close_req->mgmt_path);
+free_file:
+	free((char *) write_file_req->file);
 
 	goto out;
 }
-
-static void
-scst_dev_close_done(struct sto_aio *aio)
-{
-	struct scst_req *req = aio->priv;
-	int rc;
-
-	rc = aio->returncode;
-
-	sto_aio_free(aio);
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to CLOSE dev\n");
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	scst_req_response(req);
-}
-
-static int
-scst_dev_close_req_exec(struct scst_req *req)
-{
-	struct scst_dev_close_req *dev_close_req = to_dev_close_req(req);
-
-	return sto_aio_write_string(dev_close_req->mgmt_path, dev_close_req->parsed_cmd,
-				    scst_dev_close_done, req);
-}
-
-static void
-scst_dev_close_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
-{
-	sto_status_ok(w);
-}
-
-static void
-scst_dev_close_req_free(struct scst_req *req)
-{
-	struct scst_dev_close_req *dev_close_req = to_dev_close_req(req);
-
-	free(dev_close_req->mgmt_path);
-	free(dev_close_req->parsed_cmd);
-
-	rte_free(dev_close_req);
-}
-
-SCST_REQ_REGISTER(dev_close)
-
 
 struct scst_dev_resync_params {
 	char *name;
@@ -596,10 +609,10 @@ static const struct spdk_json_object_decoder scst_dev_resync_req_decoders[] = {
 	{"name", offsetof(struct scst_dev_resync_params, name), spdk_json_decode_string},
 };
 
-static int
-scst_dev_resync_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+int
+scst_dev_resync_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_dev_resync_req *dev_resync_req = to_dev_resync_req(req);
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
 	struct scst_dev_resync_params params = {};
 	int rc = 0;
 
@@ -609,292 +622,73 @@ scst_dev_resync_req_decode_cdb(struct scst_req *req, const struct spdk_json_val 
 		return -EINVAL;
 	}
 
-	dev_resync_req->mgmt_path = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEVICES,
-						        params.name, "resync_size");
-	if (spdk_unlikely(!dev_resync_req->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEVICES,
+						  params.name, "resync_size");
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
 		rc = -ENOMEM;
 		goto out;
 	}
 
-	dev_resync_req->parsed_cmd = "1";
+	write_file_req->data = strdup("1");
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
 
 out:
 	scst_dev_resync_params_free(&params);
 
 	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
 }
 
-static void
-scst_dev_resync_done(struct sto_aio *aio)
+int
+scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_req *req = aio->priv;
-	int rc;
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 
-	rc = aio->returncode;
-
-	sto_aio_free(aio);
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to CLOSE dev\n");
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	scst_req_response(req);
-}
-
-static int
-scst_dev_resync_req_exec(struct scst_req *req)
-{
-	struct scst_dev_resync_req *dev_resync_req = to_dev_resync_req(req);
-
-	return sto_aio_write_string(dev_resync_req->mgmt_path, dev_resync_req->parsed_cmd,
-				    scst_dev_resync_done, req);
-}
-
-static void
-scst_dev_resync_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
-{
-	sto_status_ok(w);
-}
-
-static void
-scst_dev_resync_req_free(struct scst_req *req)
-{
-	struct scst_dev_resync_req *dev_resync_req = to_dev_resync_req(req);
-
-	free(dev_resync_req->mgmt_path);
-
-	rte_free(dev_resync_req);
-}
-
-SCST_REQ_REGISTER(dev_resync)
-
-
-static int
-scst_handler_list_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
-{
-	struct scst_handler_list_req *handler_list_req = to_handler_list_req(req);
-
-	handler_list_req->mgmt_path = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
-	if (spdk_unlikely(!handler_list_req->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+	readdir_req->dirname = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
+	if (spdk_unlikely(!readdir_req->dirname)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirname\n");
 		return -ENOMEM;
 	}
 
 	return 0;
 }
 
-static void
-scst_handler_list_done(struct sto_readdir_req *rd_req)
+int
+scst_device_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_req *req = rd_req->priv;
-	struct scst_handler_list_req *handler_list_req = to_handler_list_req(req);
-	int rc;
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 
-	rc = rd_req->returncode;
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to handler_list\n");
-		sto_err(req->ctx.err_ctx, rc);
-		goto out;
-	}
-
-	sto_dirents_init(&handler_list_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
-
-out:
-	sto_readdir_free(rd_req);
-
-	scst_req_response(req);
-}
-
-static int
-scst_handler_list_req_exec(struct scst_req *req)
-{
-	struct scst_handler_list_req *handler_list_req = to_handler_list_req(req);
-
-	return sto_readdir(handler_list_req->mgmt_path, scst_handler_list_done, req);
-}
-
-static void
-scst_handler_list_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
-{
-	struct scst_handler_list_req *handler_list_req = to_handler_list_req(req);
-	struct sto_dirents *dirents;
-
-	dirents = &handler_list_req->dirents;
-
-	spdk_json_write_array_begin(w);
-
-	sto_status_ok(w);
-	sto_dirents_dump_json(dirents, "handlers", w);
-
-	spdk_json_write_array_end(w);
-}
-
-static void
-scst_handler_list_req_free(struct scst_req *req)
-{
-	struct scst_handler_list_req *handler_list_req = to_handler_list_req(req);
-
-	free(handler_list_req->mgmt_path);
-	sto_dirents_free(&handler_list_req->dirents);
-
-	rte_free(handler_list_req);
-}
-
-SCST_REQ_REGISTER(handler_list)
-
-
-static int
-scst_device_list_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
-{
-	struct scst_device_list_req *device_list_req = to_device_list_req(req);
-
-	device_list_req->mgmt_path = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
-	if (spdk_unlikely(!device_list_req->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+	readdir_req->dirname = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
+	if (spdk_unlikely(!readdir_req->dirname)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirname\n");
 		return -ENOMEM;
 	}
 
 	return 0;
 }
 
-static void
-scst_device_list_done(struct sto_readdir_req *rd_req)
+int
+scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_req *req = rd_req->priv;
-	struct scst_device_list_req *device_list_req = to_device_list_req(req);
-	int rc;
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 
-	rc = rd_req->returncode;
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to device_list\n");
-		sto_err(req->ctx.err_ctx, rc);
-		goto out;
-	}
-
-	sto_dirents_init(&device_list_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
-
-out:
-	sto_readdir_free(rd_req);
-
-	scst_req_response(req);
-}
-
-static int
-scst_device_list_req_exec(struct scst_req *req)
-{
-	struct scst_device_list_req *device_list_req = to_device_list_req(req);
-
-	return sto_readdir(device_list_req->mgmt_path, scst_device_list_done, req);
-}
-
-static void
-scst_device_list_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
-{
-	struct scst_device_list_req *device_list_req = to_device_list_req(req);
-	struct sto_dirents *dirents;
-
-	dirents = &device_list_req->dirents;
-
-	spdk_json_write_array_begin(w);
-
-	sto_status_ok(w);
-	sto_dirents_dump_json(dirents, "devices", w);
-
-	spdk_json_write_array_end(w);
-}
-
-static void
-scst_device_list_req_free(struct scst_req *req)
-{
-	struct scst_device_list_req *device_list_req = to_device_list_req(req);
-
-	free(device_list_req->mgmt_path);
-	sto_dirents_free(&device_list_req->dirents);
-
-	rte_free(device_list_req);
-}
-
-SCST_REQ_REGISTER(device_list)
-
-
-static int
-scst_target_list_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
-{
-	struct scst_target_list_req *target_list_req = to_target_list_req(req);
-
-	target_list_req->mgmt_path = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
-	if (spdk_unlikely(!target_list_req->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+	readdir_req->dirname = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
+	if (spdk_unlikely(!readdir_req->dirname)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirname\n");
 		return -ENOMEM;
 	}
 
 	return 0;
 }
-
-static void
-scst_target_list_done(struct sto_readdir_req *rd_req)
-{
-	struct scst_req *req = rd_req->priv;
-	struct scst_target_list_req *target_list_req = to_target_list_req(req);
-	int rc;
-
-	rc = rd_req->returncode;
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to target_list\n");
-		sto_err(req->ctx.err_ctx, rc);
-		goto out;
-	}
-
-	sto_dirents_init(&target_list_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
-
-out:
-	sto_readdir_free(rd_req);
-
-	scst_req_response(req);
-}
-
-static int
-scst_target_list_req_exec(struct scst_req *req)
-{
-	struct scst_target_list_req *target_list_req = to_target_list_req(req);
-
-	return sto_readdir(target_list_req->mgmt_path, scst_target_list_done, req);
-}
-
-static void
-scst_target_list_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
-{
-	struct scst_target_list_req *target_list_req = to_target_list_req(req);
-	struct sto_dirents *dirents;
-
-	dirents = &target_list_req->dirents;
-
-	spdk_json_write_array_begin(w);
-
-	sto_status_ok(w);
-	sto_dirents_dump_json(dirents, "targets", w);
-
-	spdk_json_write_array_end(w);
-}
-
-static void
-scst_target_list_req_free(struct scst_req *req)
-{
-	struct scst_target_list_req *target_list_req = to_target_list_req(req);
-
-	free(target_list_req->mgmt_path);
-	sto_dirents_free(&target_list_req->dirents);
-
-	rte_free(target_list_req);
-}
-
-SCST_REQ_REGISTER(target_list)
-
 
 struct scst_dgrp_add_params {
 	char *name;
@@ -910,10 +704,10 @@ static const struct spdk_json_object_decoder scst_dgrp_add_req_decoders[] = {
 	{"name", offsetof(struct scst_dgrp_add_params, name), spdk_json_decode_string},
 };
 
-static int
-scst_dgrp_add_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+int
+scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_dgrp_add_req *dgrp_add_req = to_dgrp_add_req(req);
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
 	struct scst_dgrp_add_params params = {};
 	int rc = 0;
 
@@ -923,19 +717,19 @@ scst_dgrp_add_req_decode_cdb(struct scst_req *req, const struct spdk_json_val *c
 		return -EINVAL;
 	}
 
-	dgrp_add_req->mgmt_path = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-						     SCST_MGMT_IO);
-	if (spdk_unlikely(!dgrp_add_req->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc memory for mgmt path\n");
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+						  SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
 		rc = -ENOMEM;
 		goto out;
 	}
 
-	dgrp_add_req->parsed_cmd = spdk_sprintf_alloc("create %s", params.name);
-	if (spdk_unlikely(!dgrp_add_req->parsed_cmd)) {
-		SPDK_ERRLOG("Failed to alloc memory for parsed_cmd\n");
+	write_file_req->data = spdk_sprintf_alloc("create %s", params.name);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
 		rc = -ENOMEM;
-		goto free_mgmt_path;
+		goto free_file;
 	}
 
 out:
@@ -943,55 +737,8 @@ out:
 
 	return rc;
 
-free_mgmt_path:
-	free(dgrp_add_req->mgmt_path);
+free_file:
+	free((char *) write_file_req->file);
 
 	goto out;
 }
-
-static void
-scst_dgrp_add_done(struct sto_aio *aio)
-{
-	struct scst_req *req = aio->priv;
-	int rc;
-
-	rc = aio->returncode;
-
-	sto_aio_free(aio);
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to device group add\n");
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	scst_req_response(req);
-}
-
-static int
-scst_dgrp_add_req_exec(struct scst_req *req)
-{
-	struct scst_dgrp_add_req *dgrp_add_req = to_dgrp_add_req(req);
-
-	return sto_aio_write_string(dgrp_add_req->mgmt_path, dgrp_add_req->parsed_cmd,
-				    scst_dgrp_add_done, req);
-}
-
-static void
-scst_dgrp_add_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
-{
-	sto_status_ok(w);
-}
-
-static void
-scst_dgrp_add_req_free(struct scst_req *req)
-{
-	struct scst_dgrp_add_req *dgrp_add_req = to_dgrp_add_req(req);
-
-	free(dgrp_add_req->mgmt_path);
-	free(dgrp_add_req->parsed_cmd);
-
-	rte_free(dgrp_add_req);
-}
-
-SCST_REQ_REGISTER(dgrp_add)
-
