@@ -686,13 +686,13 @@ scst_handler_list_req_decode_cdb(struct scst_req *req, const struct spdk_json_va
 }
 
 static void
-scst_handler_list_done(struct sto_readdir_ctx *ctx)
+scst_handler_list_done(struct sto_readdir_req *rd_req)
 {
-	struct scst_req *req = ctx->priv;
+	struct scst_req *req = rd_req->priv;
 	struct scst_handler_list_req *handler_list_req = to_handler_list_req(req);
 	int rc;
 
-	rc = ctx->returncode;
+	rc = rd_req->returncode;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to handler_list\n");
@@ -700,10 +700,10 @@ scst_handler_list_done(struct sto_readdir_ctx *ctx)
 		goto out;
 	}
 
-	sto_dirents_init(&handler_list_req->dirents, ctx->dirents.dirents, ctx->dirents.cnt);
+	sto_dirents_init(&handler_list_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
 
 out:
-	sto_readdir_free(ctx);
+	sto_readdir_free(rd_req);
 
 	scst_req_response(req);
 }
@@ -721,23 +721,15 @@ scst_handler_list_req_end_response(struct scst_req *req, struct spdk_json_write_
 {
 	struct scst_handler_list_req *handler_list_req = to_handler_list_req(req);
 	struct sto_dirents *dirents;
-	int i;
 
 	dirents = &handler_list_req->dirents;
 
-	spdk_json_write_object_begin(w);
+	spdk_json_write_array_begin(w);
 
-	spdk_json_write_named_string(w, "status", "OK");
-
-	spdk_json_write_named_array_begin(w, "handlers");
-
-	for (i = 0; i < dirents->cnt; i++) {
-		spdk_json_write_string(w, dirents->dirents[i]);
-	}
+	sto_status_ok(w);
+	sto_dirents_dump_json(dirents, "handlers", w);
 
 	spdk_json_write_array_end(w);
-
-	spdk_json_write_object_end(w);
 }
 
 static void
@@ -747,6 +739,8 @@ scst_handler_list_req_free(struct scst_req *req)
 
 	free(handler_list_req->mgmt_path);
 	sto_dirents_free(&handler_list_req->dirents);
+
+	rte_free(handler_list_req);
 }
 
 SCST_REQ_REGISTER(handler_list)
@@ -767,13 +761,13 @@ scst_device_list_req_decode_cdb(struct scst_req *req, const struct spdk_json_val
 }
 
 static void
-scst_device_list_done(struct sto_readdir_ctx *ctx)
+scst_device_list_done(struct sto_readdir_req *rd_req)
 {
-	struct scst_req *req = ctx->priv;
+	struct scst_req *req = rd_req->priv;
 	struct scst_device_list_req *device_list_req = to_device_list_req(req);
 	int rc;
 
-	rc = ctx->returncode;
+	rc = rd_req->returncode;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to device_list\n");
@@ -781,10 +775,10 @@ scst_device_list_done(struct sto_readdir_ctx *ctx)
 		goto out;
 	}
 
-	sto_dirents_init(&device_list_req->dirents, ctx->dirents.dirents, ctx->dirents.cnt);
+	sto_dirents_init(&device_list_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
 
 out:
-	sto_readdir_free(ctx);
+	sto_readdir_free(rd_req);
 
 	scst_req_response(req);
 }
@@ -802,23 +796,15 @@ scst_device_list_req_end_response(struct scst_req *req, struct spdk_json_write_c
 {
 	struct scst_device_list_req *device_list_req = to_device_list_req(req);
 	struct sto_dirents *dirents;
-	int i;
 
 	dirents = &device_list_req->dirents;
 
-	spdk_json_write_object_begin(w);
+	spdk_json_write_array_begin(w);
 
-	spdk_json_write_named_string(w, "status", "OK");
-
-	spdk_json_write_named_array_begin(w, "devices");
-
-	for (i = 0; i < dirents->cnt; i++) {
-		spdk_json_write_string(w, dirents->dirents[i]);
-	}
+	sto_status_ok(w);
+	sto_dirents_dump_json(dirents, "devices", w);
 
 	spdk_json_write_array_end(w);
-
-	spdk_json_write_object_end(w);
 }
 
 static void
@@ -828,6 +814,8 @@ scst_device_list_req_free(struct scst_req *req)
 
 	free(device_list_req->mgmt_path);
 	sto_dirents_free(&device_list_req->dirents);
+
+	rte_free(device_list_req);
 }
 
 SCST_REQ_REGISTER(device_list)
@@ -848,13 +836,13 @@ scst_target_list_req_decode_cdb(struct scst_req *req, const struct spdk_json_val
 }
 
 static void
-scst_target_list_done(struct sto_readdir_ctx *ctx)
+scst_target_list_done(struct sto_readdir_req *rd_req)
 {
-	struct scst_req *req = ctx->priv;
+	struct scst_req *req = rd_req->priv;
 	struct scst_target_list_req *target_list_req = to_target_list_req(req);
 	int rc;
 
-	rc = ctx->returncode;
+	rc = rd_req->returncode;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to target_list\n");
@@ -862,10 +850,10 @@ scst_target_list_done(struct sto_readdir_ctx *ctx)
 		goto out;
 	}
 
-	sto_dirents_init(&target_list_req->dirents, ctx->dirents.dirents, ctx->dirents.cnt);
+	sto_dirents_init(&target_list_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
 
 out:
-	sto_readdir_free(ctx);
+	sto_readdir_free(rd_req);
 
 	scst_req_response(req);
 }
@@ -883,23 +871,15 @@ scst_target_list_req_end_response(struct scst_req *req, struct spdk_json_write_c
 {
 	struct scst_target_list_req *target_list_req = to_target_list_req(req);
 	struct sto_dirents *dirents;
-	int i;
 
 	dirents = &target_list_req->dirents;
 
-	spdk_json_write_object_begin(w);
+	spdk_json_write_array_begin(w);
 
-	spdk_json_write_named_string(w, "status", "OK");
-
-	spdk_json_write_named_array_begin(w, "targets");
-
-	for (i = 0; i < dirents->cnt; i++) {
-		spdk_json_write_string(w, dirents->dirents[i]);
-	}
+	sto_status_ok(w);
+	sto_dirents_dump_json(dirents, "targets", w);
 
 	spdk_json_write_array_end(w);
-
-	spdk_json_write_object_end(w);
 }
 
 static void
@@ -909,6 +889,8 @@ scst_target_list_req_free(struct scst_req *req)
 
 	free(target_list_req->mgmt_path);
 	sto_dirents_free(&target_list_req->dirents);
+
+	rte_free(target_list_req);
 }
 
 SCST_REQ_REGISTER(target_list)

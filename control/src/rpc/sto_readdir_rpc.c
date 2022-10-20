@@ -21,24 +21,24 @@ static const struct spdk_json_object_decoder sto_readdir_decoders[] = {
 };
 
 static void
-sto_readdir_response(struct sto_readdir_ctx *ctx, struct spdk_jsonrpc_request *request)
+sto_readdir_response(struct sto_readdir_req *req, struct spdk_jsonrpc_request *request)
 {
 	struct sto_dirents *dirents;
 	struct spdk_json_write_ctx *w;
 	int i;
 
-	dirents = &ctx->dirents;
+	dirents = &req->dirents;
 
 	w = spdk_jsonrpc_begin_result(request);
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_int32(w, "returncode", ctx->returncode);
+	spdk_json_write_named_int32(w, "returncode", req->returncode);
 
 	spdk_json_write_named_array_begin(w, "dirents");
 
 	for (i = 0; i < dirents->cnt; i++) {
-		spdk_json_write_string(w, dirents->dirents[i]);
+		spdk_json_write_string(w, dirents->entries[i]);
 	}
 
 	spdk_json_write_array_end(w);
@@ -49,13 +49,13 @@ sto_readdir_response(struct sto_readdir_ctx *ctx, struct spdk_jsonrpc_request *r
 }
 
 static void
-sto_readdir_done(struct sto_readdir_ctx *ctx)
+sto_readdir_done(struct sto_readdir_req *req)
 {
-	struct spdk_jsonrpc_request *request = ctx->priv;
+	struct spdk_jsonrpc_request *request = req->priv;
 
-	sto_readdir_response(ctx, request);
+	sto_readdir_response(req, request);
 
-	sto_readdir_free(ctx);
+	sto_readdir_free(req);
 }
 
 static void

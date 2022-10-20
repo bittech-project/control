@@ -3,18 +3,17 @@
 
 #include <spdk/queue.h>
 
-struct sto_readdir_ctx;
-typedef void (*readdir_done_t)(struct sto_readdir_ctx *ctx);
+struct sto_readdir_req;
+typedef void (*readdir_done_t)(struct sto_readdir_req *req);
 
 struct sto_dirents {
-	const char **dirents;
+	const char **entries;
 	int cnt;
 };
 
-struct sto_readdir_ctx {
-	bool skip_hidden;
-
+struct sto_readdir_req {
 	struct {
+		bool skip_hidden;
 		const char *dirname;
 	};
 
@@ -30,8 +29,10 @@ struct sto_readdir_ctx {
 
 int sto_dirents_init(struct sto_dirents *dirents, const char **dirent_list, int cnt);
 void sto_dirents_free(struct sto_dirents *dirents);
+void sto_dirents_dump_json(struct sto_dirents *dirents, const char *dirname,
+			   struct spdk_json_write_ctx *w);
 
 int sto_readdir(const char *dirname, readdir_done_t readdir_done, void *priv);
-void sto_readdir_free(struct sto_readdir_ctx *ctx);
+void sto_readdir_free(struct sto_readdir_req *req);
 
 #endif /* _STO_READDIR_FRONT_H_ */

@@ -62,8 +62,8 @@ static const struct scst_cdbops scst_op_table[] = {
 	},
 	{
 		.op.ops = SCST_OP_DEVICE_LIST,
-		.op.name = "device_list",
-		.constructor = scst_device_list_req_constructor,
+		.op.name = "target_list",
+		.constructor = scst_target_list_req_constructor,
 	},
 };
 
