@@ -144,6 +144,15 @@ if __name__ == "__main__":
     p = subparsers.add_parser('scst_target_list', help='List all available targets')
     p.set_defaults(func=scst_target_list)
 
+    def scst_dgrp_add(args):
+        json = rpc.scst.scst_dgrp_add(args.client,
+                                      name=args.name)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_dgrp_add', help='Add device group <dgrp>')
+    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
+    p.set_defaults(func=scst_dgrp_add)
+
     def check_called_name(name):
         if name in deprecated_aliases:
             print("{} is deprecated, use {} instead.".format(name, deprecated_aliases[name]), file=sys.stderr)

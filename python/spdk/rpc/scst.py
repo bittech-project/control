@@ -96,3 +96,16 @@ def scst_target_list(client):
         'op': 'target_list',
     }
     return client.call('control', params)
+
+def scst_dgrp_add(client, name):
+    """.
+    Args: Add device group <dgrp>
+        name: SCST device group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'dgrp_add',
+        'name': name,
+    }
+    return client.call('control', params)
+

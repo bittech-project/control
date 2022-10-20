@@ -89,6 +89,13 @@ struct scst_target_list_req {
 	struct sto_dirents dirents;
 };
 
+struct scst_dgrp_add_req {
+	struct scst_req req;
+
+	char *mgmt_path;
+	char *parsed_cmd;
+};
+
 SCST_REQ_DEFINE(driver_init)
 SCST_REQ_DEFINE(driver_deinit)
 
@@ -99,5 +106,7 @@ SCST_REQ_DEFINE(dev_resync)
 SCST_REQ_DEFINE(handler_list)
 SCST_REQ_DEFINE(device_list)
 SCST_REQ_DEFINE(target_list)
+
+SCST_REQ_DEFINE(dgrp_add)
 
 #endif /* _SCST_LIB_H */

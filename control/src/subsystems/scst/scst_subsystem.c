@@ -21,6 +21,8 @@ enum scst_ops {
 	SCST_OP_DEVICE_LIST,
 	SCST_OP_TARGET_LIST,
 
+	SCST_OP_DGRP_ADD,
+
 	SCST_OP_COUNT,
 };
 
@@ -64,6 +66,11 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.ops = SCST_OP_DEVICE_LIST,
 		.op.name = "target_list",
 		.constructor = scst_target_list_req_constructor,
+	},
+	{
+		.op.ops = SCST_OP_DEVICE_LIST,
+		.op.name = "dgrp_add",
+		.constructor = scst_dgrp_add_req_constructor,
 	},
 };
 
