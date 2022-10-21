@@ -98,8 +98,8 @@ def scst_target_list(client):
     return client.call('control', params)
 
 def scst_dgrp_add(client, name):
-    """.
-    Args: Add device group <dgrp>
+    """Add device group <dgrp>.
+    Args:
         name: SCST device group name
     """
     params = {
@@ -109,3 +109,14 @@ def scst_dgrp_add(client, name):
     }
     return client.call('control', params)
 
+def scst_dgrp_del(client, name):
+    """Remove device group <dgrp>.
+    Args:
+        name: SCST device group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'dgrp_del',
+        'name': name,
+    }
+    return client.call('control', params)

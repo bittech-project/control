@@ -74,5 +74,6 @@ int scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_va
 int scst_device_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 
 #endif /* _SCST_LIB_H */

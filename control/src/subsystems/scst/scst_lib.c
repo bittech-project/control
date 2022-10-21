@@ -97,7 +97,7 @@ scst_readdir_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *
 	spdk_json_write_array_begin(w);
 
 	sto_status_ok(w);
-	sto_dirents_dump_json(dirents, "targets", w);
+	sto_dirents_dump_json(dirents, readdir_req->dirname, w);
 
 	spdk_json_write_array_end(w);
 }
@@ -734,6 +734,59 @@ scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 
 out:
 	scst_dgrp_add_params_free(&params);
+
+	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
+}
+
+struct scst_dgrp_del_params {
+	char *name;
+};
+
+static void
+scst_dgrp_del_params_free(struct scst_dgrp_del_params *params)
+{
+	free(params->name);
+}
+
+static const struct spdk_json_object_decoder scst_dgrp_del_req_decoders[] = {
+	{"name", offsetof(struct scst_dgrp_del_params, name), spdk_json_decode_string},
+};
+
+int
+scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_dgrp_del_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_dgrp_del_req_decoders,
+				    SPDK_COUNTOF(scst_dgrp_del_req_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dgrp_del req params\n");
+		return -EINVAL;
+	}
+
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+						  SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	write_file_req->data = spdk_sprintf_alloc("del %s", params.name);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+out:
+	scst_dgrp_del_params_free(&params);
 
 	return rc;
 
