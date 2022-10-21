@@ -859,6 +859,64 @@ free_name:
 	return -ENOMEM;
 }
 
+/* OP_DGRP_ADD_DEV */
+
+struct scst_dgrp_add_dev_params {
+	char *dgrp_name;
+	char *dev_name;
+};
+
+static void
+scst_dgrp_add_dev_params_free(struct scst_dgrp_add_dev_params *params)
+{
+	free(params->dgrp_name);
+	free(params->dev_name);
+}
+
+static const struct spdk_json_object_decoder scst_dgrp_add_dev_req_decoders[] = {
+	{"dgrp_name", offsetof(struct scst_dgrp_add_dev_params, dgrp_name), spdk_json_decode_string},
+	{"dev_name", offsetof(struct scst_dgrp_add_dev_params, dev_name), spdk_json_decode_string},
+};
+
+int
+scst_dgrp_add_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_dgrp_add_dev_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_dgrp_add_dev_req_decoders,
+				    SPDK_COUNTOF(scst_dgrp_add_dev_req_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dgrp_add_dev req params\n");
+		return -EINVAL;
+	}
+
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+						  params.dgrp_name, "devices", SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	write_file_req->data = spdk_sprintf_alloc("add %s", params.dev_name);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+out:
+	scst_dgrp_add_dev_params_free(&params);
+
+	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
+}
+
 /* OP_TARGET_LIST */
 
 int
