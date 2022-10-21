@@ -90,6 +90,13 @@ if __name__ == "__main__":
     p.add_argument('-d', '--drivers', nargs='+', help='SCST driver names', required=True, type=str)
     p.set_defaults(func=scst_driver_deinit)
 
+    def scst_handler_list(args):
+        json = rpc.scst.scst_handler_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_handler_list', help='List all available handlers')
+    p.set_defaults(func=scst_handler_list)
+
     def scst_dev_open(args):
         json = rpc.scst.scst_dev_open(args.client,
                                       name=args.name,
@@ -123,26 +130,12 @@ if __name__ == "__main__":
     p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
     p.set_defaults(func=scst_dev_resync)
 
-    def scst_handler_list(args):
-        json = rpc.scst.scst_handler_list(args.client)
+    def scst_dev_list(args):
+        json = rpc.scst.scst_dev_list(args.client)
         print_json(json)
 
-    p = subparsers.add_parser('scst_handler_list', help='List all available handlers')
-    p.set_defaults(func=scst_handler_list)
-
-    def scst_device_list(args):
-        json = rpc.scst.scst_device_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_device_list', help='List all open devices')
-    p.set_defaults(func=scst_device_list)
-
-    def scst_target_list(args):
-        json = rpc.scst.scst_target_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_target_list', help='List all available targets')
-    p.set_defaults(func=scst_target_list)
+    p = subparsers.add_parser('scst_dev_list', help='List all open devices')
+    p.set_defaults(func=scst_dev_list)
 
     def scst_dgrp_add(args):
         json = rpc.scst.scst_dgrp_add(args.client,
@@ -161,6 +154,13 @@ if __name__ == "__main__":
     p = subparsers.add_parser('scst_dgrp_del', help='Remove device group <dgrp>')
     p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
     p.set_defaults(func=scst_dgrp_del)
+
+    def scst_target_list(args):
+        json = rpc.scst.scst_target_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_list', help='List all available targets')
+    p.set_defaults(func=scst_target_list)
 
     def check_called_name(name):
         if name in deprecated_aliases:

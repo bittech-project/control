@@ -43,7 +43,9 @@ SCST_REQ_DEFINE(write_file)
 struct scst_readdir_req {
 	struct scst_req req;
 
-	const char *dirname;
+	const char *name;
+	char *dirpath;
+
 	struct sto_dirents dirents;
 };
 SCST_REQ_DEFINE(readdir)
@@ -67,13 +69,13 @@ SCST_REQ_DEFINE(driver_deinit)
 
 int scst_driver_init_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_driver_deinit_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dev_open_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dev_close_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dev_resync_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
-int scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
-int scst_device_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
-int scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_dev_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 
 #endif /* _SCST_LIB_H */

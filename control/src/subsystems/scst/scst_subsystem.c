@@ -13,16 +13,17 @@ enum scst_ops {
 	SCST_OP_DRIVER_INIT,
 	SCST_OP_DRIVER_DEINIT,
 
+	SCST_OP_HANDLER_LIST,
+
 	SCST_OP_DEV_OPEN,
 	SCST_OP_DEV_CLOSE,
 	SCST_OP_DEV_RESYNC,
-
-	SCST_OP_HANDLER_LIST,
-	SCST_OP_DEVICE_LIST,
-	SCST_OP_TARGET_LIST,
+	SCST_OP_DEV_LIST,
 
 	SCST_OP_DGRP_ADD,
 	SCST_OP_DGRP_DEL,
+
+	SCST_OP_TARGET_LIST,
 
 	SCST_OP_COUNT,
 };
@@ -39,6 +40,12 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.name = "driver_deinit",
 		.constructor = scst_driver_deinit_req_constructor,
 		.decode_cdb = scst_driver_deinit_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_HANDLER_LIST,
+		.op.name = "handler_list",
+		.constructor = scst_readdir_req_constructor,
+		.decode_cdb = scst_handler_list_decode_cdb,
 	},
 	{
 		.op.ops = SCST_OP_DEV_OPEN,
@@ -59,22 +66,10 @@ static const struct scst_cdbops scst_op_table[] = {
 		.decode_cdb = scst_dev_resync_decode_cdb,
 	},
 	{
-		.op.ops = SCST_OP_HANDLER_LIST,
-		.op.name = "handler_list",
+		.op.ops = SCST_OP_DEV_LIST,
+		.op.name = "dev_list",
 		.constructor = scst_readdir_req_constructor,
-		.decode_cdb = scst_handler_list_decode_cdb,
-	},
-	{
-		.op.ops = SCST_OP_DEVICE_LIST,
-		.op.name = "device_list",
-		.constructor = scst_readdir_req_constructor,
-		.decode_cdb = scst_device_list_decode_cdb,
-	},
-	{
-		.op.ops = SCST_OP_TARGET_LIST,
-		.op.name = "target_list",
-		.constructor = scst_readdir_req_constructor,
-		.decode_cdb = scst_target_list_decode_cdb,
+		.decode_cdb = scst_dev_list_decode_cdb,
 	},
 	{
 		.op.ops = SCST_OP_DGRP_ADD,
@@ -87,6 +82,12 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.name = "dgrp_del",
 		.constructor = scst_write_file_req_constructor,
 		.decode_cdb = scst_dgrp_del_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_TARGET_LIST,
+		.op.name = "target_list",
+		.constructor = scst_readdir_req_constructor,
+		.decode_cdb = scst_target_list_decode_cdb,
 	},
 };
 

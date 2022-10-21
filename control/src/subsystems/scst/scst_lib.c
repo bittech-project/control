@@ -83,7 +83,7 @@ scst_readdir_req_exec(struct scst_req *req)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 
-	return sto_readdir(readdir_req->dirname, scst_readdir_done, req);
+	return sto_readdir(readdir_req->dirpath, scst_readdir_done, req);
 }
 
 static void
@@ -97,7 +97,7 @@ scst_readdir_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *
 	spdk_json_write_array_begin(w);
 
 	sto_status_ok(w);
-	sto_dirents_dump_json(dirents, readdir_req->dirname, w);
+	sto_dirents_dump_json(dirents, readdir_req->name, w);
 
 	spdk_json_write_array_end(w);
 }
@@ -107,7 +107,9 @@ scst_readdir_req_free(struct scst_req *req)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 
-	free((char *) readdir_req->dirname);
+	free((char *) readdir_req->name);
+	free(readdir_req->dirpath);
+
 	sto_dirents_free(&readdir_req->dirents);
 
 	rte_free(readdir_req);
@@ -439,6 +441,35 @@ scst_driver_deinit_req_free(struct scst_req *req)
 
 SCST_REQ_REGISTER(driver_deinit)
 
+/* OP_HANDLER_LIST */
+
+int
+scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+
+	readdir_req->name = spdk_sprintf_alloc("handlers");
+	if (spdk_unlikely(!readdir_req->name)) {
+		SPDK_ERRLOG("Failed to alloc memory for handlers\n");
+		return -ENOMEM;
+	}
+
+	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
+	if (spdk_unlikely(!readdir_req->dirpath)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
+		goto free_name;
+	}
+
+	return 0;
+
+free_name:
+	free((char *) readdir_req->name);
+
+	return -ENOMEM;
+}
+
+/* OP_DEV_OPEN */
+
 #define SCST_DEV_MAX_ATTR_CNT 32
 struct scst_attr_name_list {
 	const char *names[SCST_DEV_MAX_ATTR_CNT];
@@ -539,6 +570,8 @@ free_file:
 	goto out;
 }
 
+/* OP_DEV_CLOSE */
+
 struct scst_dev_close_params {
 	char *name;
 	char *handler;
@@ -595,6 +628,8 @@ free_file:
 	goto out;
 }
 
+/* OP_DEV_RESYNC */
+
 struct scst_dev_resync_params {
 	char *name;
 };
@@ -648,47 +683,34 @@ free_file:
 	goto out;
 }
 
+/* OP_DEV_LIST */
+
 int
-scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+scst_dev_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 
-	readdir_req->dirname = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
-	if (spdk_unlikely(!readdir_req->dirname)) {
-		SPDK_ERRLOG("Failed to alloc memory for dirname\n");
+	readdir_req->name = spdk_sprintf_alloc("devices");
+	if (spdk_unlikely(!readdir_req->name)) {
+		SPDK_ERRLOG("Failed to alloc memory for devices\n");
 		return -ENOMEM;
 	}
 
-	return 0;
-}
-
-int
-scst_device_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
-{
-	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-
-	readdir_req->dirname = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
-	if (spdk_unlikely(!readdir_req->dirname)) {
-		SPDK_ERRLOG("Failed to alloc memory for dirname\n");
-		return -ENOMEM;
+	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
+	if (spdk_unlikely(!readdir_req->dirpath)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
+		goto free_name;
 	}
 
 	return 0;
+
+free_name:
+	free((char *) readdir_req->name);
+
+	return -ENOMEM;
 }
 
-int
-scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
-{
-	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-
-	readdir_req->dirname = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
-	if (spdk_unlikely(!readdir_req->dirname)) {
-		SPDK_ERRLOG("Failed to alloc memory for dirname\n");
-		return -ENOMEM;
-	}
-
-	return 0;
-}
+/* OP_DGRP_ADD */
 
 struct scst_dgrp_add_params {
 	char *name;
@@ -743,6 +765,8 @@ free_file:
 	goto out;
 }
 
+/* OP_DGRP_DEL */
+
 struct scst_dgrp_del_params {
 	char *name;
 };
@@ -794,4 +818,31 @@ free_file:
 	free((char *) write_file_req->file);
 
 	goto out;
+}
+
+/* OP_TARGET_LIST */
+
+int
+scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+
+	readdir_req->name = spdk_sprintf_alloc("targets");
+	if (spdk_unlikely(!readdir_req->name)) {
+		SPDK_ERRLOG("Failed to alloc memory for targets\n");
+		return -ENOMEM;
+	}
+
+	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
+	if (spdk_unlikely(!readdir_req->dirpath)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
+		goto free_name;
+	}
+
+	return 0;
+
+free_name:
+	free((char *) readdir_req->name);
+
+	return -ENOMEM;
 }

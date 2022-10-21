@@ -25,6 +25,16 @@ def scst_driver_deinit(client, drivers):
     }
     return client.call('control', params)
 
+def scst_handler_list(client):
+    """List all available handlers.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'handler_list',
+    }
+    return client.call('control', params)
+
 def scst_dev_open(client, name, handler, attributes):
     """Adds a new device using specified handler.
     Args:
@@ -67,33 +77,13 @@ def scst_dev_resync(client, name):
     }
     return client.call('control', params)
 
-def scst_handler_list(client):
-    """List all available handlers.
-    Args:
-    """
-    params = {
-        'subsystem': 'scst',
-        'op': 'handler_list',
-    }
-    return client.call('control', params)
-
-def scst_device_list(client):
+def scst_dev_list(client):
     """List all open devices.
     Args:
     """
     params = {
         'subsystem': 'scst',
-        'op': 'device_list',
-    }
-    return client.call('control', params)
-
-def scst_target_list(client):
-    """List all available targets.
-    Args:
-    """
-    params = {
-        'subsystem': 'scst',
-        'op': 'target_list',
+        'op': 'dev_list',
     }
     return client.call('control', params)
 
@@ -118,5 +108,15 @@ def scst_dgrp_del(client, name):
         'subsystem': 'scst',
         'op': 'dgrp_del',
         'name': name,
+    }
+    return client.call('control', params)
+
+def scst_target_list(client):
+    """List all available targets.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'target_list',
     }
     return client.call('control', params)
