@@ -22,6 +22,7 @@ enum scst_ops {
 
 	SCST_OP_DGRP_ADD,
 	SCST_OP_DGRP_DEL,
+	SCST_OP_DGRP_LIST,
 
 	SCST_OP_TARGET_LIST,
 
@@ -82,6 +83,12 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.name = "dgrp_del",
 		.constructor = scst_write_file_req_constructor,
 		.decode_cdb = scst_dgrp_del_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DGRP_LIST,
+		.op.name = "dgrp_list",
+		.constructor = scst_readdir_req_constructor,
+		.decode_cdb = scst_dgrp_list_decode_cdb,
 	},
 	{
 		.op.ops = SCST_OP_TARGET_LIST,

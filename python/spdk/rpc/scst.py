@@ -111,6 +111,16 @@ def scst_dgrp_del(client, name):
     }
     return client.call('control', params)
 
+def scst_dgrp_list(client):
+    """List all device groups.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'dgrp_list',
+    }
+    return client.call('control', params)
+
 def scst_target_list(client):
     """List all available targets.
     Args:

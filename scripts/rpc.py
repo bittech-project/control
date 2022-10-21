@@ -155,6 +155,13 @@ if __name__ == "__main__":
     p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
     p.set_defaults(func=scst_dgrp_del)
 
+    def scst_dgrp_list(args):
+        json = rpc.scst.scst_dgrp_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_dgrp_list', help='List all device groups')
+    p.set_defaults(func=scst_dgrp_list)
+
     def scst_target_list(args):
         json = rpc.scst.scst_target_list(args.client)
         print_json(json)

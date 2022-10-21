@@ -250,16 +250,20 @@ sto_dirents_free(struct sto_dirents *dirents)
 }
 
 void
-sto_dirents_dump_json(struct sto_dirents *dirents, const char *dirname,
-		      struct spdk_json_write_ctx *w)
+sto_dirents_dump_json(const char *name, const char *exclude_str,
+		      struct sto_dirents *dirents, struct spdk_json_write_ctx *w)
 {
 	int i;
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_array_begin(w, dirname);
+	spdk_json_write_named_array_begin(w, name);
 
 	for (i = 0; i < dirents->cnt; i++) {
+		if (exclude_str && !strcmp(dirents->entries[i], exclude_str)) {
+			continue;
+		}
+
 		spdk_json_write_string(w, dirents->entries[i]);
 	}
 

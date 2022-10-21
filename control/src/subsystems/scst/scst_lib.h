@@ -46,6 +46,8 @@ struct scst_readdir_req {
 	const char *name;
 	char *dirpath;
 
+	const char *exclude_str;
+
 	struct sto_dirents dirents;
 };
 SCST_REQ_DEFINE(readdir)
@@ -76,6 +78,7 @@ int scst_dev_resync_decode_cdb(struct scst_req *req, const struct spdk_json_val 
 int scst_dev_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
+int scst_dgrp_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 int scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb);
 
 #endif /* _SCST_LIB_H */

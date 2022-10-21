@@ -97,7 +97,8 @@ scst_readdir_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *
 	spdk_json_write_array_begin(w);
 
 	sto_status_ok(w);
-	sto_dirents_dump_json(dirents, readdir_req->name, w);
+	sto_dirents_dump_json(readdir_req->name, readdir_req->exclude_str,
+			      dirents, w);
 
 	spdk_json_write_array_end(w);
 }
@@ -109,6 +110,8 @@ scst_readdir_req_free(struct scst_req *req)
 
 	free((char *) readdir_req->name);
 	free(readdir_req->dirpath);
+
+	free((char *) readdir_req->exclude_str);
 
 	sto_dirents_free(&readdir_req->dirents);
 
@@ -818,6 +821,42 @@ free_file:
 	free((char *) write_file_req->file);
 
 	goto out;
+}
+
+/* OP_DGRP_LIST */
+
+int
+scst_dgrp_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+
+	readdir_req->name = spdk_sprintf_alloc("Device Group");
+	if (spdk_unlikely(!readdir_req->name)) {
+		SPDK_ERRLOG("Failed to alloc memory for Device Group\n");
+		return -ENOMEM;
+	}
+
+	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEV_GROUPS);
+	if (spdk_unlikely(!readdir_req->dirpath)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
+		goto free_name;
+	}
+
+	readdir_req->exclude_str = spdk_sprintf_alloc(SCST_MGMT_IO);
+	if (spdk_unlikely(!readdir_req->exclude_str)) {
+		SPDK_ERRLOG("Failed to alloc memory for exclude_str\n");
+		goto free_dirpath;
+	}
+
+	return 0;
+
+free_dirpath:
+	free(readdir_req->dirpath);
+
+free_name:
+	free((char *) readdir_req->name);
+
+	return -ENOMEM;
 }
 
 /* OP_TARGET_LIST */
