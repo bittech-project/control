@@ -149,6 +149,34 @@ def scst_dgrp_del_dev(client, dgrp_name, dev_name):
     }
     return client.call('control', params)
 
+def scst_target_add(client, target, driver):
+    """Add a dynamic target to a capable driver.
+    Args:
+        target: SCST target name
+        driver: SCST target driver name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'target_add',
+        'target': target,
+        'driver': driver,
+    }
+    return client.call('control', params)
+
+def scst_target_del(client, target, driver):
+    """Remove a dynamic target from a driver.
+    Args:
+        target: SCST target name
+        driver: SCST target driver name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'target_del',
+        'target': target,
+        'driver': driver,
+    }
+    return client.call('control', params)
+
 def scst_target_list(client):
     """List all available targets.
     Args:

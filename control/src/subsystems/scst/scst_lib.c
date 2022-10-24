@@ -944,6 +944,105 @@ free_file:
 	goto out;
 }
 
+/* OP_TARGET_ADD */
+
+struct scst_target_params {
+	char *target;
+	char *driver;
+};
+
+static void
+scst_target_params_free(struct scst_target_params *params)
+{
+	free(params->target);
+	free(params->driver);
+}
+
+static const struct spdk_json_object_decoder scst_target_decoders[] = {
+	{"target", offsetof(struct scst_target_params, target), spdk_json_decode_string},
+	{"driver", offsetof(struct scst_target_params, driver), spdk_json_decode_string},
+};
+
+int
+scst_target_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_target_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_target_decoders,
+				    SPDK_COUNTOF(scst_target_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode target params\n");
+		return -EINVAL;
+	}
+
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+						  params.driver, SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	write_file_req->data = spdk_sprintf_alloc("add_target %s", params.target);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+out:
+	scst_target_params_free(&params);
+
+	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
+}
+
+/* OP_TARGET_DEL */
+
+int
+scst_target_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_target_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_target_decoders,
+				    SPDK_COUNTOF(scst_target_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode target params\n");
+		return -EINVAL;
+	}
+
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+						  params.driver, SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	write_file_req->data = spdk_sprintf_alloc("del_target %s", params.target);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+out:
+	scst_target_params_free(&params);
+
+	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
+}
+
 /* OP_TARGET_LIST */
 
 int

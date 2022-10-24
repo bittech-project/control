@@ -184,6 +184,28 @@ if __name__ == "__main__":
     p.add_argument('-d', '--dev_name', help='SCST device name', required=True, type=str)
     p.set_defaults(func=scst_dgrp_del_dev)
 
+    def scst_target_add(args):
+        json = rpc.scst.scst_target_add(args.client,
+                                        target=args.target,
+                                        driver=args.driver)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_add', help='Add a dynamic target to a capable driver')
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver', required=True, type=str)
+    p.set_defaults(func=scst_target_add)
+
+    def scst_target_del(args):
+        json = rpc.scst.scst_target_del(args.client,
+                                        target=args.target,
+                                        driver=args.driver)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_del', help='Remove a dynamic target from a driver')
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver', required=True, type=str)
+    p.set_defaults(func=scst_target_del)
+
     def scst_target_list(args):
         json = rpc.scst.scst_target_list(args.client)
         print_json(json)
