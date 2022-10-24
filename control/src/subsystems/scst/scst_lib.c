@@ -1070,6 +1070,108 @@ free_name:
 	return -ENOMEM;
 }
 
+/* OP_GROUP_ADD */
+
+struct scst_group_params {
+	char *group;
+	char *driver;
+	char *target;
+};
+
+static void
+scst_group_params_free(struct scst_group_params *params)
+{
+	free(params->group);
+	free(params->driver);
+	free(params->target);
+}
+
+static const struct spdk_json_object_decoder scst_group_decoders[] = {
+	{"group", offsetof(struct scst_group_params, group), spdk_json_decode_string},
+	{"driver", offsetof(struct scst_group_params, driver), spdk_json_decode_string},
+	{"target", offsetof(struct scst_group_params, target), spdk_json_decode_string},
+};
+
+static int
+scst_group_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_group_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_group_decoders,
+				    SPDK_COUNTOF(scst_group_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode group params\n");
+		return -EINVAL;
+	}
+
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+						  params.driver, params.target, "ini_groups", SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	write_file_req->data = spdk_sprintf_alloc("create %s", params.group);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+out:
+	scst_group_params_free(&params);
+
+	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
+}
+
+/* OP_GROUP_DEL */
+
+static int
+scst_group_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_group_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_group_decoders,
+				    SPDK_COUNTOF(scst_group_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode group params\n");
+		return -EINVAL;
+	}
+
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+						  params.driver, params.target, "ini_groups", SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	write_file_req->data = spdk_sprintf_alloc("del %s", params.group);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+out:
+	scst_group_params_free(&params);
+
+	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
+}
+
 enum scst_ops {
 	SCST_OP_DRIVER_INIT,
 	SCST_OP_DRIVER_DEINIT,
@@ -1091,6 +1193,9 @@ enum scst_ops {
 	SCST_OP_TARGET_DEL,
 
 	SCST_OP_TARGET_LIST,
+
+	SCST_OP_GROUP_ADD,
+	SCST_OP_GROUP_DEL,
 
 	SCST_OP_COUNT,
 };
@@ -1185,6 +1290,18 @@ static const struct scst_cdbops scst_op_table[] = {
 		.op.name = "target_list",
 		.constructor = scst_readdir_req_constructor,
 		.decode_cdb = scst_target_list_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_GROUP_ADD,
+		.op.name = "group_add",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_group_add_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_GROUP_DEL,
+		.op.name = "group_del",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_group_del_decode_cdb,
 	},
 };
 

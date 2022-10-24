@@ -186,3 +186,35 @@ def scst_target_list(client):
         'op': 'target_list',
     }
     return client.call('control', params)
+
+def scst_group_add(client, group, target, driver):
+    """Add a group to a given driver & target.
+    Args:
+        group: SCST group name
+        target: SCST target name
+        driver: SCST target driver name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'group_add',
+        'group': group,
+        'target': target,
+        'driver': driver,
+    }
+    return client.call('control', params)
+
+def scst_group_del(client, group, target, driver):
+    """Remove a group from a given driver & target.
+    Args:
+        group: SCST group name
+        target: SCST target name
+        driver: SCST target driver name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'group_del',
+        'group': group,
+        'target': target,
+        'driver': driver,
+    }
+    return client.call('control', params)

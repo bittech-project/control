@@ -192,7 +192,7 @@ if __name__ == "__main__":
 
     p = subparsers.add_parser('scst_target_add', help='Add a dynamic target to a capable driver')
     p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
     p.set_defaults(func=scst_target_add)
 
     def scst_target_del(args):
@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
     p = subparsers.add_parser('scst_target_del', help='Remove a dynamic target from a driver')
     p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
     p.set_defaults(func=scst_target_del)
 
     def scst_target_list(args):
@@ -212,6 +212,32 @@ if __name__ == "__main__":
 
     p = subparsers.add_parser('scst_target_list', help='List all available targets')
     p.set_defaults(func=scst_target_list)
+
+    def scst_group_add(args):
+        json = rpc.scst.scst_group_add(args.client,
+                                       group=args.group,
+                                       driver=args.driver,
+                                       target=args.target)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_group_add', help='Add a group to a given driver & target')
+    p.add_argument('-g', '--group', help='SCST group name', required=True, type=str)
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
+    p.set_defaults(func=scst_group_add)
+
+    def scst_group_del(args):
+        json = rpc.scst.scst_group_del(args.client,
+                                       group=args.group,
+                                       driver=args.driver,
+                                       target=args.target)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_group_del', help='Remove a group from a given driver & target')
+    p.add_argument('-g', '--group', help='SCST group name', required=True, type=str)
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
+    p.set_defaults(func=scst_group_del)
 
     def check_called_name(name):
         if name in deprecated_aliases:
