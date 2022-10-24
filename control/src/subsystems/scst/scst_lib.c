@@ -159,7 +159,7 @@ static const struct spdk_json_object_decoder scst_driver_init_req_decoders[] = {
 	{"drivers", offsetof(struct scst_driver_init_params, drv_list), scst_drv_list_decode},
 };
 
-int
+static int
 scst_driver_init_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_driver_init_req *driver_init_req = to_driver_init_req(req);
@@ -305,7 +305,7 @@ static const struct spdk_json_object_decoder scst_driver_deinit_req_decoders[] =
 	{"drivers", offsetof(struct scst_driver_deinit_params, drv_list), scst_drv_list_decode},
 };
 
-int
+static int
 scst_driver_deinit_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_driver_deinit_req *driver_deinit_req = to_driver_deinit_req(req);
@@ -446,7 +446,7 @@ SCST_REQ_REGISTER(driver_deinit)
 
 /* OP_HANDLER_LIST */
 
-int
+static int
 scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
@@ -518,7 +518,7 @@ static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
 	{"attributes", offsetof(struct scst_dev_open_params, attr_list), scst_attr_list_decode, true},
 };
 
-int
+static int
 scst_dev_open_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -592,7 +592,7 @@ static const struct spdk_json_object_decoder scst_dev_close_decoders[] = {
 	{"handler", offsetof(struct scst_dev_close_params, handler), spdk_json_decode_string},
 };
 
-int
+static int
 scst_dev_close_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -647,7 +647,7 @@ static const struct spdk_json_object_decoder scst_dev_resync_decoders[] = {
 	{"name", offsetof(struct scst_dev_resync_params, name), spdk_json_decode_string},
 };
 
-int
+static int
 scst_dev_resync_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -688,7 +688,7 @@ free_file:
 
 /* OP_DEV_LIST */
 
-int
+static int
 scst_dev_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
@@ -729,7 +729,7 @@ static const struct spdk_json_object_decoder scst_dgrp_decoders[] = {
 	{"name", offsetof(struct scst_dgrp_params, name), spdk_json_decode_string},
 };
 
-int
+static int
 scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -770,7 +770,7 @@ free_file:
 
 /* OP_DGRP_DEL */
 
-int
+static int
 scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -811,7 +811,7 @@ free_file:
 
 /* OP_DGRP_LIST */
 
-int
+static int
 scst_dgrp_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
@@ -864,7 +864,7 @@ static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
 	{"dev_name", offsetof(struct scst_dgrp_dev_params, dev_name), spdk_json_decode_string},
 };
 
-int
+static int
 scst_dgrp_add_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -905,7 +905,7 @@ free_file:
 
 /* OP_DGRP_DEL_DEV */
 
-int
+static int
 scst_dgrp_del_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -963,7 +963,7 @@ static const struct spdk_json_object_decoder scst_target_decoders[] = {
 	{"driver", offsetof(struct scst_target_params, driver), spdk_json_decode_string},
 };
 
-int
+static int
 scst_target_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -1004,7 +1004,7 @@ free_file:
 
 /* OP_TARGET_DEL */
 
-int
+static int
 scst_target_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
@@ -1045,7 +1045,7 @@ free_file:
 
 /* OP_TARGET_LIST */
 
-int
+static int
 scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
@@ -1068,4 +1068,140 @@ free_name:
 	free((char *) readdir_req->name);
 
 	return -ENOMEM;
+}
+
+enum scst_ops {
+	SCST_OP_DRIVER_INIT,
+	SCST_OP_DRIVER_DEINIT,
+
+	SCST_OP_HANDLER_LIST,
+
+	SCST_OP_DEV_OPEN,
+	SCST_OP_DEV_CLOSE,
+	SCST_OP_DEV_RESYNC,
+	SCST_OP_DEV_LIST,
+
+	SCST_OP_DGRP_ADD,
+	SCST_OP_DGRP_DEL,
+	SCST_OP_DGRP_LIST,
+	SCST_OP_DGRP_ADD_DEV,
+	SCST_OP_DGRP_DEL_DEV,
+
+	SCST_OP_TARGET_ADD,
+	SCST_OP_TARGET_DEL,
+
+	SCST_OP_TARGET_LIST,
+
+	SCST_OP_COUNT,
+};
+
+static const struct scst_cdbops scst_op_table[] = {
+	{
+		.op.ops = SCST_OP_DRIVER_INIT,
+		.op.name = "driver_init",
+		.constructor = scst_driver_init_req_constructor,
+		.decode_cdb = scst_driver_init_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DRIVER_DEINIT,
+		.op.name = "driver_deinit",
+		.constructor = scst_driver_deinit_req_constructor,
+		.decode_cdb = scst_driver_deinit_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_HANDLER_LIST,
+		.op.name = "handler_list",
+		.constructor = scst_readdir_req_constructor,
+		.decode_cdb = scst_handler_list_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DEV_OPEN,
+		.op.name = "dev_open",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_dev_open_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DEV_CLOSE,
+		.op.name = "dev_close",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_dev_close_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DEV_RESYNC,
+		.op.name = "dev_resync",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_dev_resync_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DEV_LIST,
+		.op.name = "dev_list",
+		.constructor = scst_readdir_req_constructor,
+		.decode_cdb = scst_dev_list_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DGRP_ADD,
+		.op.name = "dgrp_add",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_dgrp_add_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DGRP_DEL,
+		.op.name = "dgrp_del",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_dgrp_del_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DGRP_LIST,
+		.op.name = "dgrp_list",
+		.constructor = scst_readdir_req_constructor,
+		.decode_cdb = scst_dgrp_list_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DGRP_ADD_DEV,
+		.op.name = "dgrp_add_dev",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_dgrp_add_dev_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_DGRP_DEL_DEV,
+		.op.name = "dgrp_del_dev",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_dgrp_del_dev_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_TARGET_ADD,
+		.op.name = "target_add",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_target_add_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_TARGET_DEL,
+		.op.name = "target_del",
+		.constructor = scst_write_file_req_constructor,
+		.decode_cdb = scst_target_del_decode_cdb,
+	},
+	{
+		.op.ops = SCST_OP_TARGET_LIST,
+		.op.name = "target_list",
+		.constructor = scst_readdir_req_constructor,
+		.decode_cdb = scst_target_list_decode_cdb,
+	},
+};
+
+#define SCST_OP_TBL_SIZE	(SPDK_COUNTOF(scst_op_table))
+
+const struct scst_cdbops *
+scst_find_cdbops(const char *op_name)
+{
+	int i;
+
+	for (i = 0; i < SCST_OP_TBL_SIZE; i++) {
+		const struct scst_cdbops *op = &scst_op_table[i];
+
+		if (!strcmp(op_name, op->op.name)) {
+			return op;
+		}
+	}
+
+	return NULL;
 }
