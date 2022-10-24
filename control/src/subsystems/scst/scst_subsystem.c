@@ -71,7 +71,7 @@ scst_parse(const struct spdk_json_val *params)
 		return NULL;
 	}
 
-	req = op->constructor(op);
+	req = op->req_constructor(op);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("SCST: Failed to construct req\n");
 		return NULL;

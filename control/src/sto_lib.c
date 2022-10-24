@@ -6,6 +6,33 @@
 #include "sto_lib.h"
 #include "err.h"
 
+int
+sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
+		  sto_params_parse params_parse, void *priv)
+{
+	void *params;
+	int rc = 0;
+
+	params = decoder->params_alloc();
+	if (spdk_unlikely(!params)) {
+		SPDK_ERRLOG("Failed to alloc params\n");
+		return -ENOMEM;
+	}
+
+	if (spdk_json_decode_object(data, decoder->decoders, decoder->num_decoders, params)) {
+		SPDK_ERRLOG("Failed to decode params\n");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = params_parse(priv, params);
+
+out:
+	decoder->params_free(params);
+
+	return rc;
+}
+
 void
 sto_err(struct sto_err_context *err, int rc)
 {

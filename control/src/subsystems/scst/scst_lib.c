@@ -9,6 +9,60 @@
 #include "scst_lib.h"
 #include "sto_aio_front.h"
 
+struct scst_write_file_params {
+	struct sto_decoder decoder;
+
+	const char *(*construct_file_path)(void *params);
+	char *(*construct_data)(void *params);
+
+	struct scst_write_file_req *req;
+};
+
+static int
+scst_write_file_params_parse(void *priv, void *params)
+{
+	struct scst_write_file_params *p = priv;
+	struct scst_write_file_req *req = p->req;
+	int rc;
+
+	req->file = p->construct_file_path(params);
+	if (spdk_unlikely(!req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		return -ENOMEM;
+	}
+
+	req->data = p->construct_data(params);
+	if (spdk_unlikely(!req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+	return 0;
+
+free_file:
+	free((char *) req->file);
+
+	return rc;
+}
+
+static int
+scst_write_file_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_write_file_params *p = req->op->params_constructor;
+	int rc = 0;
+
+	p->req = write_file_req;
+
+	rc = sto_decoder_parse(&p->decoder, cdb, scst_write_file_params_parse, p);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to parse CDB\n");
+	}
+
+	return rc;
+}
+
 static void
 scst_write_file_done(struct sto_aio *aio)
 {
@@ -54,6 +108,51 @@ scst_write_file_req_free(struct scst_req *req)
 }
 SCST_REQ_REGISTER(write_file)
 
+
+struct scst_readdir_params {
+	struct sto_decoder decoder;
+
+	const char *(*construct_name)(void);
+	char *(*construct_dirpath)(void);
+	const char *(*construct_exclude)(void);
+};
+
+static int
+scst_readdir_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+	struct scst_readdir_params *p = req->op->params_constructor;
+
+	readdir_req->name = p->construct_name();
+	if (spdk_unlikely(!readdir_req->name)) {
+		SPDK_ERRLOG("Failed to alloc memory for targets\n");
+		return -ENOMEM;
+	}
+
+	readdir_req->dirpath = p->construct_dirpath();
+	if (spdk_unlikely(!readdir_req->dirpath)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
+		goto free_name;
+	}
+
+	if (p->construct_exclude) {
+		readdir_req->exclude_str = p->construct_exclude();
+		if (spdk_unlikely(!readdir_req->exclude_str)) {
+			SPDK_ERRLOG("Failed to alloc memory for exclude_str\n");
+			goto free_dirpath;
+		}
+	}
+
+	return 0;
+
+free_dirpath:
+	free(readdir_req->dirpath);
+
+free_name:
+	free((char *) readdir_req->name);
+
+	return -ENOMEM;
+}
 
 static void
 scst_readdir_done(struct sto_readdir_req *rd_req)
@@ -444,34 +543,22 @@ scst_driver_deinit_req_free(struct scst_req *req)
 
 SCST_REQ_REGISTER(driver_deinit)
 
-/* OP_HANDLER_LIST */
-
-static int
-scst_handler_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_handler_list_name(void)
 {
-	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-
-	readdir_req->name = spdk_sprintf_alloc("handlers");
-	if (spdk_unlikely(!readdir_req->name)) {
-		SPDK_ERRLOG("Failed to alloc memory for handlers\n");
-		return -ENOMEM;
-	}
-
-	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
-	if (spdk_unlikely(!readdir_req->dirpath)) {
-		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
-		goto free_name;
-	}
-
-	return 0;
-
-free_name:
-	free((char *) readdir_req->name);
-
-	return -ENOMEM;
+	return spdk_sprintf_alloc("handlers");
 }
 
-/* OP_DEV_OPEN */
+static char *
+scst_handler_list_dirpath(void)
+{
+	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
+}
+
+static struct scst_readdir_params handler_list_constructor = {
+	.construct_name = scst_handler_list_name,
+	.construct_dirpath = scst_handler_list_dirpath,
+};
 
 #define SCST_DEV_MAX_ATTR_CNT 32
 struct scst_attr_name_list {
@@ -504,9 +591,17 @@ struct scst_dev_open_params {
 	struct scst_attr_name_list attr_list;
 };
 
-static void
-scst_dev_open_params_free(struct scst_dev_open_params *params)
+static void *
+scst_dev_open_params_alloc(void)
 {
+	return calloc(1, sizeof(struct scst_dev_open_params));
+}
+
+static void
+scst_dev_open_params_free(void *arg)
+{
+	struct scst_dev_open_params *params = arg;
+
 	free(params->name);
 	free(params->handler);
 	scst_attr_list_free(&params->attr_list);
@@ -518,71 +613,65 @@ static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
 	{"attributes", offsetof(struct scst_dev_open_params, attr_list), scst_attr_list_decode, true},
 };
 
-static int
-scst_dev_open_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_dev_open_mgmt_file_path(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dev_open_params params = {};
-	char *parsed_cmd;
-	int i, rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_dev_open_decoders,
-				    SPDK_COUNTOF(scst_dev_open_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dev_open params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
-						  params.handler, SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("add_device %s", params.name);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-	for (i = 0; i < params.attr_list.cnt; i++) {
-		parsed_cmd = spdk_sprintf_append_realloc(write_file_req->data, " %s;",
-							 params.attr_list.names[i]);
-		if (spdk_unlikely(!parsed_cmd)) {
-			SPDK_ERRLOG("Failed to realloc memory for data\n");
-			rc = -ENOMEM;
-			goto free_data;
-		}
-
-		write_file_req->data = parsed_cmd;
-	}
-
-out:
-	scst_dev_open_params_free(&params);
-
-	return rc;
-
-free_data:
-	free(write_file_req->data);
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_dev_open_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+				  params->handler, SCST_MGMT_IO);
 }
 
-/* OP_DEV_CLOSE */
+static char *
+scst_dev_open_data(void *arg)
+{
+	struct scst_dev_open_params *params = arg;
+	char *parsed_cmd, *data;
+	int i;
+
+	data = spdk_sprintf_alloc("add_device %s", params->name);
+	if (spdk_unlikely(!data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		return NULL;
+	}
+
+	for (i = 0; i < params->attr_list.cnt; i++) {
+		parsed_cmd = spdk_sprintf_append_realloc(data, " %s;",
+							 params->attr_list.names[i]);
+		if (spdk_unlikely(!parsed_cmd)) {
+			SPDK_ERRLOG("Failed to realloc memory for data\n");
+			free(data);
+			return NULL;
+		}
+
+		data = parsed_cmd;
+	}
+
+	return data;
+}
+
+static struct scst_write_file_params dev_open_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_dev_open_decoders,
+					   scst_dev_open_params_alloc, scst_dev_open_params_free),
+	.construct_file_path = scst_dev_open_mgmt_file_path,
+	.construct_data = scst_dev_open_data,
+};
 
 struct scst_dev_close_params {
 	char *name;
 	char *handler;
 };
 
-static void
-scst_dev_close_params_free(struct scst_dev_close_params *params)
+static void *
+scst_dev_close_params_alloc(void)
 {
+	return calloc(1, sizeof(struct scst_dev_close_params));
+}
+
+static void
+scst_dev_close_params_free(void *arg)
+{
+	struct scst_dev_close_params *params = arg;
+
 	free(params->name);
 	free(params->handler);
 }
@@ -592,54 +681,42 @@ static const struct spdk_json_object_decoder scst_dev_close_decoders[] = {
 	{"handler", offsetof(struct scst_dev_close_params, handler), spdk_json_decode_string},
 };
 
-static int
-scst_dev_close_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_dev_close_mgmt_file_path(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dev_close_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_dev_close_decoders,
-				    SPDK_COUNTOF(scst_dev_close_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dev_close params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
-						  params.handler, SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("del_device %s", params.name);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_dev_close_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_dev_close_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+				  params->handler, SCST_MGMT_IO);
 }
 
-/* OP_DEV_RESYNC */
+static char *
+scst_dev_close_data(void *arg)
+{
+	struct scst_dev_close_params *params = arg;
+	return spdk_sprintf_alloc("del_device %s", params->name);
+}
+
+static struct scst_write_file_params dev_close_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_dev_close_decoders,
+					   scst_dev_close_params_alloc, scst_dev_close_params_free),
+	.construct_file_path = scst_dev_close_mgmt_file_path,
+	.construct_data = scst_dev_close_data,
+};
 
 struct scst_dev_resync_params {
 	char *name;
 };
 
-static void
-scst_dev_resync_params_free(struct scst_dev_resync_params *params)
+static void *
+scst_dev_resync_params_alloc(void)
 {
+	return calloc(1, sizeof(struct scst_dev_resync_params));
+}
+
+static void
+scst_dev_resync_params_free(void *arg)
+{
+	struct scst_dev_resync_params *params = arg;
 	free(params->name);
 }
 
@@ -647,81 +724,59 @@ static const struct spdk_json_object_decoder scst_dev_resync_decoders[] = {
 	{"name", offsetof(struct scst_dev_resync_params, name), spdk_json_decode_string},
 };
 
-static int
-scst_dev_resync_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_dev_resync_mgmt_file_path(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dev_resync_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_dev_resync_decoders,
-				    SPDK_COUNTOF(scst_dev_resync_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dev_resync params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEVICES,
-						  params.name, "resync_size");
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = strdup("1");
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_dev_resync_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_dev_resync_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEVICES,
+				  params->name, "resync_size");
 }
 
-/* OP_DEV_LIST */
-
-static int
-scst_dev_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static char *
+scst_dev_resync_data(void *arg)
 {
-	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-
-	readdir_req->name = spdk_sprintf_alloc("devices");
-	if (spdk_unlikely(!readdir_req->name)) {
-		SPDK_ERRLOG("Failed to alloc memory for devices\n");
-		return -ENOMEM;
-	}
-
-	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
-	if (spdk_unlikely(!readdir_req->dirpath)) {
-		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
-		goto free_name;
-	}
-
-	return 0;
-
-free_name:
-	free((char *) readdir_req->name);
-
-	return -ENOMEM;
+	return spdk_sprintf_alloc("1");
 }
 
-/* OP_DGRP_ADD */
+static struct scst_write_file_params dev_resync_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_dev_resync_decoders,
+					   scst_dev_resync_params_alloc, scst_dev_resync_params_free),
+	.construct_file_path = scst_dev_resync_mgmt_file_path,
+	.construct_data = scst_dev_resync_data,
+};
+
+
+static const char *
+scst_dev_list_name(void)
+{
+	return spdk_sprintf_alloc("devices");
+}
+
+static char *
+scst_dev_list_dirpath(void)
+{
+	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
+}
+
+static struct scst_readdir_params dev_list_constructor = {
+	.construct_name = scst_dev_list_name,
+	.construct_dirpath = scst_dev_list_dirpath,
+};
 
 struct scst_dgrp_params {
 	char *name;
 };
 
-static void
-scst_dgrp_params_free(struct scst_dgrp_params *params)
+static void *
+scst_dgrp_params_alloc(void)
 {
+	return calloc(1, sizeof(struct scst_dgrp_params));
+}
+
+static void
+scst_dgrp_params_free(void *arg)
+{
+	struct scst_dgrp_params *params = arg;
 	free(params->name);
 }
 
@@ -729,132 +784,80 @@ static const struct spdk_json_object_decoder scst_dgrp_decoders[] = {
 	{"name", offsetof(struct scst_dgrp_params, name), spdk_json_decode_string},
 };
 
-static int
-scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_dgrp_mgmt_file_path(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dgrp_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_dgrp_decoders,
-				    SPDK_COUNTOF(scst_dgrp_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dgrp params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-						  SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("create %s", params.name);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_dgrp_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	return spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS, SCST_MGMT_IO);
 }
 
-/* OP_DGRP_DEL */
-
-static int
-scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static char *
+scst_dgrp_add_data(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dgrp_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_dgrp_decoders,
-				    SPDK_COUNTOF(scst_dgrp_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dgrp params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-						  SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("del %s", params.name);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_dgrp_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_dgrp_params *params = arg;
+	return spdk_sprintf_alloc("create %s", params->name);
 }
 
-/* OP_DGRP_LIST */
-
-static int
-scst_dgrp_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static char *
+scst_dgrp_del_data(void *arg)
 {
-	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-
-	readdir_req->name = spdk_sprintf_alloc("Device Group");
-	if (spdk_unlikely(!readdir_req->name)) {
-		SPDK_ERRLOG("Failed to alloc memory for Device Group\n");
-		return -ENOMEM;
-	}
-
-	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEV_GROUPS);
-	if (spdk_unlikely(!readdir_req->dirpath)) {
-		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
-		goto free_name;
-	}
-
-	readdir_req->exclude_str = spdk_sprintf_alloc(SCST_MGMT_IO);
-	if (spdk_unlikely(!readdir_req->exclude_str)) {
-		SPDK_ERRLOG("Failed to alloc memory for exclude_str\n");
-		goto free_dirpath;
-	}
-
-	return 0;
-
-free_dirpath:
-	free(readdir_req->dirpath);
-
-free_name:
-	free((char *) readdir_req->name);
-
-	return -ENOMEM;
+	struct scst_dgrp_params *params = arg;
+	return spdk_sprintf_alloc("del %s", params->name);
 }
 
-/* OP_DGRP_ADD_DEV */
+static struct scst_write_file_params dgrp_add_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
+					   scst_dgrp_params_alloc, scst_dgrp_params_free),
+	.construct_file_path = scst_dgrp_mgmt_file_path,
+	.construct_data = scst_dgrp_add_data,
+};
+
+static struct scst_write_file_params dgrp_del_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
+					   scst_dgrp_params_alloc, scst_dgrp_params_free),
+	.construct_file_path = scst_dgrp_mgmt_file_path,
+	.construct_data = scst_dgrp_del_data,
+};
+
+static const char *
+scst_dgrp_list_name(void)
+{
+	return spdk_sprintf_alloc("Device Group");
+}
+
+static char *
+scst_dgrp_list_dirpath(void)
+{
+	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEV_GROUPS);
+}
+
+static const char *
+scst_dgrp_list_exclude(void)
+{
+	return spdk_sprintf_alloc(SCST_MGMT_IO);
+}
+
+static struct scst_readdir_params dgrp_list_constructor = {
+	.construct_name = scst_dgrp_list_name,
+	.construct_dirpath = scst_dgrp_list_dirpath,
+	.construct_exclude = scst_dgrp_list_exclude,
+};
 
 struct scst_dgrp_dev_params {
 	char *dgrp_name;
 	char *dev_name;
 };
 
-static void
-scst_dgrp_dev_params_free(struct scst_dgrp_dev_params *params)
+static void *
+scst_dgrp_dev_params_alloc(void)
 {
+	return calloc(1, sizeof(struct scst_dgrp_dev_params));
+}
+
+static void
+scst_dgrp_dev_params_free(void *arg)
+{
+	struct scst_dgrp_dev_params *params = arg;
+
 	free(params->dgrp_name);
 	free(params->dev_name);
 }
@@ -864,96 +867,58 @@ static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
 	{"dev_name", offsetof(struct scst_dgrp_dev_params, dev_name), spdk_json_decode_string},
 };
 
-static int
-scst_dgrp_add_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_dgrp_dev_mgmt_file_path(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dgrp_dev_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_dgrp_dev_decoders,
-				    SPDK_COUNTOF(scst_dgrp_dev_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dgrp_dev params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-						  params.dgrp_name, "devices", SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("add %s", params.dev_name);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_dgrp_dev_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_dgrp_dev_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+				  params->dgrp_name, "devices", SCST_MGMT_IO);
 }
 
-/* OP_DGRP_DEL_DEV */
-
-static int
-scst_dgrp_del_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static char *
+scst_dgrp_add_dev_data(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dgrp_dev_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_dgrp_dev_decoders,
-				    SPDK_COUNTOF(scst_dgrp_dev_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dgrp_dev params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-						  params.dgrp_name, "devices", SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("del %s", params.dev_name);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_dgrp_dev_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_dgrp_dev_params *params = arg;
+	return spdk_sprintf_alloc("add %s", params->dev_name);
 }
 
-/* OP_TARGET_ADD */
+static char *
+scst_dgrp_del_dev_data(void *arg)
+{
+	struct scst_dgrp_dev_params *params = arg;
+	return spdk_sprintf_alloc("del %s", params->dev_name);
+}
+
+static struct scst_write_file_params dgrp_add_dev_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
+					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
+	.construct_file_path = scst_dgrp_dev_mgmt_file_path,
+	.construct_data = scst_dgrp_add_dev_data,
+};
+
+static struct scst_write_file_params dgrp_del_dev_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
+					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
+	.construct_file_path = scst_dgrp_dev_mgmt_file_path,
+	.construct_data = scst_dgrp_del_dev_data,
+};
 
 struct scst_target_params {
 	char *target;
 	char *driver;
 };
 
-static void
-scst_target_params_free(struct scst_target_params *params)
+static void *
+scst_target_params_alloc(void)
 {
+	return calloc(1, sizeof(struct scst_target_params));
+}
+
+static void
+scst_target_params_free(void *arg)
+{
+	struct scst_target_params *params = arg;
+
 	free(params->target);
 	free(params->driver);
 }
@@ -963,114 +928,58 @@ static const struct spdk_json_object_decoder scst_target_decoders[] = {
 	{"driver", offsetof(struct scst_target_params, driver), spdk_json_decode_string},
 };
 
-static int
-scst_target_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_target_mgmt_file_path(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_target_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_target_decoders,
-				    SPDK_COUNTOF(scst_target_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode target params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-						  params.driver, SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("add_target %s", params.target);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_target_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_target_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+				  params->driver, SCST_MGMT_IO);
 }
 
-/* OP_TARGET_DEL */
-
-static int
-scst_target_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static char *
+scst_target_add_data(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_target_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_target_decoders,
-				    SPDK_COUNTOF(scst_target_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode target params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-						  params.driver, SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("del_target %s", params.target);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_target_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_target_params *params = arg;
+	return spdk_sprintf_alloc("add_target %s", params->target);
 }
 
-/* OP_TARGET_LIST */
-
-static int
-scst_target_list_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static char *
+scst_target_del_data(void *arg)
 {
-	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-
-	readdir_req->name = spdk_sprintf_alloc("targets");
-	if (spdk_unlikely(!readdir_req->name)) {
-		SPDK_ERRLOG("Failed to alloc memory for targets\n");
-		return -ENOMEM;
-	}
-
-	readdir_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
-	if (spdk_unlikely(!readdir_req->dirpath)) {
-		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
-		goto free_name;
-	}
-
-	return 0;
-
-free_name:
-	free((char *) readdir_req->name);
-
-	return -ENOMEM;
+	struct scst_target_params *params = arg;
+	return spdk_sprintf_alloc("del_target %s", params->target);
 }
 
-/* OP_GROUP_ADD */
+static struct scst_write_file_params target_add_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
+					   scst_target_params_alloc, scst_target_params_free),
+	.construct_file_path = scst_target_mgmt_file_path,
+	.construct_data = scst_target_add_data,
+};
+
+static struct scst_write_file_params target_del_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
+					   scst_target_params_alloc, scst_target_params_free),
+	.construct_file_path = scst_target_mgmt_file_path,
+	.construct_data = scst_target_del_data,
+};
+
+static const char *
+scst_target_list_name(void)
+{
+	return spdk_sprintf_alloc("targets");
+}
+
+static char *
+scst_target_list_dirpath(void)
+{
+	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
+}
+
+static struct scst_readdir_params target_list_constructor = {
+	.construct_name = scst_target_list_name,
+	.construct_dirpath = scst_target_list_dirpath,
+};
 
 struct scst_group_params {
 	char *group;
@@ -1078,12 +987,22 @@ struct scst_group_params {
 	char *target;
 };
 
-static void
-scst_group_params_free(struct scst_group_params *params)
+static void *
+scst_group_params_alloc(void)
 {
+	return calloc(1, sizeof(struct scst_group_params));
+}
+
+static void
+scst_group_params_free(void *arg)
+{
+	struct scst_group_params *params = arg;
+
 	free(params->group);
 	free(params->driver);
 	free(params->target);
+
+	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_group_decoders[] = {
@@ -1092,216 +1011,126 @@ static const struct spdk_json_object_decoder scst_group_decoders[] = {
 	{"target", offsetof(struct scst_group_params, target), spdk_json_decode_string},
 };
 
-static int
-scst_group_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static const char *
+scst_group_mgmt_file_path(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_group_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_group_decoders,
-				    SPDK_COUNTOF(scst_group_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode group params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-						  params.driver, params.target, "ini_groups", SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("create %s", params.group);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_group_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_group_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+				  params->driver, params->target, "ini_groups", SCST_MGMT_IO);
 }
 
-/* OP_GROUP_DEL */
-
-static int
-scst_group_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+static char *
+scst_group_add_data(void *arg)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_group_params params = {};
-	int rc = 0;
-
-	if (spdk_json_decode_object(cdb, scst_group_decoders,
-				    SPDK_COUNTOF(scst_group_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode group params\n");
-		return -EINVAL;
-	}
-
-	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-						  params.driver, params.target, "ini_groups", SCST_MGMT_IO);
-	if (spdk_unlikely(!write_file_req->file)) {
-		SPDK_ERRLOG("Failed to alloc memory for file path\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	write_file_req->data = spdk_sprintf_alloc("del %s", params.group);
-	if (spdk_unlikely(!write_file_req->data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
-		goto free_file;
-	}
-
-out:
-	scst_group_params_free(&params);
-
-	return rc;
-
-free_file:
-	free((char *) write_file_req->file);
-
-	goto out;
+	struct scst_group_params *params = arg;
+	return spdk_sprintf_alloc("create %s", params->group);
 }
 
-enum scst_ops {
-	SCST_OP_DRIVER_INIT,
-	SCST_OP_DRIVER_DEINIT,
+static char *
+scst_group_del_data(void *arg)
+{
+	struct scst_group_params *params = arg;
+	return spdk_sprintf_alloc("del %s", params->group);
+}
 
-	SCST_OP_HANDLER_LIST,
-
-	SCST_OP_DEV_OPEN,
-	SCST_OP_DEV_CLOSE,
-	SCST_OP_DEV_RESYNC,
-	SCST_OP_DEV_LIST,
-
-	SCST_OP_DGRP_ADD,
-	SCST_OP_DGRP_DEL,
-	SCST_OP_DGRP_LIST,
-	SCST_OP_DGRP_ADD_DEV,
-	SCST_OP_DGRP_DEL_DEV,
-
-	SCST_OP_TARGET_ADD,
-	SCST_OP_TARGET_DEL,
-
-	SCST_OP_TARGET_LIST,
-
-	SCST_OP_GROUP_ADD,
-	SCST_OP_GROUP_DEL,
-
-	SCST_OP_COUNT,
+static struct scst_write_file_params group_add_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
+					   scst_group_params_alloc, scst_group_params_free),
+	.construct_file_path = scst_group_mgmt_file_path,
+	.construct_data = scst_group_add_data,
 };
+
+static struct scst_write_file_params group_del_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
+					   scst_group_params_alloc, scst_group_params_free),
+	.construct_file_path = scst_group_mgmt_file_path,
+	.construct_data = scst_group_del_data,
+};
+
 
 static const struct scst_cdbops scst_op_table[] = {
 	{
-		.op.ops = SCST_OP_DRIVER_INIT,
 		.op.name = "driver_init",
-		.constructor = scst_driver_init_req_constructor,
-		.decode_cdb = scst_driver_init_decode_cdb,
+		.req_constructor = scst_driver_init_req_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DRIVER_DEINIT,
 		.op.name = "driver_deinit",
-		.constructor = scst_driver_deinit_req_constructor,
-		.decode_cdb = scst_driver_deinit_decode_cdb,
+		.req_constructor = scst_driver_deinit_req_constructor,
 	},
 	{
-		.op.ops = SCST_OP_HANDLER_LIST,
 		.op.name = "handler_list",
-		.constructor = scst_readdir_req_constructor,
-		.decode_cdb = scst_handler_list_decode_cdb,
+		.req_constructor = scst_readdir_req_constructor,
+		.params_constructor = &handler_list_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DEV_OPEN,
 		.op.name = "dev_open",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_dev_open_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &dev_open_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DEV_CLOSE,
 		.op.name = "dev_close",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_dev_close_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &dev_close_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DEV_RESYNC,
 		.op.name = "dev_resync",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_dev_resync_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &dev_resync_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DEV_LIST,
 		.op.name = "dev_list",
-		.constructor = scst_readdir_req_constructor,
-		.decode_cdb = scst_dev_list_decode_cdb,
+		.req_constructor = scst_readdir_req_constructor,
+		.params_constructor = &dev_list_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DGRP_ADD,
 		.op.name = "dgrp_add",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_dgrp_add_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &dgrp_add_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DGRP_DEL,
 		.op.name = "dgrp_del",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_dgrp_del_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &dgrp_del_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DGRP_LIST,
 		.op.name = "dgrp_list",
-		.constructor = scst_readdir_req_constructor,
-		.decode_cdb = scst_dgrp_list_decode_cdb,
+		.req_constructor = scst_readdir_req_constructor,
+		.params_constructor = &dgrp_list_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DGRP_ADD_DEV,
 		.op.name = "dgrp_add_dev",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_dgrp_add_dev_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &dgrp_add_dev_constructor,
 	},
 	{
-		.op.ops = SCST_OP_DGRP_DEL_DEV,
 		.op.name = "dgrp_del_dev",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_dgrp_del_dev_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &dgrp_del_dev_constructor,
 	},
 	{
-		.op.ops = SCST_OP_TARGET_ADD,
 		.op.name = "target_add",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_target_add_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &target_add_constructor,
 	},
 	{
-		.op.ops = SCST_OP_TARGET_DEL,
 		.op.name = "target_del",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_target_del_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &target_del_constructor,
 	},
 	{
-		.op.ops = SCST_OP_TARGET_LIST,
 		.op.name = "target_list",
-		.constructor = scst_readdir_req_constructor,
-		.decode_cdb = scst_target_list_decode_cdb,
+		.req_constructor = scst_readdir_req_constructor,
+		.params_constructor = &target_list_constructor,
 	},
 	{
-		.op.ops = SCST_OP_GROUP_ADD,
 		.op.name = "group_add",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_group_add_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &group_add_constructor,
 	},
 	{
-		.op.ops = SCST_OP_GROUP_DEL,
 		.op.name = "group_del",
-		.constructor = scst_write_file_req_constructor,
-		.decode_cdb = scst_group_del_decode_cdb,
+		.req_constructor = scst_write_file_req_constructor,
+		.params_constructor = &group_del_constructor,
 	},
 };
 
