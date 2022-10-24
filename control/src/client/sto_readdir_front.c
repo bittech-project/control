@@ -62,8 +62,8 @@ sto_dirent_list_decode(const struct spdk_json_val *val, void *out)
 {
 	struct sto_dirent_list *dirent_list = out;
 
-	return spdk_json_decode_array(val, spdk_json_decode_string, dirent_list->entries, STO_DIRENT_MAX_CNT,
-				      &dirent_list->cnt, sizeof(char *));
+	return spdk_json_decode_array(val, spdk_json_decode_string, dirent_list->entries,
+				      STO_DIRENT_MAX_CNT, &dirent_list->cnt, sizeof(char *));
 }
 
 static void

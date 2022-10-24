@@ -512,7 +512,7 @@ scst_dev_open_params_free(struct scst_dev_open_params *params)
 	scst_attr_list_free(&params->attr_list);
 }
 
-static const struct spdk_json_object_decoder scst_dev_open_req_decoders[] = {
+static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
 	{"name", offsetof(struct scst_dev_open_params, name), spdk_json_decode_string},
 	{"handler", offsetof(struct scst_dev_open_params, handler), spdk_json_decode_string},
 	{"attributes", offsetof(struct scst_dev_open_params, attr_list), scst_attr_list_decode, true},
@@ -526,9 +526,9 @@ scst_dev_open_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 	char *parsed_cmd;
 	int i, rc = 0;
 
-	if (spdk_json_decode_object(cdb, scst_dev_open_req_decoders,
-				    SPDK_COUNTOF(scst_dev_open_req_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dev_open req params\n");
+	if (spdk_json_decode_object(cdb, scst_dev_open_decoders,
+				    SPDK_COUNTOF(scst_dev_open_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dev_open params\n");
 		return -EINVAL;
 	}
 
@@ -587,7 +587,7 @@ scst_dev_close_params_free(struct scst_dev_close_params *params)
 	free(params->handler);
 }
 
-static const struct spdk_json_object_decoder scst_dev_close_req_decoders[] = {
+static const struct spdk_json_object_decoder scst_dev_close_decoders[] = {
 	{"name", offsetof(struct scst_dev_close_params, name), spdk_json_decode_string},
 	{"handler", offsetof(struct scst_dev_close_params, handler), spdk_json_decode_string},
 };
@@ -599,9 +599,9 @@ scst_dev_close_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 	struct scst_dev_close_params params = {};
 	int rc = 0;
 
-	if (spdk_json_decode_object(cdb, scst_dev_close_req_decoders,
-				    SPDK_COUNTOF(scst_dev_close_req_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dev_close req params\n");
+	if (spdk_json_decode_object(cdb, scst_dev_close_decoders,
+				    SPDK_COUNTOF(scst_dev_close_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dev_close params\n");
 		return -EINVAL;
 	}
 
@@ -643,7 +643,7 @@ scst_dev_resync_params_free(struct scst_dev_resync_params *params)
 	free(params->name);
 }
 
-static const struct spdk_json_object_decoder scst_dev_resync_req_decoders[] = {
+static const struct spdk_json_object_decoder scst_dev_resync_decoders[] = {
 	{"name", offsetof(struct scst_dev_resync_params, name), spdk_json_decode_string},
 };
 
@@ -654,9 +654,9 @@ scst_dev_resync_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb
 	struct scst_dev_resync_params params = {};
 	int rc = 0;
 
-	if (spdk_json_decode_object(cdb, scst_dev_resync_req_decoders,
-				    SPDK_COUNTOF(scst_dev_resync_req_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dev_resync req params\n");
+	if (spdk_json_decode_object(cdb, scst_dev_resync_decoders,
+				    SPDK_COUNTOF(scst_dev_resync_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dev_resync params\n");
 		return -EINVAL;
 	}
 
@@ -715,30 +715,30 @@ free_name:
 
 /* OP_DGRP_ADD */
 
-struct scst_dgrp_add_params {
+struct scst_dgrp_params {
 	char *name;
 };
 
 static void
-scst_dgrp_add_params_free(struct scst_dgrp_add_params *params)
+scst_dgrp_params_free(struct scst_dgrp_params *params)
 {
 	free(params->name);
 }
 
-static const struct spdk_json_object_decoder scst_dgrp_add_req_decoders[] = {
-	{"name", offsetof(struct scst_dgrp_add_params, name), spdk_json_decode_string},
+static const struct spdk_json_object_decoder scst_dgrp_decoders[] = {
+	{"name", offsetof(struct scst_dgrp_params, name), spdk_json_decode_string},
 };
 
 int
 scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dgrp_add_params params = {};
+	struct scst_dgrp_params params = {};
 	int rc = 0;
 
-	if (spdk_json_decode_object(cdb, scst_dgrp_add_req_decoders,
-				    SPDK_COUNTOF(scst_dgrp_add_req_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dgrp_add req params\n");
+	if (spdk_json_decode_object(cdb, scst_dgrp_decoders,
+				    SPDK_COUNTOF(scst_dgrp_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dgrp params\n");
 		return -EINVAL;
 	}
 
@@ -758,7 +758,7 @@ scst_dgrp_add_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 	}
 
 out:
-	scst_dgrp_add_params_free(&params);
+	scst_dgrp_params_free(&params);
 
 	return rc;
 
@@ -770,30 +770,16 @@ free_file:
 
 /* OP_DGRP_DEL */
 
-struct scst_dgrp_del_params {
-	char *name;
-};
-
-static void
-scst_dgrp_del_params_free(struct scst_dgrp_del_params *params)
-{
-	free(params->name);
-}
-
-static const struct spdk_json_object_decoder scst_dgrp_del_req_decoders[] = {
-	{"name", offsetof(struct scst_dgrp_del_params, name), spdk_json_decode_string},
-};
-
 int
 scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dgrp_del_params params = {};
+	struct scst_dgrp_params params = {};
 	int rc = 0;
 
-	if (spdk_json_decode_object(cdb, scst_dgrp_del_req_decoders,
-				    SPDK_COUNTOF(scst_dgrp_del_req_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dgrp_del req params\n");
+	if (spdk_json_decode_object(cdb, scst_dgrp_decoders,
+				    SPDK_COUNTOF(scst_dgrp_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dgrp params\n");
 		return -EINVAL;
 	}
 
@@ -813,7 +799,7 @@ scst_dgrp_del_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 	}
 
 out:
-	scst_dgrp_del_params_free(&params);
+	scst_dgrp_params_free(&params);
 
 	return rc;
 
@@ -861,33 +847,33 @@ free_name:
 
 /* OP_DGRP_ADD_DEV */
 
-struct scst_dgrp_add_dev_params {
+struct scst_dgrp_dev_params {
 	char *dgrp_name;
 	char *dev_name;
 };
 
 static void
-scst_dgrp_add_dev_params_free(struct scst_dgrp_add_dev_params *params)
+scst_dgrp_dev_params_free(struct scst_dgrp_dev_params *params)
 {
 	free(params->dgrp_name);
 	free(params->dev_name);
 }
 
-static const struct spdk_json_object_decoder scst_dgrp_add_dev_req_decoders[] = {
-	{"dgrp_name", offsetof(struct scst_dgrp_add_dev_params, dgrp_name), spdk_json_decode_string},
-	{"dev_name", offsetof(struct scst_dgrp_add_dev_params, dev_name), spdk_json_decode_string},
+static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
+	{"dgrp_name", offsetof(struct scst_dgrp_dev_params, dgrp_name), spdk_json_decode_string},
+	{"dev_name", offsetof(struct scst_dgrp_dev_params, dev_name), spdk_json_decode_string},
 };
 
 int
 scst_dgrp_add_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
 	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_dgrp_add_dev_params params = {};
+	struct scst_dgrp_dev_params params = {};
 	int rc = 0;
 
-	if (spdk_json_decode_object(cdb, scst_dgrp_add_dev_req_decoders,
-				    SPDK_COUNTOF(scst_dgrp_add_dev_req_decoders), &params)) {
-		SPDK_ERRLOG("Failed to decode dgrp_add_dev req params\n");
+	if (spdk_json_decode_object(cdb, scst_dgrp_dev_decoders,
+				    SPDK_COUNTOF(scst_dgrp_dev_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dgrp_dev params\n");
 		return -EINVAL;
 	}
 
@@ -907,7 +893,48 @@ scst_dgrp_add_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *c
 	}
 
 out:
-	scst_dgrp_add_dev_params_free(&params);
+	scst_dgrp_dev_params_free(&params);
+
+	return rc;
+
+free_file:
+	free((char *) write_file_req->file);
+
+	goto out;
+}
+
+/* OP_DGRP_DEL_DEV */
+
+int
+scst_dgrp_del_dev_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+{
+	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_dgrp_dev_params params = {};
+	int rc = 0;
+
+	if (spdk_json_decode_object(cdb, scst_dgrp_dev_decoders,
+				    SPDK_COUNTOF(scst_dgrp_dev_decoders), &params)) {
+		SPDK_ERRLOG("Failed to decode dgrp_dev params\n");
+		return -EINVAL;
+	}
+
+	write_file_req->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+						  params.dgrp_name, "devices", SCST_MGMT_IO);
+	if (spdk_unlikely(!write_file_req->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	write_file_req->data = spdk_sprintf_alloc("del %s", params.dev_name);
+	if (spdk_unlikely(!write_file_req->data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		rc = -ENOMEM;
+		goto free_file;
+	}
+
+out:
+	scst_dgrp_dev_params_free(&params);
 
 	return rc;
 

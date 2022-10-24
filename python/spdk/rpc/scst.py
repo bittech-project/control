@@ -135,6 +135,20 @@ def scst_dgrp_add_dev(client, dgrp_name, dev_name):
     }
     return client.call('control', params)
 
+def scst_dgrp_del_dev(client, dgrp_name, dev_name):
+    """Remove device <dev_name> from device group <dgrp_name>.
+    Args:
+        dgrp_name: SCST device group name
+        dev_name: SCST device name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'dgrp_del_dev',
+        'dgrp_name': dgrp_name,
+        'dev_name': dev_name,
+    }
+    return client.call('control', params)
+
 def scst_target_list(client):
     """List all available targets.
     Args:
