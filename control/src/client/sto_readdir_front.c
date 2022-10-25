@@ -91,6 +91,7 @@ sto_readdir_result_free(void *arg)
 {
 	struct sto_readdir_result *result = arg;
 	sto_dirent_list_free(&result->dirent_list);
+	free(result);
 }
 
 static const struct spdk_json_object_decoder sto_readdir_result_decoders[] = {

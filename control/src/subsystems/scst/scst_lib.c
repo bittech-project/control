@@ -613,6 +613,7 @@ scst_dev_open_params_free(void *arg)
 	free(params->name);
 	free(params->handler);
 	scst_attr_list_free(&params->attr_list);
+	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
@@ -684,6 +685,7 @@ scst_dev_close_params_free(void *arg)
 
 	free(params->name);
 	free(params->handler);
+	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dev_close_decoders[] = {
@@ -730,6 +732,7 @@ scst_dev_resync_params_free(void *arg)
 {
 	struct scst_dev_resync_params *params = arg;
 	free(params->name);
+	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dev_resync_decoders[] = {
@@ -794,6 +797,7 @@ scst_dgrp_params_free(void *arg)
 {
 	struct scst_dgrp_params *params = arg;
 	free(params->name);
+	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dgrp_decoders[] = {
@@ -882,6 +886,7 @@ scst_dgrp_dev_params_free(void *arg)
 
 	free(params->dgrp_name);
 	free(params->dev_name);
+	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
@@ -947,6 +952,7 @@ scst_target_params_free(void *arg)
 
 	free(params->target);
 	free(params->driver);
+	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_target_decoders[] = {
@@ -1033,7 +1039,6 @@ scst_group_params_free(void *arg)
 	free(params->group);
 	free(params->driver);
 	free(params->target);
-
 	free(params);
 }
 
