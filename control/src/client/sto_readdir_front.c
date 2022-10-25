@@ -4,6 +4,7 @@
 
 #include <rte_malloc.h>
 
+#include "sto_lib.h"
 #include "sto_client.h"
 #include "sto_readdir_front.h"
 
@@ -81,9 +82,16 @@ struct sto_readdir_result {
 	struct sto_dirent_list dirent_list;
 };
 
-static void
-sto_readdir_result_free(struct sto_readdir_result *result)
+static void *
+sto_readdir_result_alloc(void)
 {
+	return calloc(1, sizeof(struct sto_readdir_result));
+}
+
+static void
+sto_readdir_result_free(void *arg)
+{
+	struct sto_readdir_result *result = arg;
 	sto_dirent_list_free(&result->dirent_list);
 }
 
@@ -92,45 +100,54 @@ static const struct spdk_json_object_decoder sto_readdir_result_decoders[] = {
 	{"dirents", offsetof(struct sto_readdir_result, dirent_list), sto_dirent_list_decode},
 };
 
-static void
-sto_readdir_resp_handler(struct sto_rpc_request *rpc_req,
-			 struct spdk_jsonrpc_client_response *resp)
+static struct sto_decoder sto_readdir_result_decoder =
+	STO_DECODER_INITIALIZER(sto_readdir_result_decoders,
+				sto_readdir_result_alloc, sto_readdir_result_free);
+
+static int
+sto_readdir_parse_result(void *priv, void *params)
 {
-	struct sto_readdir_req *req = rpc_req->priv;
-	struct sto_readdir_result result;
+	struct sto_readdir_req *req = priv;
+	struct sto_readdir_result *result = params;
 	struct sto_dirent_list *dirent_list;
 	int rc;
 
-	memset(&result, 0, sizeof(result));
+	SPDK_NOTICELOG("GLEB: Get result from READDIR response: returncode[%d], dir_cnt %d\n",
+		       result->returncode, (int) result->dirent_list.cnt);
 
-	if (spdk_json_decode_object(resp->result, sto_readdir_result_decoders,
-				    SPDK_COUNTOF(sto_readdir_result_decoders), &result)) {
-		SPDK_ERRLOG("Failed to decode response for subprocess\n");
+	req->returncode = result->returncode;
+
+	if (spdk_unlikely(req->returncode)) {
 		goto out;
 	}
 
-	dirent_list = &result.dirent_list;
-
-	SPDK_NOTICELOG("GLEB: Get result from READDIR response: returncode[%d], dir_cnt %d\n",
-		       result.returncode, (int) result.dirent_list.cnt);
-
-	req->returncode = result.returncode;
-
-	if (spdk_unlikely(req->returncode)) {
-		goto free_result;
-	}
+	dirent_list = &result->dirent_list;
 
 	rc = sto_dirents_init(&req->dirents, dirent_list->entries, dirent_list->cnt);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to copy dirents, rc=%d\n", rc);
 		req->returncode = rc;
-		goto free_result;
+		goto out;
 	}
 
-free_result:
-	sto_readdir_result_free(&result);
-
 out:
+	return 0;
+}
+
+static void
+sto_readdir_resp_handler(struct sto_rpc_request *rpc_req,
+			 struct spdk_jsonrpc_client_response *resp)
+{
+	struct sto_readdir_req *req = rpc_req->priv;
+	int rc;
+
+	rc = sto_decoder_parse(&sto_readdir_result_decoder, resp->result,
+			       sto_readdir_parse_result, req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to parse readdir result, rc=%d\n", rc);
+		req->returncode = rc;
+	}
+
 	sto_rpc_req_free(rpc_req);
 
 	req->readdir_done(req);
