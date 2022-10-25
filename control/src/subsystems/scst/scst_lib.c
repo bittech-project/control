@@ -965,20 +965,20 @@ static struct scst_write_file_params target_del_constructor = {
 };
 
 static const char *
-scst_target_list_name(void)
+scst_driver_list_name(void)
 {
-	return spdk_sprintf_alloc("targets");
+	return spdk_sprintf_alloc("Drivers");
 }
 
 static char *
-scst_target_list_dirpath(void)
+scst_driver_list_dirpath(void)
 {
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
 }
 
-static struct scst_readdir_params target_list_constructor = {
-	.construct_name = scst_target_list_name,
-	.construct_dirpath = scst_target_list_dirpath,
+static struct scst_readdir_params driver_list_constructor = {
+	.construct_name = scst_driver_list_name,
+	.construct_dirpath = scst_driver_list_dirpath,
 };
 
 struct scst_group_params {
@@ -1118,9 +1118,9 @@ static const struct scst_cdbops scst_op_table[] = {
 		.params_constructor = &target_del_constructor,
 	},
 	{
-		.op.name = "target_list",
+		.op.name = "driver_list",
 		.req_constructor = scst_readdir_req_constructor,
-		.params_constructor = &target_list_constructor,
+		.params_constructor = &driver_list_constructor,
 	},
 	{
 		.op.name = "group_add",
