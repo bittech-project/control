@@ -5,20 +5,19 @@
 
 #include "sto_exec.h"
 
-struct sto_readdir_back_ctx;
-typedef void (*readdir_back_done_t)(struct sto_readdir_back_ctx *ctx);
+struct sto_readdir_back_req;
+typedef void (*readdir_back_done_t)(struct sto_readdir_back_req *req);
 
 struct sto_dirent {
 	char *name;
 	TAILQ_ENTRY(sto_dirent) list;
 };
 
-struct sto_readdir_back_ctx {
+struct sto_readdir_back_req {
 	struct sto_exec_ctx exec_ctx;
 
-	bool skip_hidden;
-
 	struct {
+		bool skip_hidden;
 		const char *dirname;
 	};
 
@@ -34,6 +33,6 @@ struct sto_readdir_back_ctx {
 
 int sto_readdir_back(const char *dirname, bool skip_hidden,
 		     readdir_back_done_t readdir_back_done, void *priv);
-void sto_readdir_back_free(struct sto_readdir_back_ctx *ctx);
+void sto_readdir_back_free(struct sto_readdir_back_req *req);
 
 #endif /* _STO_READDIR_BACK_H_ */

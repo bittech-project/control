@@ -12,8 +12,10 @@
 struct scst_write_file_params {
 	struct sto_decoder decoder;
 
-	const char *(*construct_file_path)(void *params);
-	char *(*construct_data)(void *params);
+	struct {
+		const char *(*file_path)(void *params);
+		char *(*data)(void *params);
+	} constructor;
 
 	struct scst_write_file_req *req;
 };
@@ -25,13 +27,13 @@ scst_write_file_params_parse(void *priv, void *params)
 	struct scst_write_file_req *req = p->req;
 	int rc;
 
-	req->file = p->construct_file_path(params);
+	req->file = p->constructor.file_path(params);
 	if (spdk_unlikely(!req->file)) {
 		SPDK_ERRLOG("Failed to alloc memory for file path\n");
 		return -ENOMEM;
 	}
 
-	req->data = p->construct_data(params);
+	req->data = p->constructor.data(params);
 	if (spdk_unlikely(!req->data)) {
 		SPDK_ERRLOG("Failed to alloc memory for data\n");
 		rc = -ENOMEM;
@@ -112,9 +114,11 @@ SCST_REQ_REGISTER(write_file)
 struct scst_readdir_params {
 	struct sto_decoder decoder;
 
-	const char *(*construct_name)(void);
-	char *(*construct_dirpath)(void);
-	const char *(*construct_exclude)(void);
+	struct {
+		const char *(*name)(void);
+		char *(*dirpath)(void);
+		const char *(*exclude)(void);
+	} constructor;
 };
 
 static int
@@ -123,20 +127,20 @@ scst_readdir_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 	struct scst_readdir_params *p = req->op->params_constructor;
 
-	readdir_req->name = p->construct_name();
+	readdir_req->name = p->constructor.name();
 	if (spdk_unlikely(!readdir_req->name)) {
 		SPDK_ERRLOG("Failed to alloc memory for targets\n");
 		return -ENOMEM;
 	}
 
-	readdir_req->dirpath = p->construct_dirpath();
+	readdir_req->dirpath = p->constructor.dirpath();
 	if (spdk_unlikely(!readdir_req->dirpath)) {
 		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
 		goto free_name;
 	}
 
-	if (p->construct_exclude) {
-		readdir_req->exclude_str = p->construct_exclude();
+	if (p->constructor.exclude) {
+		readdir_req->exclude_str = p->constructor.exclude();
 		if (spdk_unlikely(!readdir_req->exclude_str)) {
 			SPDK_ERRLOG("Failed to alloc memory for exclude_str\n");
 			goto free_dirpath;
@@ -558,8 +562,10 @@ scst_handler_list_dirpath(void)
 }
 
 static struct scst_readdir_params handler_list_constructor = {
-	.construct_name = scst_handler_list_name,
-	.construct_dirpath = scst_handler_list_dirpath,
+	.constructor = {
+		.name = scst_handler_list_name,
+		.dirpath = scst_handler_list_dirpath,
+	}
 };
 
 #define SCST_DEV_MAX_ATTR_CNT 32
@@ -654,8 +660,10 @@ scst_dev_open_data(void *arg)
 static struct scst_write_file_params dev_open_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_open_decoders,
 					   scst_dev_open_params_alloc, scst_dev_open_params_free),
-	.construct_file_path = scst_dev_open_mgmt_file_path,
-	.construct_data = scst_dev_open_data,
+	.constructor = {
+		.file_path = scst_dev_open_mgmt_file_path,
+		.data = scst_dev_open_data,
+	}
 };
 
 struct scst_dev_close_params {
@@ -701,8 +709,10 @@ scst_dev_close_data(void *arg)
 static struct scst_write_file_params dev_close_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_close_decoders,
 					   scst_dev_close_params_alloc, scst_dev_close_params_free),
-	.construct_file_path = scst_dev_close_mgmt_file_path,
-	.construct_data = scst_dev_close_data,
+	.constructor = {
+		.file_path = scst_dev_close_mgmt_file_path,
+		.data = scst_dev_close_data,
+	}
 };
 
 struct scst_dev_resync_params {
@@ -743,8 +753,10 @@ scst_dev_resync_data(void *arg)
 static struct scst_write_file_params dev_resync_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_resync_decoders,
 					   scst_dev_resync_params_alloc, scst_dev_resync_params_free),
-	.construct_file_path = scst_dev_resync_mgmt_file_path,
-	.construct_data = scst_dev_resync_data,
+	.constructor = {
+		.file_path = scst_dev_resync_mgmt_file_path,
+		.data = scst_dev_resync_data,
+	}
 };
 
 
@@ -761,8 +773,10 @@ scst_dev_list_dirpath(void)
 }
 
 static struct scst_readdir_params dev_list_constructor = {
-	.construct_name = scst_dev_list_name,
-	.construct_dirpath = scst_dev_list_dirpath,
+	.constructor = {
+		.name = scst_dev_list_name,
+		.dirpath = scst_dev_list_dirpath,
+	}
 };
 
 struct scst_dgrp_params {
@@ -809,15 +823,19 @@ scst_dgrp_del_data(void *arg)
 static struct scst_write_file_params dgrp_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
 					   scst_dgrp_params_alloc, scst_dgrp_params_free),
-	.construct_file_path = scst_dgrp_mgmt_file_path,
-	.construct_data = scst_dgrp_add_data,
+	.constructor = {
+		.file_path = scst_dgrp_mgmt_file_path,
+		.data = scst_dgrp_add_data,
+	}
 };
 
 static struct scst_write_file_params dgrp_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
 					   scst_dgrp_params_alloc, scst_dgrp_params_free),
-	.construct_file_path = scst_dgrp_mgmt_file_path,
-	.construct_data = scst_dgrp_del_data,
+	.constructor = {
+		.file_path = scst_dgrp_mgmt_file_path,
+		.data = scst_dgrp_del_data,
+	}
 };
 
 static const char *
@@ -839,9 +857,11 @@ scst_dgrp_list_exclude(void)
 }
 
 static struct scst_readdir_params dgrp_list_constructor = {
-	.construct_name = scst_dgrp_list_name,
-	.construct_dirpath = scst_dgrp_list_dirpath,
-	.construct_exclude = scst_dgrp_list_exclude,
+	.constructor = {
+		.name = scst_dgrp_list_name,
+		.dirpath = scst_dgrp_list_dirpath,
+		.exclude = scst_dgrp_list_exclude,
+	}
 };
 
 struct scst_dgrp_dev_params {
@@ -894,15 +914,19 @@ scst_dgrp_del_dev_data(void *arg)
 static struct scst_write_file_params dgrp_add_dev_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
 					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
-	.construct_file_path = scst_dgrp_dev_mgmt_file_path,
-	.construct_data = scst_dgrp_add_dev_data,
+	.constructor = {
+		.file_path = scst_dgrp_dev_mgmt_file_path,
+		.data = scst_dgrp_add_dev_data,
+	}
 };
 
 static struct scst_write_file_params dgrp_del_dev_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
 					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
-	.construct_file_path = scst_dgrp_dev_mgmt_file_path,
-	.construct_data = scst_dgrp_del_dev_data,
+	.constructor = {
+		.file_path = scst_dgrp_dev_mgmt_file_path,
+		.data = scst_dgrp_del_dev_data,
+	}
 };
 
 struct scst_target_params {
@@ -955,15 +979,19 @@ scst_target_del_data(void *arg)
 static struct scst_write_file_params target_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
 					   scst_target_params_alloc, scst_target_params_free),
-	.construct_file_path = scst_target_mgmt_file_path,
-	.construct_data = scst_target_add_data,
+	.constructor = {
+		.file_path = scst_target_mgmt_file_path,
+		.data = scst_target_add_data,
+	}
 };
 
 static struct scst_write_file_params target_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
 					   scst_target_params_alloc, scst_target_params_free),
-	.construct_file_path = scst_target_mgmt_file_path,
-	.construct_data = scst_target_del_data,
+	.constructor = {
+		.file_path = scst_target_mgmt_file_path,
+		.data = scst_target_del_data,
+	}
 };
 
 static const char *
@@ -979,8 +1007,10 @@ scst_driver_list_dirpath(void)
 }
 
 static struct scst_readdir_params driver_list_constructor = {
-	.construct_name = scst_driver_list_name,
-	.construct_dirpath = scst_driver_list_dirpath,
+	.constructor = {
+		.name = scst_driver_list_name,
+		.dirpath = scst_driver_list_dirpath,
+	}
 };
 
 struct scst_group_params {
@@ -1038,15 +1068,19 @@ scst_group_del_data(void *arg)
 static struct scst_write_file_params group_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
 					   scst_group_params_alloc, scst_group_params_free),
-	.construct_file_path = scst_group_mgmt_file_path,
-	.construct_data = scst_group_add_data,
+	.constructor = {
+		.file_path = scst_group_mgmt_file_path,
+		.data = scst_group_add_data,
+	}
 };
 
 static struct scst_write_file_params group_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
 					   scst_group_params_alloc, scst_group_params_free),
-	.construct_file_path = scst_group_mgmt_file_path,
-	.construct_data = scst_group_del_data,
+	.constructor = {
+		.file_path = scst_group_mgmt_file_path,
+		.data = scst_group_del_data,
+	}
 };
 
 
