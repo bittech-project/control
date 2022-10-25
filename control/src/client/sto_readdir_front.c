@@ -45,8 +45,6 @@ sto_readdir_init_cb(struct sto_readdir_req *req, readdir_done_t readdir_done, vo
 void
 sto_readdir_free(struct sto_readdir_req *req)
 {
-	sto_dirents_free(&req->dirents);
-
 	free((char *) req->dirname);
 	rte_free(req);
 }
@@ -123,7 +121,7 @@ sto_readdir_parse_result(void *priv, void *params)
 
 	dirent_list = &result->dirent_list;
 
-	rc = sto_dirents_init(&req->dirents, dirent_list->entries, dirent_list->cnt);
+	rc = sto_dirents_init(req->dirents, dirent_list->entries, dirent_list->cnt);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to copy dirents, rc=%d\n", rc);
 		req->returncode = rc;
@@ -190,7 +188,7 @@ sto_readdir_submit(struct sto_readdir_req *req)
 }
 
 int
-sto_readdir(const char *dirname, readdir_done_t readdir_done, void *priv)
+sto_readdir(const char *dirname, struct sto_readdir_ctx *ctx)
 {
 	struct sto_readdir_req *req;
 	int rc;
@@ -201,7 +199,9 @@ sto_readdir(const char *dirname, readdir_done_t readdir_done, void *priv)
 		return -ENOMEM;
 	}
 
-	sto_readdir_init_cb(req, readdir_done, priv);
+	sto_readdir_init_cb(req, ctx->readdir_done, ctx->priv);
+
+	req->dirents = ctx->dirents;
 
 	rc = sto_readdir_submit(req);
 	if (spdk_unlikely(rc)) {

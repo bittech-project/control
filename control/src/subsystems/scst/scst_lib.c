@@ -158,7 +158,6 @@ static void
 scst_readdir_done(struct sto_readdir_req *rd_req)
 {
 	struct scst_req *req = rd_req->priv;
-	struct scst_readdir_req *scst_rd_req = to_readdir_req(req);
 	int rc;
 
 	rc = rd_req->returncode;
@@ -168,8 +167,6 @@ scst_readdir_done(struct sto_readdir_req *rd_req)
 		sto_err(req->ctx.err_ctx, rc);
 		goto out;
 	}
-
-	sto_dirents_init(&scst_rd_req->dirents, rd_req->dirents.entries, rd_req->dirents.cnt);
 
 out:
 	sto_readdir_free(rd_req);
@@ -181,8 +178,13 @@ static int
 scst_readdir_req_exec(struct scst_req *req)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+	struct sto_readdir_ctx ctx = {
+		.dirents = &readdir_req->dirents,
+		.priv = req,
+		.readdir_done = scst_readdir_done,
+	};
 
-	return sto_readdir(readdir_req->dirpath, scst_readdir_done, req);
+	return sto_readdir(readdir_req->dirpath, &ctx);
 }
 
 static void

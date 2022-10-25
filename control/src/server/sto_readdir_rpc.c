@@ -57,7 +57,7 @@ sto_readdir_done(struct sto_readdir_back_ctx *ctx)
 }
 
 static void
-sto_readdir(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
+sto_rpc_readdir(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
 	struct sto_readdir_params rd_params = {};
 	int rc;
@@ -81,4 +81,4 @@ out:
 
 	return;
 }
-STO_RPC_REGISTER("readdir", sto_readdir)
+STO_RPC_REGISTER("readdir", sto_rpc_readdir)
