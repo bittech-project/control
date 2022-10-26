@@ -1,8 +1,6 @@
 #ifndef _STO_READDIR_FRONT_H_
 #define _STO_READDIR_FRONT_H_
 
-#include <spdk/queue.h>
-
 struct sto_readdir_req;
 typedef void (*readdir_done_t)(struct sto_readdir_req *req);
 

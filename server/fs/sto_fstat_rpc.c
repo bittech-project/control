@@ -32,43 +32,43 @@ sto_fstat_response(struct sto_fstat_back_req *req, struct spdk_jsonrpc_request *
 	spdk_json_write_named_int32(w, "returncode", req->returncode);
 
 	/* dev_t     st_dev; ID of device containing file */
-	spdk_json_write_named_uint64(w, "st_dev", stat->st_dev);
+	spdk_json_write_named_uint64(w, "dev", stat->st_dev);
 
 	/* ino_t     st_ino; inode number */
-	spdk_json_write_named_uint64(w, "st_ino", stat->st_ino);
+	spdk_json_write_named_uint64(w, "ino", stat->st_ino);
 
 	/* mode_t    st_mode; protection */
-	spdk_json_write_named_uint32(w, "st_mode", stat->st_mode);
+	spdk_json_write_named_uint32(w, "mode", stat->st_mode);
 
 	/* nlink_t   st_nlink; number of hard links */
-	spdk_json_write_named_uint64(w, "st_nlink", stat->st_nlink);
+	spdk_json_write_named_uint64(w, "nlink", stat->st_nlink);
 
 	/* uid_t     st_uid; user ID of owner */
-	spdk_json_write_named_uint64(w, "st_uid", stat->st_uid);
+	spdk_json_write_named_uint64(w, "uid", stat->st_uid);
 
 	/* gid_t     st_gid; group ID of owner */
-	spdk_json_write_named_uint64(w, "st_gid", stat->st_gid);
+	spdk_json_write_named_uint64(w, "gid", stat->st_gid);
 
 	/* dev_t     st_rdev; device ID (if special file) */
-	spdk_json_write_named_uint64(w, "st_rdev", stat->st_rdev);
+	spdk_json_write_named_uint64(w, "rdev", stat->st_rdev);
 
 	/* off_t     st_size; total size, in bytes */
-	spdk_json_write_named_uint64(w, "st_size", stat->st_size);
+	spdk_json_write_named_uint64(w, "size", stat->st_size);
 
 	/* blksize_t st_blksize; blocksize for file system I/O */
-	spdk_json_write_named_uint64(w, "st_blksize", stat->st_blksize);
+	spdk_json_write_named_uint64(w, "blksize", stat->st_blksize);
 
 	/* blkcnt_t  st_blocks; number of 512B blocks allocated */
-	spdk_json_write_named_uint64(w, "st_blocks", stat->st_blocks);
+	spdk_json_write_named_uint64(w, "blocks", stat->st_blocks);
 
 	/* time_t    st_atime; time of last access */
-	spdk_json_write_named_uint64(w, "st_atime", stat->st_atime);
+	spdk_json_write_named_uint64(w, "atime", stat->st_atime);
 
 	/* time_t    st_mtime; time of last modification */
-	spdk_json_write_named_uint64(w, "st_mtime", stat->st_mtime);
+	spdk_json_write_named_uint64(w, "mtime", stat->st_mtime);
 
 	/* time_t    st_ctime; time of last status change */
-	spdk_json_write_named_uint64(w, "st_ctime", stat->st_ctime);
+	spdk_json_write_named_uint64(w, "ctime", stat->st_ctime);
 
 	spdk_json_write_object_end(w);
 
