@@ -6,7 +6,7 @@ include $(CONTROL_ROOT_DIR)/mk/spdk.mk
 LIBNAME = server
 LIB = libsto_$(LIBNAME).so
 
-CFLAGS = -fPIC -Wall -g -O2 -pthread $(SPDK_CFLAGS)
+CFLAGS = -fPIC -Wall -g -O2 -pthread -I./include $(SPDK_CFLAGS)
 LDFLAGS = -shared -Wl,-soname,$(LIB) -pthread
 
 C_SRCS = sto_server.c sto_exec.c sto_subprocess_back.c sto_subprocess_rpc.c \
