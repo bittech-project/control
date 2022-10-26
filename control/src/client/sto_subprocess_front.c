@@ -140,7 +140,7 @@ sto_subprocess_run(struct sto_subprocess *subp)
 
 	sto_rpc_req_init_cb(rpc_req, sto_subprocess_resp_handler);
 
-	rc = sto_client_send(rpc_req);
+	rc = sto_client_submit(rpc_req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to send RPC req, rc=%d\n", rc);
 		sto_rpc_req_free(rpc_req);

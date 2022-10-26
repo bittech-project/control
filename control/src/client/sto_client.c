@@ -161,7 +161,7 @@ sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler)
 }
 
 int
-sto_client_send(struct sto_rpc_request *req)
+sto_client_submit(struct sto_rpc_request *req)
 {
 	struct sto_client_group *group;
 	struct sto_client *client;

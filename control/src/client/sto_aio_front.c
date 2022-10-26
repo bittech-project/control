@@ -205,7 +205,7 @@ sto_aio_submit(struct sto_aio *aio)
 		return -ENOMEM;
 	}
 
-	rc = sto_client_send(rpc_req);
+	rc = sto_client_submit(rpc_req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to send RPC req, rc=%d\n", rc);
 		sto_rpc_req_free(rpc_req);

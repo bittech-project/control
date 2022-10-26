@@ -28,9 +28,9 @@ void sto_client_close(void);
 
 struct sto_rpc_request *sto_rpc_req_alloc(const char *method_name,
 		sto_dump_params_json params_json, void *priv);
-void sto_rpc_req_free(struct sto_rpc_request *req);
 void sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler);
+void sto_rpc_req_free(struct sto_rpc_request *req);
 
-int sto_client_send(struct sto_rpc_request *req);
+int sto_client_submit(struct sto_rpc_request *req);
 
 #endif /* _STO_CLIENT_H_ */
