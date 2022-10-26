@@ -254,15 +254,14 @@ sto_dirents_free(struct sto_dirents *dirents)
 static bool
 find_match_str(const char **exclude_list, const char *str)
 {
-	const char *s;
-	int i;
+	const char **i;
 
 	if (!exclude_list) {
 		return false;
 	}
 
-	for (i = 0, s = exclude_list[0]; s; i++, s = exclude_list[i]) {
-		if (!strcmp(str, s)) {
+	for (i = exclude_list; *i; i++) {
+		if (!strcmp(str, *i)) {
 			return true;
 		}
 	}
