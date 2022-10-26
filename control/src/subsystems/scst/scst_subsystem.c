@@ -38,6 +38,7 @@ static int
 scst_decode_params(struct scst_req *req, const struct spdk_json_val *params)
 {
 	const struct spdk_json_val *cdb;
+	struct scst_req_ops *ops = scst_req_get_ops(req);
 	int rc = 0;
 
 	cdb = sto_decode_next_cdb(params);
@@ -46,7 +47,7 @@ scst_decode_params(struct scst_req *req, const struct spdk_json_val *params)
 		return PTR_ERR(cdb);
 	}
 
-	rc = req->decode_cdb(req, cdb);
+	rc = ops->decode_cdb(req, cdb);
 	if (rc) {
 		SPDK_ERRLOG("SCST: Failed to parse CDB for req[%p], rc=%d\n", req, rc);
 		goto out;
@@ -79,8 +80,10 @@ scst_parse(const struct spdk_json_val *params)
 
 	rc = scst_decode_params(req, params);
 	if (rc) {
+		struct scst_req_ops *ops = scst_req_get_ops(req);
 		SPDK_ERRLOG("SCST: Failed to decode params, rc=%d\n", rc);
-		req->free(req);
+
+		ops->free(req);
 		return NULL;
 	}
 
@@ -91,24 +94,22 @@ static int
 scst_exec(struct sto_context *ctx)
 {
 	struct scst_req *req = to_scst_req(ctx);
-	int rc = 0;
+	struct scst_req_ops *ops = scst_req_get_ops(req);
 
 	SPDK_NOTICELOG("SCST: Exec req[%p]\n", req);
 
-	rc = scst_req_submit(req);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to submit SCST req, rc=%d\n", rc);
-	}
-
-	return rc;
+	return ops->exec(req);
 }
 
 static void
 scst_end_response(struct sto_context *ctx, struct spdk_json_write_ctx *w)
 {
 	struct scst_req *req = to_scst_req(ctx);
+	struct scst_req_ops *ops = scst_req_get_ops(req);
 
-	req->end_response(req, w);
+	SPDK_NOTICELOG("SCST: End response req[%p]\n", req);
+
+	ops->end_response(req, w);
 
 	return;
 }
@@ -117,10 +118,11 @@ static void
 scst_free(struct sto_context *ctx)
 {
 	struct scst_req *req = to_scst_req(ctx);
+	struct scst_req_ops *ops = scst_req_get_ops(req);
 
 	SPDK_NOTICELOG("SCST: Done req[%p]\n", req);
 
-	req->free(req);
+	ops->free(req);
 
 	return;
 }

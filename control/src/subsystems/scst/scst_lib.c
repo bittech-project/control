@@ -9,6 +9,8 @@
 #include "scst_lib.h"
 #include "sto_aio_front.h"
 
+SCST_REQ_REGISTER(write_file)
+
 struct scst_write_file_params {
 	struct sto_decoder decoder;
 
@@ -108,8 +110,15 @@ scst_write_file_req_free(struct scst_req *req)
 
 	rte_free(write_file_req);
 }
-SCST_REQ_REGISTER(write_file)
 
+static struct scst_req_ops scst_write_file_ops = {
+	.decode_cdb = scst_write_file_decode_cdb,
+	.exec = scst_write_file_req_exec,
+	.end_response = scst_write_file_req_end_response,
+	.free = scst_write_file_req_free,
+};
+
+SCST_REQ_REGISTER(readdir)
 
 struct scst_readdir_params {
 	struct sto_decoder decoder;
@@ -223,8 +232,14 @@ scst_readdir_req_free(struct scst_req *req)
 	rte_free(readdir_req);
 }
 
-SCST_REQ_REGISTER(readdir)
+static struct scst_req_ops scst_readdir_ops = {
+	.decode_cdb = scst_readdir_decode_cdb,
+	.exec = scst_readdir_req_exec,
+	.end_response = scst_readdir_req_end_response,
+	.free = scst_readdir_req_free,
+};
 
+SCST_REQ_REGISTER(driver_init)
 
 struct scst_drv_name_list {
 	const char *names[SCST_DRV_COUNT];
@@ -393,8 +408,14 @@ scst_driver_init_req_free(struct scst_req *req)
 	rte_free(driver_init_req);
 }
 
-SCST_REQ_REGISTER(driver_init)
+static struct scst_req_ops scst_driver_init_ops = {
+	.decode_cdb = scst_driver_init_decode_cdb,
+	.exec = scst_driver_init_req_exec,
+	.end_response = scst_driver_init_req_end_response,
+	.free = scst_driver_init_req_free,
+};
 
+SCST_REQ_REGISTER(driver_deinit)
 
 struct scst_driver_deinit_params {
 	struct scst_drv_name_list drv_list;
@@ -547,7 +568,12 @@ scst_driver_deinit_req_free(struct scst_req *req)
 	rte_free(driver_deinit_req);
 }
 
-SCST_REQ_REGISTER(driver_deinit)
+static struct scst_req_ops scst_driver_deinit_ops = {
+	.decode_cdb = scst_driver_deinit_decode_cdb,
+	.exec = scst_driver_deinit_req_exec,
+	.end_response = scst_driver_deinit_req_end_response,
+	.free = scst_driver_deinit_req_free,
+};
 
 static const char *
 scst_handler_list_name(void)
@@ -565,6 +591,25 @@ static struct scst_readdir_params handler_list_constructor = {
 	.constructor = {
 		.name = scst_handler_list_name,
 		.dirpath = scst_handler_list_dirpath,
+	}
+};
+
+static const char *
+scst_driver_list_name(void)
+{
+	return spdk_sprintf_alloc("Drivers");
+}
+
+static char *
+scst_driver_list_dirpath(void)
+{
+	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
+}
+
+static struct scst_readdir_params driver_list_constructor = {
+	.constructor = {
+		.name = scst_driver_list_name,
+		.dirpath = scst_driver_list_dirpath,
 	}
 };
 
@@ -1002,25 +1047,6 @@ static struct scst_write_file_params target_del_constructor = {
 	}
 };
 
-static const char *
-scst_driver_list_name(void)
-{
-	return spdk_sprintf_alloc("Drivers");
-}
-
-static char *
-scst_driver_list_dirpath(void)
-{
-	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
-}
-
-static struct scst_readdir_params driver_list_constructor = {
-	.constructor = {
-		.name = scst_driver_list_name,
-		.dirpath = scst_driver_list_dirpath,
-	}
-};
-
 struct scst_group_params {
 	char *group;
 	char *driver;
@@ -1095,15 +1121,24 @@ static const struct scst_cdbops scst_op_table[] = {
 	{
 		.op.name = "driver_init",
 		.req_constructor = scst_driver_init_req_constructor,
+		.req_ops = &scst_driver_init_ops,
 	},
 	{
 		.op.name = "driver_deinit",
 		.req_constructor = scst_driver_deinit_req_constructor,
+		.req_ops = &scst_driver_deinit_ops,
 	},
 	{
 		.op.name = "handler_list",
 		.req_constructor = scst_readdir_req_constructor,
+		.req_ops = &scst_readdir_ops,
 		.params_constructor = &handler_list_constructor,
+	},
+	{
+		.op.name = "driver_list",
+		.req_constructor = scst_readdir_req_constructor,
+		.req_ops = &scst_readdir_ops,
+		.params_constructor = &driver_list_constructor,
 	},
 	{
 		.op.name = "dev_open",
@@ -1113,66 +1148,73 @@ static const struct scst_cdbops scst_op_table[] = {
 	{
 		.op.name = "dev_close",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &dev_close_constructor,
 	},
 	{
 		.op.name = "dev_resync",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &dev_resync_constructor,
 	},
 	{
 		.op.name = "dev_list",
 		.req_constructor = scst_readdir_req_constructor,
+		.req_ops = &scst_readdir_ops,
 		.params_constructor = &dev_list_constructor,
 	},
 	{
 		.op.name = "dgrp_add",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &dgrp_add_constructor,
 	},
 	{
 		.op.name = "dgrp_del",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &dgrp_del_constructor,
 	},
 	{
 		.op.name = "dgrp_list",
 		.req_constructor = scst_readdir_req_constructor,
+		.req_ops = &scst_readdir_ops,
 		.params_constructor = &dgrp_list_constructor,
 	},
 	{
 		.op.name = "dgrp_add_dev",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &dgrp_add_dev_constructor,
 	},
 	{
 		.op.name = "dgrp_del_dev",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &dgrp_del_dev_constructor,
 	},
 	{
 		.op.name = "target_add",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &target_add_constructor,
 	},
 	{
 		.op.name = "target_del",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &target_del_constructor,
-	},
-	{
-		.op.name = "driver_list",
-		.req_constructor = scst_readdir_req_constructor,
-		.params_constructor = &driver_list_constructor,
 	},
 	{
 		.op.name = "group_add",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &group_add_constructor,
 	},
 	{
 		.op.name = "group_del",
 		.req_constructor = scst_write_file_req_constructor,
+		.req_ops = &scst_write_file_ops,
 		.params_constructor = &group_del_constructor,
 	},
 };

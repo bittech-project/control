@@ -105,18 +105,27 @@ struct scst_req;
 struct scst_cdbops;
 
 typedef int (*scst_req_decode_cdb_t)(struct scst_req *req, const struct spdk_json_val *cdb);
+typedef int (*scst_req_exec_t)(struct scst_req *req);
+typedef void (*scst_req_end_response_t)(struct scst_req *req, struct spdk_json_write_ctx *w);
+typedef void (*scst_req_free_t)(struct scst_req *req);
+
+struct scst_req_ops {
+	scst_req_decode_cdb_t decode_cdb;
+	scst_req_exec_t exec;
+	scst_req_end_response_t end_response;
+	scst_req_free_t free;
+};
+
 typedef struct scst_req *(*scst_req_constructor_t)(const struct scst_cdbops *op);
 
 struct scst_cdbops {
 	struct sto_cdbops op;
 
 	scst_req_constructor_t req_constructor;
+	struct scst_req_ops *req_ops;
+
 	void *params_constructor;
 };
-
-typedef int (*scst_req_exec_t)(struct scst_req *req);
-typedef void (*scst_req_end_response_t)(struct scst_req *req, struct spdk_json_write_ctx *w);
-typedef void (*scst_req_free_t)(struct scst_req *req);
 
 struct scst_req {
 	struct sto_context ctx;
@@ -124,17 +133,18 @@ struct scst_req {
 	struct scst *scst;
 
 	const struct scst_cdbops *op;
-
-	scst_req_decode_cdb_t decode_cdb;
-	scst_req_exec_t exec;
-	scst_req_end_response_t end_response;
-	scst_req_free_t free;
 };
 
 static inline struct scst_req *
 to_scst_req(struct sto_context *ctx)
 {
 	return SPDK_CONTAINEROF(ctx, struct scst_req, ctx);
+}
+
+static inline struct scst_req_ops *
+scst_req_get_ops(struct scst_req *req)
+{
+	return req->op->req_ops;
 }
 
 #define SCST_REQ_DEFINE(req_type)							\
@@ -164,11 +174,6 @@ scst_ ## req_type ## _req_constructor(const struct scst_cdbops *op)			\
 											\
 	scst_req_init(req, op);								\
 											\
-	req->decode_cdb = scst_ ## req_type ## _decode_cdb;				\
-	req->exec = scst_ ## req_type ## _req_exec;					\
-	req->end_response = scst_ ## req_type ## _req_end_response;			\
-	req->free = scst_ ## req_type ## _req_free;					\
-											\
 	return req;									\
 }
 
@@ -179,7 +184,6 @@ struct scst_tgt *scst_find_tgt_by_name(struct scst *scst, const char *name);
 struct scst_driver *scst_find_drv_by_name(struct scst *scst, const char *name);
 
 void scst_req_init(struct scst_req *req, const struct scst_cdbops *op);
-int scst_req_submit(struct scst_req *req);
 
 static inline void
 scst_req_response(struct scst_req *req)

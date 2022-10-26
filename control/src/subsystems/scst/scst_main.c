@@ -230,9 +230,3 @@ scst_req_init(struct scst_req *req, const struct scst_cdbops *op)
 	req->scst = &g_scst;
 	req->op = op;
 }
-
-int
-scst_req_submit(struct scst_req *req)
-{
-	return req->exec(req);
-}
