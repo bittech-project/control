@@ -8,6 +8,7 @@
 #include <spdk/env_dpdk.h>
 
 #include "sto_server.h"
+#include "sto_rpc.h"
 
 #define UNIX_PATH_MAX 108
 

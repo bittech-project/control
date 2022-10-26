@@ -1,7 +1,7 @@
 #include <spdk/util.h>
 #include <spdk/likely.h>
 
-#include "sto_server.h"
+#include "sto_rpc.h"
 #include "sto_aio_back.h"
 
 struct sto_aio_read_params {

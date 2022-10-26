@@ -2,7 +2,7 @@
 #include <spdk/likely.h>
 #include <spdk/util.h>
 
-#include "sto_server.h"
+#include "sto_rpc.h"
 #include "sto_fstat_back.h"
 
 struct sto_fstat_params {

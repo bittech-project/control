@@ -2,7 +2,7 @@
 #include <spdk/likely.h>
 #include <spdk/util.h>
 
-#include "sto_server.h"
+#include "sto_rpc.h"
 #include "sto_subprocess_back.h"
 
 #define STO_SUBPROCESS_MAX_ARGS 256
