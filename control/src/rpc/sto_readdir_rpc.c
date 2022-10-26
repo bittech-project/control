@@ -48,7 +48,7 @@ sto_readdir_done(struct sto_readdir_req *req)
 
 	spdk_json_write_object_end(w);
 
-	sto_dirents_dump_json("dirents", NULL, &ctx->dirents, w);
+	sto_dirents_dump_json("dirents", &ctx->dirents, NULL, w);
 
 	spdk_json_write_array_end(w);
 

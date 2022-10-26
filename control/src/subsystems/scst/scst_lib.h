@@ -46,9 +46,10 @@ struct scst_readdir_req {
 	const char *name;
 	char *dirpath;
 
-	const char *exclude_str;
-
 	struct sto_dirents dirents;
+
+#define EXCLUDE_LIST_MAX 20
+	const char *exclude_list[EXCLUDE_LIST_MAX];
 };
 SCST_REQ_DEFINE(readdir)
 

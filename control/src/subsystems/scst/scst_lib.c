@@ -117,7 +117,7 @@ struct scst_readdir_params {
 	struct {
 		const char *(*name)(void);
 		char *(*dirpath)(void);
-		const char *(*exclude)(void);
+		int (*exclude)(const char **arr);
 	} constructor;
 };
 
@@ -140,9 +140,11 @@ scst_readdir_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 	}
 
 	if (p->constructor.exclude) {
-		readdir_req->exclude_str = p->constructor.exclude();
-		if (spdk_unlikely(!readdir_req->exclude_str)) {
-			SPDK_ERRLOG("Failed to alloc memory for exclude_str\n");
+		int rc;
+
+		rc = p->constructor.exclude(readdir_req->exclude_list);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Failed to init exclude list, rc=%d\n", rc);
 			goto free_dirpath;
 		}
 	}
@@ -202,8 +204,8 @@ scst_readdir_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *
 	spdk_json_write_array_begin(w);
 
 	sto_status_ok(w);
-	sto_dirents_dump_json(readdir_req->name, readdir_req->exclude_str,
-			      dirents, w);
+	sto_dirents_dump_json(readdir_req->name, dirents,
+			      readdir_req->exclude_list, w);
 
 	spdk_json_write_array_end(w);
 }
@@ -215,8 +217,6 @@ scst_readdir_req_free(struct scst_req *req)
 
 	free((char *) readdir_req->name);
 	free(readdir_req->dirpath);
-
-	free((char *) readdir_req->exclude_str);
 
 	sto_dirents_free(&readdir_req->dirents);
 
@@ -854,10 +854,12 @@ scst_dgrp_list_dirpath(void)
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEV_GROUPS);
 }
 
-static const char *
-scst_dgrp_list_exclude(void)
+static int
+scst_dgrp_list_exclude(const char **exclude_list)
 {
-	return spdk_sprintf_alloc(SCST_MGMT_IO);
+	exclude_list[0] = SCST_MGMT_IO;
+
+	return 0;
 }
 
 static struct scst_readdir_params dgrp_list_constructor = {

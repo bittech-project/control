@@ -251,9 +251,28 @@ sto_dirents_free(struct sto_dirents *dirents)
 	free(dirents->entries);
 }
 
+static bool
+find_match_str(const char **exclude_list, const char *str)
+{
+	const char *s;
+	int i;
+
+	if (!exclude_list) {
+		return false;
+	}
+
+	for (i = 0, s = exclude_list[0]; s; i++, s = exclude_list[i]) {
+		if (!strcmp(str, s)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void
-sto_dirents_dump_json(const char *name, const char *exclude_str,
-		      struct sto_dirents *dirents, struct spdk_json_write_ctx *w)
+sto_dirents_dump_json(const char *name, struct sto_dirents *dirents,
+		      const char **exclude_list, struct spdk_json_write_ctx *w)
 {
 	int i;
 
@@ -262,7 +281,7 @@ sto_dirents_dump_json(const char *name, const char *exclude_str,
 	spdk_json_write_named_array_begin(w, name);
 
 	for (i = 0; i < dirents->cnt; i++) {
-		if (exclude_str && !strcmp(dirents->entries[i], exclude_str)) {
+		if (find_match_str(exclude_list, dirents->entries[i])) {
 			continue;
 		}
 

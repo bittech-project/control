@@ -31,8 +31,8 @@ struct sto_readdir_req {
 
 int sto_dirents_init(struct sto_dirents *dirents, const char **dirent_list, int cnt);
 void sto_dirents_free(struct sto_dirents *dirents);
-void sto_dirents_dump_json(const char *name, const char *exclude_str,
-			   struct sto_dirents *dirents, struct spdk_json_write_ctx *w);
+void sto_dirents_dump_json(const char *name, struct sto_dirents *dirents,
+			   const char **exclude_list, struct spdk_json_write_ctx *w);
 
 int sto_readdir(const char *dirname, struct sto_readdir_ctx *ctx);
 void sto_readdir_free(struct sto_readdir_req *req);
