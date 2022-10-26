@@ -174,12 +174,12 @@ sto_readdir_back(const char *dirname, bool skip_hidden,
 	rc = sto_readdir_back_submit(req);
 	if (spdk_unlikely(rc)) {
 		printf("server: Failed to submit back readdir, rc=%d\n", rc);
-		goto free_readdir;
+		goto free_req;
 	}
 
 	return 0;
 
-free_readdir:
+free_req:
 	sto_readdir_back_free(req);
 
 	return rc;
