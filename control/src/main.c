@@ -2,7 +2,7 @@
 #include <spdk/log.h>
 #include <spdk/likely.h>
 
-#include "sto_server.h"
+#include <sto_server.h>
 
 /*
  * Usage function for printing parameters that are specific to this application
