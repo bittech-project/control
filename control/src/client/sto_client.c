@@ -209,6 +209,30 @@ sto_client_submit(struct sto_rpc_request *req)
 	return 0;
 }
 
+int
+sto_client_send(const char *method_name, sto_dump_params_json params_json,
+		resp_handler resp_handler, void *priv)
+{
+	struct sto_rpc_request *rpc_req;
+	int rc = 0;
+
+	rpc_req = sto_rpc_req_alloc(method_name, params_json, priv);
+	if (spdk_unlikely(!rpc_req)) {
+		SPDK_ERRLOG("Failed to alloc `%s` RPC req\n", method_name);
+		return -ENOMEM;
+	}
+
+	sto_rpc_req_init_cb(rpc_req, resp_handler);
+
+	rc = sto_client_submit(rpc_req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to send RPC req, rc=%d\n", rc);
+		sto_rpc_req_free(rpc_req);
+	}
+
+	return rc;
+}
+
 static void sto_client_group_close(struct sto_client_group *group);
 
 static int

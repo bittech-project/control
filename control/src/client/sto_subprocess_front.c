@@ -129,24 +129,8 @@ sto_subprocess_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write
 int
 sto_subprocess_run(struct sto_subprocess *subp)
 {
-	struct sto_rpc_request *rpc_req;
-	int rc = 0;
-
-	rpc_req = sto_rpc_req_alloc("subprocess", sto_subprocess_info_json, subp);
-	if (spdk_unlikely(!rpc_req)) {
-		SPDK_ERRLOG("Failed to alloc RPC req\n");
-		return -ENOMEM;
-	}
-
-	sto_rpc_req_init_cb(rpc_req, sto_subprocess_resp_handler);
-
-	rc = sto_client_submit(rpc_req);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to send RPC req, rc=%d\n", rc);
-		sto_rpc_req_free(rpc_req);
-	}
-
-	return rc;
+	return sto_client_send("subprocess", sto_subprocess_info_json,
+			       sto_subprocess_resp_handler, subp);
 }
 
 int
