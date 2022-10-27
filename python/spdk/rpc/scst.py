@@ -35,6 +35,16 @@ def scst_handler_list(client):
     }
     return client.call('control', params)
 
+def scst_driver_list(client):
+    """List all available drivers.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'driver_list',
+    }
+    return client.call('control', params)
+
 def scst_dev_open(client, name, handler, attributes):
     """Adds a new device using specified handler.
     Args:
@@ -177,13 +187,13 @@ def scst_target_del(client, target, driver):
     }
     return client.call('control', params)
 
-def scst_driver_list(client):
-    """List all available drivers.
+def scst_target_list(client):
+    """List all available targets.
     Args:
     """
     params = {
         'subsystem': 'scst',
-        'op': 'driver_list',
+        'op': 'target_list',
     }
     return client.call('control', params)
 

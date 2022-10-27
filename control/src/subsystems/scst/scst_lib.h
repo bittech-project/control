@@ -1,6 +1,7 @@
 #ifndef _SCST_LIB_H
 #define _SCST_LIB_H
 
+#include <spdk/queue.h>
 #include <spdk/util.h>
 
 #include "scst.h"
@@ -45,13 +46,26 @@ struct scst_readdir_req {
 
 	const char *name;
 	char *dirpath;
+#define EXCLUDE_LIST_MAX 20
+	const char *exclude_list[EXCLUDE_LIST_MAX];
 
 	struct sto_readdir_result result;
 
-#define EXCLUDE_LIST_MAX 20
-	const char *exclude_list[EXCLUDE_LIST_MAX];
+	void *priv;
 };
 SCST_REQ_DEFINE(readdir)
+
+struct scst_target_list_req {
+	struct scst_req req;
+
+	struct scst_readdir_req *driver_req;
+
+	struct scst_readdir_req **target_reqs;
+	int target_cnt;
+
+	int refcnt;
+};
+SCST_REQ_DEFINE(target_list)
 
 struct scst_driver_init_req {
 	struct scst_req req;

@@ -97,6 +97,13 @@ if __name__ == "__main__":
     p = subparsers.add_parser('scst_handler_list', help='List all available handlers')
     p.set_defaults(func=scst_handler_list)
 
+    def scst_driver_list(args):
+        json = rpc.scst.scst_driver_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_driver_list', help='List all available drivers')
+    p.set_defaults(func=scst_driver_list)
+
     def scst_dev_open(args):
         json = rpc.scst.scst_dev_open(args.client,
                                       name=args.name,
@@ -206,13 +213,6 @@ if __name__ == "__main__":
     p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
     p.set_defaults(func=scst_target_del)
 
-    def scst_driver_list(args):
-        json = rpc.scst.scst_driver_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_driver_list', help='List all available drivers')
-    p.set_defaults(func=scst_driver_list)
-
     def scst_group_add(args):
         json = rpc.scst.scst_group_add(args.client,
                                        group=args.group,
@@ -238,6 +238,13 @@ if __name__ == "__main__":
     p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
     p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
     p.set_defaults(func=scst_group_del)
+
+    def scst_target_list(args):
+        json = rpc.scst.scst_target_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_list', help='List all available targets')
+    p.set_defaults(func=scst_target_list)
 
     def check_called_name(name):
         if name in deprecated_aliases:
