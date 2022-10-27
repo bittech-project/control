@@ -8,6 +8,60 @@
 #include "sto_client.h"
 #include "sto_readdir_front.h"
 
+static const struct spdk_json_object_decoder sto_dirent_decoders[] = {
+	{"d_name", offsetof(struct sto_dirent, d_name), spdk_json_decode_string},
+	{"mode", offsetof(struct sto_dirent, mode), spdk_json_decode_uint32},
+};
+
+static int
+sto_dirent_decode(const struct spdk_json_val *val, void *out)
+{
+	struct sto_dirent *dirent = out;
+
+	return spdk_json_decode_object(val, sto_dirent_decoders,
+				       SPDK_COUNTOF(sto_dirent_decoders), dirent);
+}
+
+static int
+sto_dirents_decode(const struct spdk_json_val *val, void *out)
+{
+	struct sto_dirents *dirents = out;
+
+	return spdk_json_decode_array(val, sto_dirent_decode, dirents->dirents,
+				      STO_DIRENT_MAX_CNT, &dirents->cnt, sizeof(struct sto_dirent));
+}
+
+static const struct spdk_json_object_decoder sto_readdir_result_decoders[] = {
+	{"returncode", offsetof(struct sto_readdir_result, returncode), spdk_json_decode_int32},
+	{"dirents", offsetof(struct sto_readdir_result, dirents), sto_dirents_decode},
+};
+
+static void
+sto_dirent_free(struct sto_dirent *dirent)
+{
+	free(dirent->d_name);
+}
+
+static void
+sto_dirents_free(struct sto_dirents *dirents)
+{
+	int i;
+
+	if (spdk_unlikely(!dirents->cnt)) {
+		return;
+	}
+
+	for (i = 0; i < dirents->cnt; i++) {
+		sto_dirent_free(&dirents->dirents[i]);
+	}
+}
+
+void
+sto_readdir_result_free(struct sto_readdir_result *result)
+{
+	sto_dirents_free(&result->dirents);
+}
+
 static struct sto_readdir_req *
 sto_readdir_alloc(const char *dirname)
 {
@@ -49,104 +103,24 @@ sto_readdir_free(struct sto_readdir_req *req)
 	rte_free(req);
 }
 
-#define STO_DIRENT_MAX_CNT 256
-
-struct sto_dirent_list {
-	const char *entries[STO_DIRENT_MAX_CNT];
-	size_t cnt;
-};
-
-static int
-sto_dirent_list_decode(const struct spdk_json_val *val, void *out)
-{
-	struct sto_dirent_list *dirent_list = out;
-
-	return spdk_json_decode_array(val, spdk_json_decode_string, dirent_list->entries,
-				      STO_DIRENT_MAX_CNT, &dirent_list->cnt, sizeof(char *));
-}
-
-static void
-sto_dirent_list_free(struct sto_dirent_list *dirent_list)
-{
-	ssize_t i;
-
-	for (i = 0; i < dirent_list->cnt; i++) {
-		free((char *) dirent_list->entries[i]);
-	}
-}
-
-struct sto_readdir_result {
-	int returncode;
-	struct sto_dirent_list dirent_list;
-};
-
-static void *
-sto_readdir_result_alloc(void)
-{
-	return calloc(1, sizeof(struct sto_readdir_result));
-}
-
-static void
-sto_readdir_result_free(void *arg)
-{
-	struct sto_readdir_result *result = arg;
-	sto_dirent_list_free(&result->dirent_list);
-	free(result);
-}
-
-static const struct spdk_json_object_decoder sto_readdir_result_decoders[] = {
-	{"returncode", offsetof(struct sto_readdir_result, returncode), spdk_json_decode_int32},
-	{"dirents", offsetof(struct sto_readdir_result, dirent_list), sto_dirent_list_decode},
-};
-
-static struct sto_decoder sto_readdir_result_decoder =
-	STO_DECODER_INITIALIZER(sto_readdir_result_decoders,
-				sto_readdir_result_alloc, sto_readdir_result_free);
-
-static int
-sto_readdir_parse_result(void *priv, void *params)
-{
-	struct sto_readdir_req *req = priv;
-	struct sto_readdir_result *result = params;
-	struct sto_dirent_list *dirent_list;
-	int rc;
-
-	SPDK_NOTICELOG("GLEB: Get result from READDIR response: returncode[%d], dir_cnt %d\n",
-		       result->returncode, (int) result->dirent_list.cnt);
-
-	req->returncode = result->returncode;
-
-	if (spdk_unlikely(req->returncode)) {
-		goto out;
-	}
-
-	dirent_list = &result->dirent_list;
-
-	rc = sto_dirents_init(req->dirents, dirent_list->entries, dirent_list->cnt);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to copy dirents, rc=%d\n", rc);
-		req->returncode = rc;
-		goto out;
-	}
-
-out:
-	return 0;
-}
-
 static void
 sto_readdir_resp_handler(struct sto_rpc_request *rpc_req,
 			 struct spdk_jsonrpc_client_response *resp)
 {
 	struct sto_readdir_req *req = rpc_req->priv;
-	int rc;
+	struct sto_readdir_result *result = req->result;
 
-	rc = sto_decoder_parse(&sto_readdir_result_decoder, resp->result,
-			       sto_readdir_parse_result, req);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to parse readdir result, rc=%d\n", rc);
-		req->returncode = rc;
+	if (spdk_json_decode_object(resp->result, sto_readdir_result_decoders,
+				    SPDK_COUNTOF(sto_readdir_result_decoders), result)) {
+		SPDK_ERRLOG("Failed to decode readdir result\n");
+		result->returncode = -ENOMEM;
+		goto out;
 	}
 
+	SPDK_NOTICELOG("GLEB: Get result from READDIR response: returncode[%d], dir_cnt %d\n",
+		       result->returncode, (int) result->dirents.cnt);
+
+out:
 	sto_rpc_req_free(rpc_req);
 
 	req->readdir_done(req);
@@ -173,7 +147,7 @@ sto_readdir_submit(struct sto_readdir_req *req)
 }
 
 int
-sto_readdir(const char *dirname, struct sto_readdir_ctx *ctx)
+sto_readdir(const char *dirname, struct sto_readdir_args *args)
 {
 	struct sto_readdir_req *req;
 	int rc;
@@ -184,9 +158,8 @@ sto_readdir(const char *dirname, struct sto_readdir_ctx *ctx)
 		return -ENOMEM;
 	}
 
-	sto_readdir_init_cb(req, ctx->readdir_done, ctx->priv);
-
-	req->dirents = ctx->dirents;
+	req->result = args->result;
+	sto_readdir_init_cb(req, args->readdir_done, args->priv);
 
 	rc = sto_readdir_submit(req);
 	if (spdk_unlikely(rc)) {
@@ -200,55 +173,6 @@ free_req:
 	sto_readdir_free(req);
 
 	return rc;
-}
-
-int
-sto_dirents_init(struct sto_dirents *dirents, const char **entries, int cnt)
-{
-	int i, j;
-
-	dirents->entries = calloc(cnt, sizeof(char *));
-	if (spdk_unlikely(!dirents->entries)) {
-		SPDK_ERRLOG("Failed to alloc %d dirents\n", cnt);
-		return -ENOMEM;
-	}
-
-	for (i = 0; i < cnt; i++) {
-		dirents->entries[i] = strdup(entries[i]);
-		if (spdk_unlikely(!dirents->entries[i])) {
-			SPDK_ERRLOG("Failed to copy %d dirent\n", i);
-			goto free_dirents;
-		}
-	}
-
-	dirents->cnt = cnt;
-
-	return 0;
-
-free_dirents:
-	for (j = 0; j < i; j++) {
-		free((char *) dirents->entries[j]);
-	}
-
-	free(dirents->entries);
-
-	return -ENOMEM;
-}
-
-void
-sto_dirents_free(struct sto_dirents *dirents)
-{
-	int i;
-
-	if (spdk_unlikely(!dirents->cnt)) {
-		return;
-	}
-
-	for (i = 0; i < dirents->cnt; i++) {
-		free((char *) dirents->entries[i]);
-	}
-
-	free(dirents->entries);
 }
 
 static bool
@@ -270,7 +194,7 @@ find_match_str(const char **exclude_list, const char *str)
 }
 
 void
-sto_dirents_dump_json(const char *name, struct sto_dirents *dirents,
+sto_dirents_info_json(const char *name, struct sto_dirents *dirents,
 		      const char **exclude_list, struct spdk_json_write_ctx *w)
 {
 	int i;
@@ -280,11 +204,13 @@ sto_dirents_dump_json(const char *name, struct sto_dirents *dirents,
 	spdk_json_write_named_array_begin(w, name);
 
 	for (i = 0; i < dirents->cnt; i++) {
-		if (find_match_str(exclude_list, dirents->entries[i])) {
+		struct sto_dirent *dirent = &dirents->dirents[i];
+
+		if (find_match_str(exclude_list, dirent->d_name)) {
 			continue;
 		}
 
-		spdk_json_write_string(w, dirents->entries[i]);
+		spdk_json_write_string(w, dirent->d_name);
 	}
 
 	spdk_json_write_array_end(w);

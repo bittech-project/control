@@ -173,9 +173,11 @@ static void
 scst_readdir_done(struct sto_readdir_req *rd_req)
 {
 	struct scst_req *req = rd_req->priv;
+	struct scst_readdir_req *readdir_req = to_readdir_req(req);
+	struct sto_readdir_result *result = &readdir_req->result;
 	int rc;
 
-	rc = rd_req->returncode;
+	rc = result->returncode;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to readdir\n");
@@ -193,30 +195,23 @@ static int
 scst_readdir_req_exec(struct scst_req *req)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-	struct sto_readdir_ctx ctx = {
-		.dirents = &readdir_req->dirents,
+	struct sto_readdir_args args = {
 		.priv = req,
 		.readdir_done = scst_readdir_done,
+		.result = &readdir_req->result,
 	};
 
-	return sto_readdir(readdir_req->dirpath, &ctx);
+	return sto_readdir(readdir_req->dirpath, &args);
 }
 
 static void
 scst_readdir_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
-	struct sto_dirents *dirents;
+	struct sto_readdir_result *result = &readdir_req->result;
 
-	dirents = &readdir_req->dirents;
-
-	spdk_json_write_array_begin(w);
-
-	sto_status_ok(w);
-	sto_dirents_dump_json(readdir_req->name, dirents,
+	sto_dirents_info_json(readdir_req->name, &result->dirents,
 			      readdir_req->exclude_list, w);
-
-	spdk_json_write_array_end(w);
 }
 
 static void
@@ -227,7 +222,7 @@ scst_readdir_req_free(struct scst_req *req)
 	free((char *) readdir_req->name);
 	free(readdir_req->dirpath);
 
-	sto_dirents_free(&readdir_req->dirents);
+	sto_readdir_result_free(&readdir_req->result);
 
 	rte_free(readdir_req);
 }

@@ -1,4 +1,5 @@
 #include <spdk/likely.h>
+#include <spdk/string.h>
 
 #include "sto_readdir_back.h"
 
@@ -11,6 +12,71 @@ static struct sto_exec_ops readdir_ops = {
 	.exec_done = sto_readdir_exec_done,
 };
 
+static struct sto_dirent *
+sto_readdir_alloc_dirent(const char *d_name)
+{
+	struct sto_dirent *dirent;
+
+	dirent = calloc(1, sizeof(*dirent));
+	if (spdk_unlikely(!dirent)) {
+		printf("server: Failed to alloc dirent\n");
+		return NULL;
+	}
+
+	dirent->d_name = strdup(d_name);
+	if (spdk_unlikely(!dirent->d_name)) {
+		printf("server: Failed to alloc dirent name\n");
+		goto free_dirent;
+	}
+
+	return dirent;
+
+free_dirent:
+	free(dirent);
+
+	return NULL;
+}
+
+static int
+sto_dirent_get_stat(struct sto_dirent *dirent, const char *path)
+{
+	struct stat sb;
+	char *full_path;
+	int rc = 0;
+
+	full_path = spdk_sprintf_alloc("%s/%s", path, dirent->d_name);
+	if (spdk_unlikely(!full_path)) {
+		return -ENOMEM;
+	}
+
+	if (stat(full_path, &sb) == -1) {
+		printf("server: Failed to get stat for file %s: %s\n",
+		       full_path, strerror(errno));
+		rc = -errno;
+		goto out;
+	}
+
+	dirent->mode = sb.st_mode;
+
+out:
+	free(full_path);
+
+	return rc;
+}
+
+static void
+sto_readdir_dirents_free(struct sto_readdir_back_req *req)
+{
+	struct sto_dirent *dirent, *tmp;
+
+	TAILQ_FOREACH_SAFE(dirent, &req->dirent_list, list, tmp) {
+		TAILQ_REMOVE(&req->dirent_list, dirent, list);
+
+		free(dirent->d_name);
+		free(dirent);
+	}
+}
+
 static void
 sto_readdir_exec_done(void *arg, int rc)
 {
@@ -18,44 +84,6 @@ sto_readdir_exec_done(void *arg, int rc)
 
 	req->returncode = rc;
 	req->readdir_back_done(req);
-}
-
-static struct sto_dirent *
-sto_readdir_alloc_dirent(const char *d_name)
-{
-	struct sto_dirent *d;
-
-	d = calloc(1, sizeof(*d));
-	if (spdk_unlikely(!d)) {
-		printf("server: Failed to alloc dirent\n");
-		return NULL;
-	}
-
-	d->name = strdup(d_name);
-	if (spdk_unlikely(!d->name)) {
-		printf("server: Failed to alloc dirent name\n");
-		goto free_dirent;
-	}
-
-	return d;
-
-free_dirent:
-	free(d);
-
-	return NULL;
-}
-
-static void
-sto_readdir_dirents_free(struct sto_readdir_back_req *req)
-{
-	struct sto_dirent *d, *tmp;
-
-	TAILQ_FOREACH_SAFE(d, &req->dirent_list, list, tmp) {
-		TAILQ_REMOVE(&req->dirent_list, d, list);
-
-		free(d->name);
-		free(d);
-	}
 }
 
 static int
@@ -75,21 +103,28 @@ sto_readdir_exec(void *arg)
 	entry = readdir(dir);
 
 	while (entry != NULL) {
-		struct sto_dirent *d;
+		struct sto_dirent *dirent;
 
 		if (req->skip_hidden && entry->d_name[0] == '.') {
 			entry = readdir(dir);
 			continue;
 		}
 
-		d = sto_readdir_alloc_dirent(entry->d_name);
-		if (spdk_unlikely(!d)) {
+		dirent = sto_readdir_alloc_dirent(entry->d_name);
+		if (spdk_unlikely(!dirent)) {
 			sto_readdir_dirents_free(req);
 			printf("server: Failed to alloc dirent\n");
 			break;
 		}
 
-		TAILQ_INSERT_TAIL(&req->dirent_list, d, list);
+		rc = sto_dirent_get_stat(dirent, req->dirname);
+		if (spdk_unlikely(rc)) {
+			sto_readdir_dirents_free(req);
+			printf("server: Failed to dirent to get stat\n");
+			break;
+		}
+
+		TAILQ_INSERT_TAIL(&req->dirent_list, dirent, list);
 
 		entry = readdir(dir);
 	}
@@ -97,6 +132,7 @@ sto_readdir_exec(void *arg)
 	rc = closedir(dir);
 	if (spdk_unlikely(rc == -1)) {
 		printf("server: Failed to close %s dir\n", req->dirname);
+		rc = -errno;
 	}
 
 	return rc;

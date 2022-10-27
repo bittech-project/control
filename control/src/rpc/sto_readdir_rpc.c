@@ -22,13 +22,13 @@ static const struct spdk_json_object_decoder sto_readdir_decoders[] = {
 
 struct sto_readdir_rpc_ctx {
 	struct spdk_jsonrpc_request *request;
-	struct sto_dirents dirents;
+	struct sto_readdir_result result;
 };
 
 static void
 sto_readdir_rpc_ctx_free(struct sto_readdir_rpc_ctx *ctx)
 {
-	sto_dirents_free(&ctx->dirents);
+	sto_readdir_result_free(&ctx->result);
 	free(ctx);
 }
 
@@ -36,6 +36,7 @@ static void
 sto_readdir_done(struct sto_readdir_req *req)
 {
 	struct sto_readdir_rpc_ctx *ctx = req->priv;
+	struct sto_readdir_result *result = &ctx->result;
 	struct spdk_json_write_ctx *w;
 
 	w = spdk_jsonrpc_begin_result(ctx->request);
@@ -44,16 +45,15 @@ sto_readdir_done(struct sto_readdir_req *req)
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_int32(w, "returncode", req->returncode);
+	spdk_json_write_named_int32(w, "returncode", result->returncode);
 
 	spdk_json_write_object_end(w);
 
-	sto_dirents_dump_json("dirents", &ctx->dirents, NULL, w);
+	sto_dirents_info_json("dirents", &result->dirents, NULL, w);
 
 	spdk_json_write_array_end(w);
 
 	spdk_jsonrpc_end_result(ctx->request, w);
-
 
 	sto_readdir_rpc_ctx_free(ctx);
 	sto_readdir_free(req);
@@ -64,7 +64,7 @@ sto_rpc_readdir(struct spdk_jsonrpc_request *request, const struct spdk_json_val
 {
 	struct sto_readdir_rpc_ctx *rpc_ctx;
 	struct sto_readdir_params rd_params = {};
-	struct sto_readdir_ctx ctx = {};
+	struct sto_readdir_args args = {};
 	int rc;
 
 	if (spdk_json_decode_object(params, sto_readdir_decoders,
@@ -83,11 +83,11 @@ sto_rpc_readdir(struct spdk_jsonrpc_request *request, const struct spdk_json_val
 
 	rpc_ctx->request = request;
 
-	ctx.dirents = &rpc_ctx->dirents;
-	ctx.priv = rpc_ctx;
-	ctx.readdir_done = sto_readdir_done;
+	args.result = &rpc_ctx->result;
+	args.priv = rpc_ctx;
+	args.readdir_done = sto_readdir_done;
 
-	rc = sto_readdir(rd_params.dirname, &ctx);
+	rc = sto_readdir(rd_params.dirname, &args);
 	if (spdk_unlikely(rc)) {
 		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));
 		goto free_rpc_ctx;
