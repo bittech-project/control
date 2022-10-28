@@ -32,13 +32,13 @@
 
 /* - ./srpt/src/ib_srpt.ko */
 
-struct scst_write_file_req {
+struct scst_write_req {
 	struct scst_req req;
 
 	const char *file;
 	char *data;
 };
-SCST_REQ_DEFINE(write_file)
+SCST_REQ_DEFINE(write)
 
 struct scst_readdir_req {
 	struct scst_req req;

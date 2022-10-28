@@ -9,9 +9,9 @@
 #include "scst_lib.h"
 #include "sto_aio_front.h"
 
-SCST_REQ_REGISTER(write_file)
+SCST_REQ_REGISTER(write)
 
-struct scst_write_file_params {
+struct scst_write_params {
 	struct sto_decoder decoder;
 
 	struct {
@@ -19,14 +19,14 @@ struct scst_write_file_params {
 		char *(*data)(void *params);
 	} constructor;
 
-	struct scst_write_file_req *req;
+	struct scst_write_req *req;
 };
 
 static int
-scst_write_file_params_parse(void *priv, void *params)
+scst_write_params_parse(void *priv, void *params)
 {
-	struct scst_write_file_params *p = priv;
-	struct scst_write_file_req *req = p->req;
+	struct scst_write_params *p = priv;
+	struct scst_write_req *req = p->req;
 	int rc;
 
 	req->file = p->constructor.file_path(params);
@@ -51,15 +51,15 @@ free_file:
 }
 
 static int
-scst_write_file_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
+scst_write_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
-	struct scst_write_file_params *p = req->op->params_constructor;
+	struct scst_write_req *write_req = to_write_req(req);
+	struct scst_write_params *p = req->op->params_constructor;
 	int rc = 0;
 
-	p->req = write_file_req;
+	p->req = write_req;
 
-	rc = sto_decoder_parse(&p->decoder, cdb, scst_write_file_params_parse, p);
+	rc = sto_decoder_parse(&p->decoder, cdb, scst_write_params_parse, p);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to parse CDB\n");
 	}
@@ -68,7 +68,7 @@ scst_write_file_decode_cdb(struct scst_req *req, const struct spdk_json_val *cdb
 }
 
 static void
-scst_write_file_done(struct sto_aio *aio)
+scst_write_done(struct sto_aio *aio)
 {
 	struct scst_req *req = aio->priv;
 	int rc;
@@ -86,36 +86,36 @@ scst_write_file_done(struct sto_aio *aio)
 }
 
 static int
-scst_write_file_req_exec(struct scst_req *req)
+scst_write_req_exec(struct scst_req *req)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_write_req *write_req = to_write_req(req);
 
-	return sto_aio_write_string(write_file_req->file, write_file_req->data,
-				    scst_write_file_done, req);
+	return sto_aio_write_string(write_req->file, write_req->data,
+				    scst_write_done, req);
 }
 
 static void
-scst_write_file_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
+scst_write_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *w)
 {
 	sto_status_ok(w);
 }
 
 static void
-scst_write_file_req_free(struct scst_req *req)
+scst_write_req_free(struct scst_req *req)
 {
-	struct scst_write_file_req *write_file_req = to_write_file_req(req);
+	struct scst_write_req *write_req = to_write_req(req);
 
-	free((char *) write_file_req->file);
-	free(write_file_req->data);
+	free((char *) write_req->file);
+	free(write_req->data);
 
-	rte_free(write_file_req);
+	rte_free(write_req);
 }
 
-static struct scst_req_ops scst_write_file_ops = {
-	.decode_cdb = scst_write_file_decode_cdb,
-	.exec = scst_write_file_req_exec,
-	.end_response = scst_write_file_req_end_response,
-	.free = scst_write_file_req_free,
+static struct scst_req_ops scst_write_ops = {
+	.decode_cdb = scst_write_decode_cdb,
+	.exec = scst_write_req_exec,
+	.end_response = scst_write_req_end_response,
+	.free = scst_write_req_free,
 };
 
 SCST_REQ_REGISTER(readdir)
@@ -698,7 +698,7 @@ scst_dev_open_data(void *arg)
 	return data;
 }
 
-static struct scst_write_file_params dev_open_constructor = {
+static struct scst_write_params dev_open_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_open_decoders,
 					   scst_dev_open_params_alloc, scst_dev_open_params_free),
 	.constructor = {
@@ -748,7 +748,7 @@ scst_dev_close_data(void *arg)
 	return spdk_sprintf_alloc("del_device %s", params->name);
 }
 
-static struct scst_write_file_params dev_close_constructor = {
+static struct scst_write_params dev_close_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_close_decoders,
 					   scst_dev_close_params_alloc, scst_dev_close_params_free),
 	.constructor = {
@@ -793,7 +793,7 @@ scst_dev_resync_data(void *arg)
 	return spdk_sprintf_alloc("1");
 }
 
-static struct scst_write_file_params dev_resync_constructor = {
+static struct scst_write_params dev_resync_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_resync_decoders,
 					   scst_dev_resync_params_alloc, scst_dev_resync_params_free),
 	.constructor = {
@@ -864,7 +864,7 @@ scst_dgrp_del_data(void *arg)
 	return spdk_sprintf_alloc("del %s", params->name);
 }
 
-static struct scst_write_file_params dgrp_add_constructor = {
+static struct scst_write_params dgrp_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
 					   scst_dgrp_params_alloc, scst_dgrp_params_free),
 	.constructor = {
@@ -873,7 +873,7 @@ static struct scst_write_file_params dgrp_add_constructor = {
 	}
 };
 
-static struct scst_write_file_params dgrp_del_constructor = {
+static struct scst_write_params dgrp_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
 					   scst_dgrp_params_alloc, scst_dgrp_params_free),
 	.constructor = {
@@ -958,7 +958,7 @@ scst_dgrp_del_dev_data(void *arg)
 	return spdk_sprintf_alloc("del %s", params->dev_name);
 }
 
-static struct scst_write_file_params dgrp_add_dev_constructor = {
+static struct scst_write_params dgrp_add_dev_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
 					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
 	.constructor = {
@@ -967,7 +967,7 @@ static struct scst_write_file_params dgrp_add_dev_constructor = {
 	}
 };
 
-static struct scst_write_file_params dgrp_del_dev_constructor = {
+static struct scst_write_params dgrp_del_dev_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
 					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
 	.constructor = {
@@ -1024,7 +1024,7 @@ scst_target_del_data(void *arg)
 	return spdk_sprintf_alloc("del_target %s", params->target);
 }
 
-static struct scst_write_file_params target_add_constructor = {
+static struct scst_write_params target_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
 					   scst_target_params_alloc, scst_target_params_free),
 	.constructor = {
@@ -1033,7 +1033,7 @@ static struct scst_write_file_params target_add_constructor = {
 	}
 };
 
-static struct scst_write_file_params target_del_constructor = {
+static struct scst_write_params target_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
 					   scst_target_params_alloc, scst_target_params_free),
 	.constructor = {
@@ -1093,7 +1093,7 @@ scst_group_del_data(void *arg)
 	return spdk_sprintf_alloc("del %s", params->group);
 }
 
-static struct scst_write_file_params group_add_constructor = {
+static struct scst_write_params group_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
 					   scst_group_params_alloc, scst_group_params_free),
 	.constructor = {
@@ -1102,7 +1102,7 @@ static struct scst_write_file_params group_add_constructor = {
 	}
 };
 
-static struct scst_write_file_params group_del_constructor = {
+static struct scst_write_params group_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
 					   scst_group_params_alloc, scst_group_params_free),
 	.constructor = {
@@ -1137,19 +1137,20 @@ static const struct scst_cdbops scst_op_table[] = {
 	},
 	{
 		.op.name = "dev_open",
-		.req_constructor = scst_write_file_req_constructor,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &dev_open_constructor,
 	},
 	{
 		.op.name = "dev_close",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &dev_close_constructor,
 	},
 	{
 		.op.name = "dev_resync",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &dev_resync_constructor,
 	},
 	{
@@ -1160,14 +1161,14 @@ static const struct scst_cdbops scst_op_table[] = {
 	},
 	{
 		.op.name = "dgrp_add",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &dgrp_add_constructor,
 	},
 	{
 		.op.name = "dgrp_del",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &dgrp_del_constructor,
 	},
 	{
@@ -1178,38 +1179,38 @@ static const struct scst_cdbops scst_op_table[] = {
 	},
 	{
 		.op.name = "dgrp_add_dev",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &dgrp_add_dev_constructor,
 	},
 	{
 		.op.name = "dgrp_del_dev",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &dgrp_del_dev_constructor,
 	},
 	{
 		.op.name = "target_add",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &target_add_constructor,
 	},
 	{
 		.op.name = "target_del",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &target_del_constructor,
 	},
 	{
 		.op.name = "group_add",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &group_add_constructor,
 	},
 	{
 		.op.name = "group_del",
-		.req_constructor = scst_write_file_req_constructor,
-		.req_ops = &scst_write_file_ops,
+		.req_constructor = scst_write_req_constructor,
+		.req_ops = &scst_write_ops,
 		.params_constructor = &group_del_constructor,
 	},
 };
