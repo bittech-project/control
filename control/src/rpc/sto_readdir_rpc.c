@@ -33,9 +33,9 @@ sto_readdir_rpc_ctx_free(struct sto_readdir_rpc_ctx *ctx)
 }
 
 static void
-sto_readdir_done(struct sto_readdir_req *req)
+sto_readdir_done(void *priv)
 {
-	struct sto_readdir_rpc_ctx *ctx = req->priv;
+	struct sto_readdir_rpc_ctx *ctx = priv;
 	struct sto_readdir_result *result = &ctx->result;
 	struct spdk_json_write_ctx *w;
 
@@ -56,7 +56,6 @@ sto_readdir_done(struct sto_readdir_req *req)
 	spdk_jsonrpc_end_result(ctx->request, w);
 
 	sto_readdir_rpc_ctx_free(ctx);
-	sto_readdir_free(req);
 }
 
 static void

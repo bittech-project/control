@@ -2,7 +2,7 @@
 #define _STO_READDIR_FRONT_H_
 
 struct sto_readdir_req;
-typedef void (*readdir_done_t)(struct sto_readdir_req *req);
+typedef void (*readdir_done_t)(void *priv);
 
 struct sto_dirent {
 	char *d_name;
@@ -43,7 +43,6 @@ struct sto_readdir_req {
 void sto_readdir_result_free(struct sto_readdir_result *result);
 
 int sto_readdir(const char *dirname, struct sto_readdir_args *args);
-void sto_readdir_free(struct sto_readdir_req *req);
 
 void sto_dirents_info_json(const char *name, struct sto_dirents *dirents,
 			   const char **exclude_list, struct spdk_json_write_ctx *w);

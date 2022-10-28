@@ -170,9 +170,9 @@ free_name:
 }
 
 static void
-scst_readdir_done(struct sto_readdir_req *rd_req)
+scst_readdir_done(void *priv)
 {
-	struct scst_req *req = rd_req->priv;
+	struct scst_req *req = priv;
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 	struct sto_readdir_result *result = &readdir_req->result;
 	int rc;
@@ -186,8 +186,6 @@ scst_readdir_done(struct sto_readdir_req *rd_req)
 	}
 
 out:
-	sto_readdir_free(rd_req);
-
 	scst_req_response(req);
 }
 

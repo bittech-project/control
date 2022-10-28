@@ -96,7 +96,7 @@ sto_readdir_init_cb(struct sto_readdir_req *req, readdir_done_t readdir_done, vo
 	req->priv = priv;
 }
 
-void
+static void
 sto_readdir_free(struct sto_readdir_req *req)
 {
 	free((char *) req->dirname);
@@ -110,6 +110,8 @@ sto_readdir_resp_handler(struct sto_rpc_request *rpc_req,
 	struct sto_readdir_req *req = rpc_req->priv;
 	struct sto_readdir_result *result = req->result;
 
+	sto_rpc_req_free(rpc_req);
+
 	if (spdk_json_decode_object(resp->result, sto_readdir_result_decoders,
 				    SPDK_COUNTOF(sto_readdir_result_decoders), result)) {
 		SPDK_ERRLOG("Failed to decode readdir result\n");
@@ -121,9 +123,9 @@ sto_readdir_resp_handler(struct sto_rpc_request *rpc_req,
 		       result->returncode, (int) result->dirents.cnt);
 
 out:
-	sto_rpc_req_free(rpc_req);
+	req->readdir_done(req->priv);
 
-	req->readdir_done(req);
+	sto_readdir_free(req);
 }
 
 static void
