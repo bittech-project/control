@@ -207,9 +207,12 @@ scst_readdir_req_end_response(struct scst_req *req, struct spdk_json_write_ctx *
 {
 	struct scst_readdir_req *readdir_req = to_readdir_req(req);
 	struct sto_readdir_result *result = &readdir_req->result;
+	struct sto_dirents_json_cfg cfg = {
+		.name = readdir_req->name,
+		.exclude_list = readdir_req->exclude_list,
+	};
 
-	sto_dirents_info_json(readdir_req->name, &result->dirents,
-			      readdir_req->exclude_list, w);
+	sto_dirents_info_json(&result->dirents, &cfg, w);
 }
 
 static void

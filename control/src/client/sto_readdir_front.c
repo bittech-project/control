@@ -196,19 +196,23 @@ find_match_str(const char **exclude_list, const char *str)
 }
 
 void
-sto_dirents_info_json(const char *name, struct sto_dirents *dirents,
-		      const char **exclude_list, struct spdk_json_write_ctx *w)
+sto_dirents_info_json(struct sto_dirents *dirents,
+		      struct sto_dirents_json_cfg *cfg, struct spdk_json_write_ctx *w)
 {
 	int i;
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_array_begin(w, name);
+	spdk_json_write_named_array_begin(w, cfg->name);
 
 	for (i = 0; i < dirents->cnt; i++) {
 		struct sto_dirent *dirent = &dirents->dirents[i];
 
-		if (find_match_str(exclude_list, dirent->d_name)) {
+		if (find_match_str(cfg->exclude_list, dirent->d_name)) {
+			continue;
+		}
+
+		if (cfg->type && ((dirent->mode & S_IFMT) != cfg->type)) {
 			continue;
 		}
 

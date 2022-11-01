@@ -38,6 +38,9 @@ sto_readdir_done(void *priv)
 	struct sto_readdir_rpc_ctx *ctx = priv;
 	struct sto_readdir_result *result = &ctx->result;
 	struct spdk_json_write_ctx *w;
+	struct sto_dirents_json_cfg cfg = {
+		.name = "dirents",
+	};
 
 	w = spdk_jsonrpc_begin_result(ctx->request);
 
@@ -49,7 +52,7 @@ sto_readdir_done(void *priv)
 
 	spdk_json_write_object_end(w);
 
-	sto_dirents_info_json("dirents", &result->dirents, NULL, w);
+	sto_dirents_info_json(&result->dirents, &cfg, w);
 
 	spdk_json_write_array_end(w);
 
