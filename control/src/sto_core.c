@@ -11,45 +11,45 @@
 #include "sto_subsystem.h"
 #include "err.h"
 
-#define STO_REQ_POLL_PERIOD	1000 /* 1ms */
+#define STO_CORE_POLL_PERIOD	1000 /* 1ms */
 
-struct spdk_poller *g_sto_req_poller;
+struct spdk_poller *g_sto_core_poller;
 
-static TAILQ_HEAD(sto_req_list, sto_req) g_sto_req_list
-	= TAILQ_HEAD_INITIALIZER(g_sto_req_list);
+static TAILQ_HEAD(sto_core_req_list, sto_core_req) g_sto_core_req_list
+	= TAILQ_HEAD_INITIALIZER(g_sto_core_req_list);
 
 
-static void sto_process_req(struct sto_req *req);
+static void sto_process_req(struct sto_core_req *req);
 
-static const char *const sto_req_state_names[] = {
-	[STO_REQ_STATE_PARSE]		= "STATE_PARSE",
-	[STO_REQ_STATE_EXEC]		= "STATE_EXEC",
-	[STO_REQ_STATE_RESPONSE]	= "STATE_RESPONSE",
+static const char *const sto_core_req_state_names[] = {
+	[STO_CORE_REQ_STATE_PARSE]	= "STATE_PARSE",
+	[STO_CORE_REQ_STATE_EXEC]	= "STATE_EXEC",
+	[STO_CORE_REQ_STATE_RESPONSE]	= "STATE_RESPONSE",
 };
 
 const char *
-sto_req_state_name(enum sto_req_state state)
+sto_core_req_state_name(enum sto_core_req_state state)
 {
 	size_t index = state;
 
-	if (spdk_unlikely(index >= SPDK_COUNTOF(sto_req_state_names))) {
+	if (spdk_unlikely(index >= SPDK_COUNTOF(sto_core_req_state_names))) {
 		assert(0);
 	}
 
-	return sto_req_state_names[index];
+	return sto_core_req_state_names[index];
 }
 
 static int
-sto_req_poll(void *ctx)
+sto_core_poll(void *ctx)
 {
-	struct sto_req_list req_list = TAILQ_HEAD_INITIALIZER(req_list);
-	struct sto_req *req, *tmp;
+	struct sto_core_req_list req_list = TAILQ_HEAD_INITIALIZER(req_list);
+	struct sto_core_req *req, *tmp;
 
-	if (TAILQ_EMPTY(&g_sto_req_list)) {
+	if (TAILQ_EMPTY(&g_sto_core_req_list)) {
 		return SPDK_POLLER_IDLE;
 	}
 
-	TAILQ_SWAP(&req_list, &g_sto_req_list, sto_req, list);
+	TAILQ_SWAP(&req_list, &g_sto_core_req_list, sto_core_req, list);
 
 	TAILQ_FOREACH_SAFE(req, &req_list, list, tmp) {
 		TAILQ_REMOVE(&req_list, req, list);
@@ -60,10 +60,10 @@ sto_req_poll(void *ctx)
 	return SPDK_POLLER_BUSY;
 }
 
-struct sto_req *
-sto_req_alloc(const struct spdk_json_val *params)
+struct sto_core_req *
+sto_core_req_alloc(const struct spdk_json_val *params)
 {
-	struct sto_req *req;
+	struct sto_core_req *req;
 
 	req = rte_zmalloc(NULL, sizeof(*req), 0);
 	if (spdk_unlikely(!req)) {
@@ -72,38 +72,38 @@ sto_req_alloc(const struct spdk_json_val *params)
 	}
 
 	req->params = params;
-	sto_req_set_state(req, STO_REQ_STATE_PARSE);
+	sto_core_req_set_state(req, STO_CORE_REQ_STATE_PARSE);
 
 	return req;
 }
 
 void
-sto_req_init_cb(struct sto_req *req, sto_req_response_t response, void *priv)
+sto_core_req_init_cb(struct sto_core_req *req, sto_core_req_response_t response, void *priv)
 {
 	req->response = response;
 	req->priv = priv;
 }
 
 void
-sto_req_free(struct sto_req *req)
+sto_core_req_free(struct sto_core_req *req)
 {
 	rte_free(req);
 }
 
 void
-sto_req_process(struct sto_req *req)
+sto_core_req_process(struct sto_core_req *req)
 {
-	TAILQ_INSERT_TAIL(&g_sto_req_list, req, list);
+	TAILQ_INSERT_TAIL(&g_sto_core_req_list, req, list);
 }
 
 void
-sto_req_submit(struct sto_req *req)
+sto_core_req_submit(struct sto_core_req *req)
 {
-	sto_req_process(req);
+	sto_core_req_process(req);
 }
 
 static int
-sto_req_get_subsystem(struct sto_req *req)
+sto_core_req_get_subsystem(struct sto_core_req *req)
 {
 	char *subsystem_name = NULL;
 	int rc = 0;
@@ -130,7 +130,7 @@ out:
 static void sto_exec_done(void *priv);
 
 static void
-sto_req_init_ctx(struct sto_req *req, struct sto_context *ctx)
+sto_core_req_init_ctx(struct sto_core_req *req, struct sto_context *ctx)
 {
 	ctx->priv = req;
 	ctx->response = sto_exec_done;
@@ -140,14 +140,14 @@ sto_req_init_ctx(struct sto_req *req, struct sto_context *ctx)
 }
 
 static int
-sto_req_parse(struct sto_req *req)
+sto_core_req_parse(struct sto_core_req *req)
 {
 	struct sto_subsystem *subsystem;
 	const struct spdk_json_val *cdb;
 	struct sto_context *ctx;
 	int rc = 0;
 
-	rc = sto_req_get_subsystem(req);
+	rc = sto_core_req_get_subsystem(req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to get subsystem for req[%p], rc=%d\n", req, rc);
 		return rc;
@@ -169,10 +169,10 @@ sto_req_parse(struct sto_req *req)
 		goto out;
 	}
 
-	sto_req_init_ctx(req, ctx);
+	sto_core_req_init_ctx(req, ctx);
 
-	sto_req_set_state(req, STO_REQ_STATE_EXEC);
-	sto_req_process(req);
+	sto_core_req_set_state(req, STO_CORE_REQ_STATE_EXEC);
+	sto_core_req_process(req);
 
 out:
 	free((struct spdk_json_val *) cdb);
@@ -183,14 +183,14 @@ out:
 static void
 sto_exec_done(void *priv)
 {
-	struct sto_req *req = priv;
+	struct sto_core_req *req = priv;
 
-	sto_req_set_state(req, STO_REQ_STATE_RESPONSE);
-	sto_req_process(req);
+	sto_core_req_set_state(req, STO_CORE_REQ_STATE_RESPONSE);
+	sto_core_req_process(req);
 }
 
 static int
-sto_req_exec(struct sto_req *req)
+sto_core_req_exec(struct sto_core_req *req)
 {
 	struct sto_subsystem *subsystem = req->subsystem;
 
@@ -198,13 +198,13 @@ sto_req_exec(struct sto_req *req)
 }
 
 static void
-sto_req_response(struct sto_req *req)
+sto_core_req_response(struct sto_core_req *req)
 {
 	req->response(req);
 }
 
 void
-sto_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_core_req_end_response(struct sto_core_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_subsystem *subsystem = req->subsystem;
 	struct sto_err_context *err = &req->err_ctx;
@@ -226,31 +226,31 @@ out:
 }
 
 static void
-sto_process_req(struct sto_req *req)
+sto_process_req(struct sto_core_req *req)
 {
 	int rc = 0;
 
 	switch (req->state) {
-	case STO_REQ_STATE_PARSE:
-		rc = sto_req_parse(req);
+	case STO_CORE_REQ_STATE_PARSE:
+		rc = sto_core_req_parse(req);
 		break;
-	case STO_REQ_STATE_EXEC:
-		rc = sto_req_exec(req);
+	case STO_CORE_REQ_STATE_EXEC:
+		rc = sto_core_req_exec(req);
 		break;
-	case STO_REQ_STATE_RESPONSE:
-		sto_req_response(req);
+	case STO_CORE_REQ_STATE_RESPONSE:
+		sto_core_req_response(req);
 		break;
 	default:
 		SPDK_ERRLOG("req (%p) in state %s, but shouldn't be\n",
-			    req, sto_req_state_name(req->state));
+			    req, sto_core_req_state_name(req->state));
 		assert(0);
 	}
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("req (%p) in state %s failed, rc=%d\n",
-			    req, sto_req_state_name(req->state), rc);
+			    req, sto_core_req_state_name(req->state), rc);
 		sto_err(&req->err_ctx, rc);
-		sto_req_response(req);
+		sto_core_req_response(req);
 	}
 
 	return;
@@ -259,8 +259,8 @@ sto_process_req(struct sto_req *req)
 int
 sto_core_init(void)
 {
-	g_sto_req_poller = SPDK_POLLER_REGISTER(sto_req_poll, NULL, STO_REQ_POLL_PERIOD);
-	if (spdk_unlikely(!g_sto_req_poller)) {
+	g_sto_core_poller = SPDK_POLLER_REGISTER(sto_core_poll, NULL, STO_CORE_POLL_PERIOD);
+	if (spdk_unlikely(!g_sto_core_poller)) {
 		SPDK_ERRLOG("Cann't register the STO req poller\n");
 		return -ENOMEM;
 	}
@@ -271,5 +271,5 @@ sto_core_init(void)
 void
 sto_core_fini(void)
 {
-	spdk_poller_unregister(&g_sto_req_poller);
+	spdk_poller_unregister(&g_sto_core_poller);
 }
