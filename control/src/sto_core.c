@@ -163,7 +163,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 
 	ctx = sto_subsystem_parse(subsystem, cdb);
 	if (spdk_unlikely(!ctx)) {
-		SPDK_ERRLOG("Failed to %s to parse req\n", subsystem->name);
+		SPDK_ERRLOG("%s subsystem failed to parse req\n", subsystem->name);
 		rc = -EINVAL;
 		goto out;
 	}

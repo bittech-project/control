@@ -57,8 +57,11 @@ def scst_dev_open(client, name, handler, attributes):
         'op': 'dev_open',
         'name': name,
         'handler': handler,
-        'attributes': attributes,
     }
+
+    if attributes is not None:
+        params['attributes'] =  attributes
+
     return client.call('control', params)
 
 def scst_dev_close(client, name, handler):
@@ -227,4 +230,51 @@ def scst_group_del(client, group, target, driver):
         'target': target,
         'driver': driver,
     }
+    return client.call('control', params)
+
+def scst_lun_add(client, lun, driver, target, group, device, attributes):
+    """Adds a given device to a group.
+    Args:
+        lun: LUN number
+        driver: SCST driver name
+        target: SCST target name
+        group: SCST group name
+        device: SCST device name
+        attributes: SCST dev attributes <p=v,...>
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'lun_add',
+        'lun': lun,
+        'driver': driver,
+        'target': target,
+        'device': device,
+    }
+
+    if group is not None:
+        params['group'] = group
+    if attributes is not None:
+        params['attributes'] =  attributes
+
+    return client.call('control', params)
+
+def scst_lun_del(client, lun, driver, target, group):
+    """Remove a LUN from a group.
+    Args:
+        lun: LUN number
+        driver: SCST driver name
+        target: SCST target name
+        group: SCST group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'lun_del',
+        'lun': lun,
+        'driver': driver,
+        'target': target,
+    }
+
+    if group is not None:
+        params['group'] = group
+
     return client.call('control', params)

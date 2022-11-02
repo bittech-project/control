@@ -329,6 +329,26 @@ scst_attr_list_free(struct scst_attr_name_list *attr_list)
 	}
 }
 
+static int
+scst_attr_list_fill_data(struct scst_attr_name_list *attr_list, char **data)
+{
+	char *parsed_cmd;
+	int i;
+
+	for (i = 0; i < attr_list->cnt; i++) {
+		parsed_cmd = spdk_sprintf_append_realloc(*data, " %s;",
+							 attr_list->names[i]);
+		if (spdk_unlikely(!parsed_cmd)) {
+			SPDK_ERRLOG("Failed to realloc memory for attributes data\n");
+			return -ENOMEM;
+		}
+
+		*data = parsed_cmd;
+	}
+
+	return 0;
+}
+
 struct scst_dev_open_params {
 	char *name;
 	char *handler;
@@ -370,8 +390,8 @@ static char *
 scst_dev_open_data(void *arg)
 {
 	struct scst_dev_open_params *params = arg;
-	char *parsed_cmd, *data;
-	int i;
+	char *data;
+	int rc;
 
 	data = spdk_sprintf_alloc("add_device %s", params->name);
 	if (spdk_unlikely(!data)) {
@@ -379,16 +399,11 @@ scst_dev_open_data(void *arg)
 		return NULL;
 	}
 
-	for (i = 0; i < params->attr_list.cnt; i++) {
-		parsed_cmd = spdk_sprintf_append_realloc(data, " %s;",
-							 params->attr_list.names[i]);
-		if (spdk_unlikely(!parsed_cmd)) {
-			SPDK_ERRLOG("Failed to realloc memory for data\n");
-			free(data);
-			return NULL;
-		}
-
-		data = parsed_cmd;
+	rc = scst_attr_list_fill_data(&params->attr_list, &data);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to fill scst attrs\n");
+		free(data);
+		return NULL;
 	}
 
 	return data;
@@ -807,6 +822,156 @@ static struct sto_write_req_params group_del_constructor = {
 	}
 };
 
+struct scst_lun_add_params {
+	int lun;
+	char *driver;
+	char *target;
+	char *device;
+	char *group;
+	struct scst_attr_name_list attr_list;
+};
+
+static void *
+scst_lun_add_params_alloc(void)
+{
+	return calloc(1, sizeof(struct scst_lun_add_params));
+}
+
+static void
+scst_lun_add_params_free(void *arg)
+{
+	struct scst_lun_add_params *params = arg;
+
+	free(params->driver);
+	free(params->target);
+	free(params->device);
+	free(params->group);
+	scst_attr_list_free(&params->attr_list);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder scst_lun_add_decoders[] = {
+	{"lun", offsetof(struct scst_lun_add_params, lun), spdk_json_decode_int32},
+	{"driver", offsetof(struct scst_lun_add_params, driver), spdk_json_decode_string},
+	{"target", offsetof(struct scst_lun_add_params, target), spdk_json_decode_string},
+	{"device", offsetof(struct scst_lun_add_params, device), spdk_json_decode_string},
+	{"group", offsetof(struct scst_lun_add_params, group), spdk_json_decode_string, true},
+	{"attributes", offsetof(struct scst_lun_add_params, attr_list), scst_attr_list_decode, true},
+};
+
+static const char *
+scst_lun_add_mgmt_file_path(void *arg)
+{
+	struct scst_lun_add_params *params = arg;
+
+	if (params->group) {
+		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
+					  SCST_TARGETS, params->driver,
+					  params->target, "ini_groups", params->group,
+					  "luns", SCST_MGMT_IO);
+	}
+
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
+				  SCST_TARGETS, params->driver,
+				  params->target, "luns", SCST_MGMT_IO);
+}
+
+static char *
+scst_lun_add_data(void *arg)
+{
+	struct scst_lun_add_params *params = arg;
+	char *data;
+	int rc;
+
+	data = spdk_sprintf_alloc("add %s %d", params->device, params->lun);
+	if (spdk_unlikely(!data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		return NULL;
+	}
+
+	rc = scst_attr_list_fill_data(&params->attr_list, &data);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to fill scst attrs\n");
+		free(data);
+		return NULL;
+	}
+
+	return data;
+}
+
+static struct sto_write_req_params lun_add_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_lun_add_decoders,
+					   scst_lun_add_params_alloc, scst_lun_add_params_free),
+	.constructor = {
+		.file_path = scst_lun_add_mgmt_file_path,
+		.data = scst_lun_add_data,
+	}
+};
+
+struct scst_lun_del_params {
+	int lun;
+	char *driver;
+	char *target;
+	char *group;
+};
+
+static void *
+scst_lun_del_params_alloc(void)
+{
+	return calloc(1, sizeof(struct scst_lun_del_params));
+}
+
+static void
+scst_lun_del_params_free(void *arg)
+{
+	struct scst_lun_del_params *params = arg;
+
+	free(params->driver);
+	free(params->target);
+	free(params->group);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder scst_lun_del_decoders[] = {
+	{"lun", offsetof(struct scst_lun_add_params, lun), spdk_json_decode_int32},
+	{"driver", offsetof(struct scst_lun_del_params, driver), spdk_json_decode_string},
+	{"target", offsetof(struct scst_lun_del_params, target), spdk_json_decode_string},
+	{"group", offsetof(struct scst_lun_del_params, group), spdk_json_decode_string, true},
+};
+
+static const char *
+scst_lun_del_mgmt_file_path(void *arg)
+{
+	struct scst_lun_del_params *params = arg;
+
+	if (params->group) {
+		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
+					  SCST_TARGETS, params->driver,
+					  params->target, "ini_groups", params->group,
+					  "luns", SCST_MGMT_IO);
+	}
+
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
+				  SCST_TARGETS, params->driver,
+				  params->target, "luns", SCST_MGMT_IO);
+}
+
+static char *
+scst_lun_del_data(void *arg)
+{
+	struct scst_lun_del_params *params = arg;
+
+	return spdk_sprintf_alloc("del %d", params->lun);
+}
+
+static struct sto_write_req_params lun_del_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_lun_del_decoders,
+					   scst_lun_del_params_alloc, scst_lun_del_params_free),
+	.constructor = {
+		.file_path = scst_lun_del_mgmt_file_path,
+		.data = scst_lun_del_data,
+	}
+};
 
 static const struct sto_cdbops scst_op_table[] = {
 	{
@@ -903,6 +1068,18 @@ static const struct sto_cdbops scst_op_table[] = {
 		.req_constructor = sto_write_req_constructor,
 		.req_ops = &sto_write_req_ops,
 		.params_constructor = &group_del_constructor,
+	},
+	{
+		.name = "lun_add",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &lun_add_constructor,
+	},
+	{
+		.name = "lun_del",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &lun_del_constructor,
 	},
 };
 
