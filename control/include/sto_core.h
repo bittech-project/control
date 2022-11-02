@@ -23,8 +23,6 @@ struct sto_core_req {
 
 	enum sto_core_req_state state;
 
-	struct sto_subsystem *subsystem;
-
 	struct sto_context *ctx;
 	struct sto_err_context err_ctx;
 

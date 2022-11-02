@@ -3,29 +3,17 @@
 
 #include <spdk/queue.h>
 
+struct sto_cdbops;
 struct spdk_json_val;
-struct spdk_json_write_ctx;
 
 typedef void (*sto_subsys_response_t)(void *priv);
 
-typedef void (*sto_subsys_init_t)(void);
-typedef void (*sto_subsys_fini_t)(void);
-
-typedef struct sto_context *(*sto_subsys_parse_t)(const struct spdk_json_val *params);
-typedef int (*sto_subsys_exec_t)(struct sto_context *ctx);
-typedef void (*sto_subsys_end_response_t)(struct sto_context *ctx, struct spdk_json_write_ctx *w);
-typedef void (*sto_subsys_free_t)(struct sto_context *ctx);
+typedef const struct sto_cdbops *(*sto_subsys_find_cdbops)(const char *name);
 
 struct sto_subsystem {
 	const char *name;
 
-	sto_subsys_init_t init;
-	sto_subsys_fini_t fini;
-
-	sto_subsys_parse_t parse;
-	sto_subsys_exec_t exec;
-	sto_subsys_end_response_t end_response;
-	sto_subsys_free_t free;
+	sto_subsys_find_cdbops find_cdbops;
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };
@@ -33,18 +21,13 @@ struct sto_subsystem {
 void sto_add_subsystem(struct sto_subsystem *subsystem);
 
 struct sto_subsystem *sto_subsystem_find(const char *name);
-
+struct sto_context *sto_subsystem_parse(struct sto_subsystem *subsystem,
+					const struct spdk_json_val *params);
 
 #define STO_SUBSYSTEM_REGISTER(_name)					\
 static void __attribute__((constructor)) _name ## _register(void)	\
 {									\
-	_name.init();							\
 	sto_add_subsystem(&_name);					\
-}									\
-									\
-static void __attribute__((destructor)) _name ## _deregister(void)	\
-{									\
-	_name.fini();							\
 }
 
 #endif /* _STO_SUBSYSTEM_H_ */
