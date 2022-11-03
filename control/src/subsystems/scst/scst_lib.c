@@ -959,6 +959,21 @@ static struct sto_write_req_params group_del_constructor = {
 	}
 };
 
+static const char *
+scst_lun_mgmt_file_constructor(char *driver, char *target, char *group)
+{
+	if (group) {
+		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
+					  SCST_TARGETS, driver,
+					  target, "ini_groups", group,
+					  "luns", SCST_MGMT_IO);
+	}
+
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
+				  SCST_TARGETS, driver,
+				  target, "luns", SCST_MGMT_IO);
+}
+
 struct scst_lun_add_params {
 	int lun;
 	char *driver;
@@ -1001,16 +1016,7 @@ scst_lun_add_mgmt_file_path(void *arg)
 {
 	struct scst_lun_add_params *params = arg;
 
-	if (params->group) {
-		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
-					  SCST_TARGETS, params->driver,
-					  params->target, "ini_groups", params->group,
-					  "luns", SCST_MGMT_IO);
-	}
-
-	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
-				  SCST_TARGETS, params->driver,
-				  params->target, "luns", SCST_MGMT_IO);
+	return scst_lun_mgmt_file_constructor(params->driver, params->target, params->group);
 }
 
 static char *
@@ -1081,16 +1087,7 @@ scst_lun_del_mgmt_file_path(void *arg)
 {
 	struct scst_lun_del_params *params = arg;
 
-	if (params->group) {
-		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
-					  SCST_TARGETS, params->driver,
-					  params->target, "ini_groups", params->group,
-					  "luns", SCST_MGMT_IO);
-	}
-
-	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
-				  SCST_TARGETS, params->driver,
-				  params->target, "luns", SCST_MGMT_IO);
+	return scst_lun_mgmt_file_constructor(params->driver, params->target, params->group);
 }
 
 static char *
@@ -1176,16 +1173,7 @@ scst_lun_clear_mgmt_file_path(void *arg)
 {
 	struct scst_lun_clear_params *params = arg;
 
-	if (params->group) {
-		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
-					  SCST_TARGETS, params->driver,
-					  params->target, "ini_groups", params->group,
-					  "luns", SCST_MGMT_IO);
-	}
-
-	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
-				  SCST_TARGETS, params->driver,
-				  params->target, "luns", SCST_MGMT_IO);
+	return scst_lun_mgmt_file_constructor(params->driver, params->target, params->group);
 }
 
 static char *
