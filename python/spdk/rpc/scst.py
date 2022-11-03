@@ -190,6 +190,38 @@ def scst_tgrp_del(client, name, dgrp_name):
     }
     return client.call('control', params)
 
+def scst_tgrp_add_tgt(client, tgt_name, dgrp_name, tgrp_name):
+    """Add target <tgt_name> to specified target group.
+    Args:
+        tgt_name: SCST target name
+        dgrp_name: SCST device group name
+        tgrp_name: SCST target group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'tgrp_add_tgt',
+        'tgt_name': tgt_name,
+        'dgrp_name': dgrp_name,
+        'tgrp_name': tgrp_name,
+    }
+    return client.call('control', params)
+
+def scst_tgrp_del_tgt(client, tgt_name, dgrp_name, tgrp_name):
+    """Remove target <tgt_name> from specified target group.
+    Args:
+        tgt_name: SCST target name
+        dgrp_name: SCST device group name
+        tgrp_name: SCST target group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'tgrp_del_tgt',
+        'tgt_name': tgt_name,
+        'dgrp_name': dgrp_name,
+        'tgrp_name': tgrp_name,
+    }
+    return client.call('control', params)
+
 def scst_target_add(client, target, driver):
     """Add a dynamic target to a capable driver.
     Args:

@@ -213,6 +213,32 @@ if __name__ == "__main__":
     p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
     p.set_defaults(func=scst_tgrp_del)
 
+    def scst_tgrp_add_tgt(args):
+        json = rpc.scst.scst_tgrp_add_tgt(args.client,
+                                          tgt_name=args.tgt_name,
+                                          dgrp_name=args.dgrp_name,
+                                          tgrp_name=args.tgrp_name)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_tgrp_add_tgt', help='Add target <tgt_name> to specified target group')
+    p.add_argument('-t', '--tgt_name', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
+    p.add_argument('-tg', '--tgrp_name', help='SCST target group name', required=True, type=str)
+    p.set_defaults(func=scst_tgrp_add_tgt)
+
+    def scst_tgrp_del_tgt(args):
+        json = rpc.scst.scst_tgrp_del_tgt(args.client,
+                                          tgt_name=args.tgt_name,
+                                          dgrp_name=args.dgrp_name,
+                                          tgrp_name=args.tgrp_name)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_tgrp_del_tgt', help='Add target <tgt_name> to specified target group')
+    p.add_argument('-t', '--tgt_name', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
+    p.add_argument('-tg', '--tgrp_name', help='SCST target group name', required=True, type=str)
+    p.set_defaults(func=scst_tgrp_del_tgt)
+
     def scst_target_add(args):
         json = rpc.scst.scst_target_add(args.client,
                                         target=args.target,

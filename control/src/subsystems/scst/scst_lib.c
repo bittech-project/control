@@ -753,6 +753,77 @@ static struct sto_write_req_params tgrp_del_constructor = {
 	}
 };
 
+struct scst_tgrp_tgt_params {
+	char *tgt_name;
+	char *dgrp_name;
+	char *tgrp_name;
+};
+
+static void *
+scst_tgrp_tgt_params_alloc(void)
+{
+	return calloc(1, sizeof(struct scst_tgrp_tgt_params));
+}
+
+static void
+scst_tgrp_tgt_params_free(void *arg)
+{
+	struct scst_tgrp_tgt_params *params = arg;
+
+	free(params->tgt_name);
+	free(params->dgrp_name);
+	free(params->tgrp_name);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder scst_tgrp_tgt_decoders[] = {
+	{"tgt_name", offsetof(struct scst_tgrp_tgt_params, tgt_name), spdk_json_decode_string},
+	{"dgrp_name", offsetof(struct scst_tgrp_tgt_params, dgrp_name), spdk_json_decode_string},
+	{"tgrp_name", offsetof(struct scst_tgrp_tgt_params, tgrp_name), spdk_json_decode_string},
+};
+
+static const char *
+scst_tgrp_tgt_mgmt_file_path(void *arg)
+{
+	struct scst_tgrp_tgt_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+				  params->dgrp_name, "target_groups",
+				  params->tgrp_name, SCST_MGMT_IO);
+}
+
+static char *
+scst_tgrp_add_tgt_data(void *arg)
+{
+	struct scst_tgrp_tgt_params *params = arg;
+	return spdk_sprintf_alloc("add %s", params->tgt_name);
+}
+
+static char *
+scst_tgrp_del_tgt_data(void *arg)
+{
+	struct scst_tgrp_tgt_params *params = arg;
+	return spdk_sprintf_alloc("del %s", params->tgt_name);
+}
+
+static struct sto_write_req_params tgrp_add_tgt_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_tgt_decoders,
+					   scst_tgrp_tgt_params_alloc, scst_tgrp_tgt_params_free),
+	.constructor = {
+		.file_path = scst_tgrp_tgt_mgmt_file_path,
+		.data = scst_tgrp_add_tgt_data,
+	}
+};
+
+static struct sto_write_req_params tgrp_del_tgt_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_tgt_decoders,
+					   scst_tgrp_tgt_params_alloc, scst_tgrp_tgt_params_free),
+	.constructor = {
+		.file_path = scst_tgrp_tgt_mgmt_file_path,
+		.data = scst_tgrp_del_tgt_data,
+	}
+};
+
+
 struct scst_target_params {
 	char *target;
 	char *driver;
@@ -1117,6 +1188,18 @@ static const struct sto_cdbops scst_op_table[] = {
 		.req_constructor = sto_write_req_constructor,
 		.req_ops = &sto_write_req_ops,
 		.params_constructor = &tgrp_del_constructor,
+	},
+	{
+		.name = "tgrp_add_tgt",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &tgrp_add_tgt_constructor,
+	},
+	{
+		.name = "tgrp_del_tgt",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &tgrp_del_tgt_constructor,
 	},
 	{
 		.name = "target_add",
