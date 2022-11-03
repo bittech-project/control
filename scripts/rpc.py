@@ -328,6 +328,19 @@ if __name__ == "__main__":
     p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
     p.set_defaults(func=scst_lun_del)
 
+    def scst_lun_clear(args):
+        json = rpc.scst.scst_lun_clear(args.client,
+                                       driver=args.driver,
+                                       target=args.target,
+                                       group=args.group)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_lun_clear', help='Clear all LUNs within a group')
+    p.add_argument('-d', '--driver', help='SCST driver name', required=True, type=str)
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
+    p.set_defaults(func=scst_lun_clear)
+
     def check_called_name(name):
         if name in deprecated_aliases:
             print("{} is deprecated, use {} instead.".format(name, deprecated_aliases[name]), file=sys.stderr)

@@ -338,3 +338,22 @@ def scst_lun_del(client, lun, driver, target, group):
         params['group'] = group
 
     return client.call('control', params)
+
+def scst_lun_clear(client, driver, target, group):
+    """Clear all LUNs within a group.
+    Args:
+        driver: SCST driver name
+        target: SCST target name
+        group: SCST group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'lun_clear',
+        'driver': driver,
+        'target': target,
+    }
+
+    if group is not None:
+        params['group'] = group
+
+    return client.call('control', params)

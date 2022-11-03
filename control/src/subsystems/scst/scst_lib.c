@@ -1110,6 +1110,67 @@ static struct sto_write_req_params lun_del_constructor = {
 	}
 };
 
+struct scst_lun_clear_params {
+	char *driver;
+	char *target;
+	char *group;
+};
+
+static void *
+scst_lun_clear_params_alloc(void)
+{
+	return calloc(1, sizeof(struct scst_lun_clear_params));
+}
+
+static void
+scst_lun_clear_params_free(void *arg)
+{
+	struct scst_lun_clear_params *params = arg;
+
+	free(params->driver);
+	free(params->target);
+	free(params->group);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder scst_lun_clear_decoders[] = {
+	{"driver", offsetof(struct scst_lun_clear_params, driver), spdk_json_decode_string},
+	{"target", offsetof(struct scst_lun_clear_params, target), spdk_json_decode_string},
+	{"group", offsetof(struct scst_lun_clear_params, group), spdk_json_decode_string, true},
+};
+
+static const char *
+scst_lun_clear_mgmt_file_path(void *arg)
+{
+	struct scst_lun_clear_params *params = arg;
+
+	if (params->group) {
+		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
+					  SCST_TARGETS, params->driver,
+					  params->target, "ini_groups", params->group,
+					  "luns", SCST_MGMT_IO);
+	}
+
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
+				  SCST_TARGETS, params->driver,
+				  params->target, "luns", SCST_MGMT_IO);
+}
+
+static char *
+scst_lun_clear_data(void *arg)
+{
+	return spdk_sprintf_alloc("clear");
+}
+
+static struct sto_write_req_params lun_clear_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_lun_clear_decoders,
+					   scst_lun_clear_params_alloc, scst_lun_clear_params_free),
+	.constructor = {
+		.file_path = scst_lun_clear_mgmt_file_path,
+		.data = scst_lun_clear_data,
+	}
+};
+
 static const struct sto_cdbops scst_op_table[] = {
 	{
 		.name = "handler_list",
@@ -1241,6 +1302,12 @@ static const struct sto_cdbops scst_op_table[] = {
 		.req_constructor = sto_write_req_constructor,
 		.req_ops = &sto_write_req_ops,
 		.params_constructor = &lun_del_constructor,
+	},
+	{
+		.name = "lun_clear",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &lun_clear_constructor,
 	},
 };
 
