@@ -190,6 +190,18 @@ def scst_tgrp_del(client, name, dgrp_name):
     }
     return client.call('control', params)
 
+def scst_tgrp_list(client, dgrp):
+    """List all target groups within a device group.
+    Args:
+        dgrp: SCST device group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'tgrp_list',
+        'dgrp': dgrp
+    }
+    return client.call('control', params)
+
 def scst_tgrp_add_tgt(client, tgt_name, dgrp_name, tgrp_name):
     """Add target <tgt_name> to specified target group.
     Args:

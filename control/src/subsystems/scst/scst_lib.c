@@ -267,13 +267,13 @@ static struct sto_req_ops scst_tg_list_req_ops = {
 };
 
 static const char *
-scst_handler_list_name(void)
+scst_handler_list_name(void *arg)
 {
 	return spdk_sprintf_alloc("handlers");
 }
 
 static char *
-scst_handler_list_dirpath(void)
+scst_handler_list_dirpath(void *arg)
 {
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
 }
@@ -286,13 +286,13 @@ static struct sto_ls_req_params handler_list_constructor = {
 };
 
 static const char *
-scst_driver_list_name(void)
+scst_driver_list_name(void *arg)
 {
 	return spdk_sprintf_alloc("Drivers");
 }
 
 static char *
-scst_driver_list_dirpath(void)
+scst_driver_list_dirpath(void *arg)
 {
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
 }
@@ -515,13 +515,13 @@ static struct sto_write_req_params dev_resync_constructor = {
 
 
 static const char *
-scst_dev_list_name(void)
+scst_dev_list_name(void *arg)
 {
 	return spdk_sprintf_alloc("devices");
 }
 
 static char *
-scst_dev_list_dirpath(void)
+scst_dev_list_dirpath(void *arg)
 {
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
 }
@@ -594,13 +594,13 @@ static struct sto_write_req_params dgrp_del_constructor = {
 };
 
 static const char *
-scst_dgrp_list_name(void)
+scst_dgrp_list_name(void *arg)
 {
 	return spdk_sprintf_alloc("Device Group");
 }
 
 static char *
-scst_dgrp_list_dirpath(void)
+scst_dgrp_list_dirpath(void *arg)
 {
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEV_GROUPS);
 }
@@ -750,6 +750,62 @@ static struct sto_write_req_params tgrp_del_constructor = {
 	.constructor = {
 		.file_path = scst_tgrp_mgmt_file_path,
 		.data = scst_tgrp_del_data,
+	}
+};
+
+struct scst_tgrp_list_params {
+	char *dgrp;
+};
+
+static void *
+scst_tgrp_list_params_alloc(void)
+{
+	return calloc(1, sizeof(struct scst_tgrp_list_params));
+}
+
+static void
+scst_tgrp_list_params_free(void *arg)
+{
+	struct scst_tgrp_list_params *params = arg;
+
+	free(params->dgrp);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder scst_tgrp_list_decoders[] = {
+	{"dgrp", offsetof(struct scst_tgrp_list_params, dgrp), spdk_json_decode_string},
+};
+
+static const char *
+scst_tgrp_list_name(void *arg)
+{
+	return spdk_sprintf_alloc("Target Groups");
+}
+
+static char *
+scst_tgrp_list_dirpath(void *arg)
+{
+	struct scst_tgrp_list_params *params = arg;
+
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+				  params->dgrp, "target_groups");
+}
+
+static int
+scst_tgrp_list_exclude(const char **exclude_list)
+{
+	exclude_list[0] = SCST_MGMT_IO;
+
+	return 0;
+}
+
+static struct sto_ls_req_params tgrp_list_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_list_decoders,
+					   scst_tgrp_list_params_alloc, scst_tgrp_list_params_free),
+	.constructor = {
+		.name = scst_tgrp_list_name,
+		.dirpath = scst_tgrp_list_dirpath,
+		.exclude = scst_tgrp_list_exclude,
 	}
 };
 
@@ -1269,6 +1325,12 @@ static const struct sto_cdbops scst_op_table[] = {
 		.req_constructor = sto_write_req_constructor,
 		.req_ops = &sto_write_req_ops,
 		.params_constructor = &tgrp_del_constructor,
+	},
+	{
+		.name = "tgrp_list",
+		.req_constructor = sto_ls_req_constructor,
+		.req_ops = &sto_ls_req_ops,
+		.params_constructor = &tgrp_list_constructor,
 	},
 	{
 		.name = "tgrp_add_tgt",

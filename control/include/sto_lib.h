@@ -17,9 +17,11 @@ struct sto_decoder {
 
 	sto_params_alloc params_alloc;
 	sto_params_free params_free;
+
+	bool initialized;
 };
 #define STO_DECODER_INITIALIZER(decoders, params_alloc, params_free)	\
-	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free}
+	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free, true}
 
 struct sto_err_context {
 	int rc;
@@ -129,10 +131,12 @@ struct sto_ls_req_params {
 	struct sto_decoder decoder;
 
 	struct {
-		const char *(*name)(void);
-		char *(*dirpath)(void);
+		const char *(*name)(void *params);
+		char *(*dirpath)(void *params);
 		int (*exclude)(const char **arr);
 	} constructor;
+
+	struct sto_ls_req *req;
 };
 
 extern struct sto_req_ops sto_ls_req_ops;

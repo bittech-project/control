@@ -16,6 +16,10 @@ sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 	void *params;
 	int rc = 0;
 
+	if (!decoder->initialized) {
+		return params_parse(priv, NULL);
+	}
+
 	params = decoder->params_alloc();
 	if (spdk_unlikely(!params)) {
 		SPDK_ERRLOG("Failed to alloc params\n");
@@ -176,7 +180,6 @@ sto_write_req_params_parse(void *priv, void *params)
 {
 	struct sto_write_req_params *p = priv;
 	struct sto_write_req *req = p->req;
-	int rc;
 
 	req->file = p->constructor.file_path(params);
 	if (spdk_unlikely(!req->file)) {
@@ -187,7 +190,6 @@ sto_write_req_params_parse(void *priv, void *params)
 	req->data = p->constructor.data(params);
 	if (spdk_unlikely(!req->data)) {
 		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		rc = -ENOMEM;
 		goto free_file;
 	}
 
@@ -196,7 +198,7 @@ sto_write_req_params_parse(void *priv, void *params)
 free_file:
 	free((char *) req->file);
 
-	return rc;
+	return -ENOMEM;
 }
 
 static int
@@ -210,7 +212,7 @@ sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 
 	rc = sto_decoder_parse(&p->decoder, cdb, sto_write_req_params_parse, p);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to parse CDB\n");
+		SPDK_ERRLOG("Failed to parse params for write req\n");
 	}
 
 	return rc;
@@ -284,19 +286,19 @@ sto_ls_req_constructor(const struct sto_cdbops *op)
 }
 
 static int
-sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+sto_ls_req_params_parse(void *priv, void *params)
 {
-	struct sto_ls_req *ls_req = to_ls_req(req);
-	struct sto_ls_req_params *p = req->params_constructor;
+	struct sto_ls_req_params *p = priv;
+	struct sto_ls_req *req = p->req;
 
-	ls_req->name = p->constructor.name();
-	if (spdk_unlikely(!ls_req->name)) {
+	req->name = p->constructor.name(params);
+	if (spdk_unlikely(!req->name)) {
 		SPDK_ERRLOG("Failed to alloc memory for targets\n");
 		return -ENOMEM;
 	}
 
-	ls_req->dirpath = p->constructor.dirpath();
-	if (spdk_unlikely(!ls_req->dirpath)) {
+	req->dirpath = p->constructor.dirpath(params);
+	if (spdk_unlikely(!req->dirpath)) {
 		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
 		goto free_name;
 	}
@@ -304,7 +306,7 @@ sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	if (p->constructor.exclude) {
 		int rc;
 
-		rc = p->constructor.exclude(ls_req->exclude_list);
+		rc = p->constructor.exclude(req->exclude_list);
 		if (spdk_unlikely(rc)) {
 			SPDK_ERRLOG("Failed to init exclude list, rc=%d\n", rc);
 			goto free_dirpath;
@@ -314,12 +316,29 @@ sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	return 0;
 
 free_dirpath:
-	free(ls_req->dirpath);
+	free(req->dirpath);
 
 free_name:
-	free((char *) ls_req->name);
+	free((char *) req->name);
 
 	return -ENOMEM;
+}
+
+static int
+sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+{
+	struct sto_ls_req *ls_req = to_ls_req(req);
+	struct sto_ls_req_params *p = req->params_constructor;
+	int rc = 0;
+
+	p->req = ls_req;
+
+	rc = sto_decoder_parse(&p->decoder, cdb, sto_ls_req_params_parse, p);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to parse params for ls req\n");
+	}
+
+	return rc;
 }
 
 static void
