@@ -339,6 +339,32 @@ def scst_lun_del(client, lun, driver, target, group):
 
     return client.call('control', params)
 
+def scst_lun_replace(client, lun, driver, target, group, device, attributes):
+    """Replaces a LUN's device with a different one.
+    Args:
+        lun: LUN number
+        driver: SCST driver name
+        target: SCST target name
+        group: SCST group name
+        device: SCST device name
+        attributes: SCST dev attributes <p=v,...>
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'lun_replace',
+        'lun': lun,
+        'driver': driver,
+        'target': target,
+        'device': device,
+    }
+
+    if group is not None:
+        params['group'] = group
+    if attributes is not None:
+        params['attributes'] =  attributes
+
+    return client.call('control', params)
+
 def scst_lun_clear(client, driver, target, group):
     """Clear all LUNs within a group.
     Args:

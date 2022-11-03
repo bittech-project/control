@@ -328,6 +328,25 @@ if __name__ == "__main__":
     p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
     p.set_defaults(func=scst_lun_del)
 
+    def scst_lun_replace(args):
+        json = rpc.scst.scst_lun_replace(args.client,
+                                         lun=args.lun,
+                                         driver=args.driver,
+                                         target=args.target,
+                                         group=args.group,
+                                         device=args.device,
+                                         attributes=args.attributes)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_lun_replace', help='Adds a given device to a group')
+    p.add_argument('-l', '--lun', help='LUN number', required=True, type=int)
+    p.add_argument('-d', '--driver', help='SCST driver name', required=True, type=str)
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
+    p.add_argument('-dev', '--device', help='SCST device name', required=True, type=str)
+    p.add_argument('-attrs', '--attributes', nargs='+', help='SCST dev attributes <p=v,...>', required=False, type=str)
+    p.set_defaults(func=scst_lun_replace)
+
     def scst_lun_clear(args):
         json = rpc.scst.scst_lun_clear(args.client,
                                        driver=args.driver,

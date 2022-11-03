@@ -1110,6 +1110,38 @@ static struct sto_write_req_params lun_del_constructor = {
 	}
 };
 
+static char *
+scst_lun_replace_data(void *arg)
+{
+	struct scst_lun_add_params *params = arg;
+	char *data;
+	int rc;
+
+	data = spdk_sprintf_alloc("replace %s %d", params->device, params->lun);
+	if (spdk_unlikely(!data)) {
+		SPDK_ERRLOG("Failed to alloc memory for data\n");
+		return NULL;
+	}
+
+	rc = scst_attr_list_fill_data(&params->attr_list, &data);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to fill scst attrs\n");
+		free(data);
+		return NULL;
+	}
+
+	return data;
+}
+
+static struct sto_write_req_params lun_replace_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_lun_add_decoders,
+					   scst_lun_add_params_alloc, scst_lun_add_params_free),
+	.constructor = {
+		.file_path = scst_lun_add_mgmt_file_path,
+		.data = scst_lun_replace_data,
+	}
+};
+
 struct scst_lun_clear_params {
 	char *driver;
 	char *target;
@@ -1302,6 +1334,12 @@ static const struct sto_cdbops scst_op_table[] = {
 		.req_constructor = sto_write_req_constructor,
 		.req_ops = &sto_write_req_ops,
 		.params_constructor = &lun_del_constructor,
+	},
+	{
+		.name = "lun_replace",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &lun_replace_constructor,
 	},
 	{
 		.name = "lun_clear",
