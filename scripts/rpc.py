@@ -270,6 +270,35 @@ if __name__ == "__main__":
     p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
     p.set_defaults(func=scst_target_del)
 
+    def scst_target_list(args):
+        json = rpc.scst.scst_target_list(args.client)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_list', help='List all available targets')
+    p.set_defaults(func=scst_target_list)
+
+    def scst_target_enable(args):
+        json = rpc.scst.scst_target_enable(args.client,
+                                           target=args.target,
+                                           driver=args.driver)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_enable', help='Enable target mode for a given driver & target')
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
+    p.set_defaults(func=scst_target_enable)
+
+    def scst_target_disable(args):
+        json = rpc.scst.scst_target_disable(args.client,
+                                           target=args.target,
+                                           driver=args.driver)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_target_disable', help='Disable target mode for a given driver & target')
+    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
+    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
+    p.set_defaults(func=scst_target_disable)
+
     def scst_group_add(args):
         json = rpc.scst.scst_group_add(args.client,
                                        group=args.group,
@@ -295,13 +324,6 @@ if __name__ == "__main__":
     p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
     p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
     p.set_defaults(func=scst_group_del)
-
-    def scst_target_list(args):
-        json = rpc.scst.scst_target_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_target_list', help='List all available targets')
-    p.set_defaults(func=scst_target_list)
 
     def scst_lun_add(args):
         json = rpc.scst.scst_lun_add(args.client,

@@ -272,6 +272,34 @@ def scst_target_list(client):
     }
     return client.call('control', params)
 
+def scst_target_enable(client, target, driver):
+    """Enable target mode for a given driver & target.
+    Args:
+        target: SCST target name
+        driver: SCST target driver name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'target_enable',
+        'target': target,
+        'driver': driver,
+    }
+    return client.call('control', params)
+
+def scst_target_disable(client, target, driver):
+    """Disable target mode for a given driver & target.
+    Args:
+        target: SCST target name
+        driver: SCST target driver name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'target_disable',
+        'target': target,
+        'driver': driver,
+    }
+    return client.call('control', params)
+
 def scst_group_add(client, group, target, driver):
     """Add a group to a given driver & target.
     Args:

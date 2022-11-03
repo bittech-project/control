@@ -946,6 +946,44 @@ static struct sto_write_req_params target_del_constructor = {
 	}
 };
 
+static const char *
+scst_target_enable_file_path(void *arg)
+{
+	struct scst_target_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+				  params->driver, params->target, "enabled");
+}
+
+static char *
+scst_target_enable_data(void *arg)
+{
+	return spdk_sprintf_alloc("1");
+}
+
+static char *
+scst_target_disable_data(void *arg)
+{
+	return spdk_sprintf_alloc("0");
+}
+
+static struct sto_write_req_params target_enable_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
+					   scst_target_params_alloc, scst_target_params_free),
+	.constructor = {
+		.file_path = scst_target_enable_file_path,
+		.data = scst_target_enable_data,
+	}
+};
+
+static struct sto_write_req_params target_disable_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
+					   scst_target_params_alloc, scst_target_params_free),
+	.constructor = {
+		.file_path = scst_target_enable_file_path,
+		.data = scst_target_disable_data,
+	}
+};
+
 struct scst_group_params {
 	char *group;
 	char *driver;
@@ -1360,6 +1398,18 @@ static const struct sto_cdbops scst_op_table[] = {
 		.name = "target_list",
 		.req_constructor = scst_tg_list_req_constructor,
 		.req_ops = &scst_tg_list_req_ops,
+	},
+	{
+		.name = "target_enable",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &target_enable_constructor,
+	},
+	{
+		.name = "target_disable",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &target_disable_constructor,
 	},
 	{
 		.name = "group_add",
