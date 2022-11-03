@@ -622,7 +622,7 @@ static struct sto_ls_req_params dgrp_list_constructor = {
 };
 
 struct scst_dgrp_dev_params {
-	char *dgrp_name;
+	char *name;
 	char *dev_name;
 };
 
@@ -637,13 +637,13 @@ scst_dgrp_dev_params_free(void *arg)
 {
 	struct scst_dgrp_dev_params *params = arg;
 
-	free(params->dgrp_name);
+	free(params->name);
 	free(params->dev_name);
 	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
-	{"dgrp_name", offsetof(struct scst_dgrp_dev_params, dgrp_name), spdk_json_decode_string},
+	{"name", offsetof(struct scst_dgrp_dev_params, name), spdk_json_decode_string},
 	{"dev_name", offsetof(struct scst_dgrp_dev_params, dev_name), spdk_json_decode_string},
 };
 
@@ -652,7 +652,7 @@ scst_dgrp_dev_mgmt_file_path(void *arg)
 {
 	struct scst_dgrp_dev_params *params = arg;
 	return spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-				  params->dgrp_name, "devices", SCST_MGMT_IO);
+				  params->name, "devices", SCST_MGMT_IO);
 }
 
 static char *
@@ -684,6 +684,72 @@ static struct sto_write_req_params dgrp_del_dev_constructor = {
 	.constructor = {
 		.file_path = scst_dgrp_dev_mgmt_file_path,
 		.data = scst_dgrp_del_dev_data,
+	}
+};
+
+struct scst_tgrp_params {
+	char *name;
+	char *dgrp_name;
+};
+
+static void *
+scst_tgrp_params_alloc(void)
+{
+	return calloc(1, sizeof(struct scst_tgrp_params));
+}
+
+static void
+scst_tgrp_params_free(void *arg)
+{
+	struct scst_tgrp_params *params = arg;
+
+	free(params->name);
+	free(params->dgrp_name);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder scst_tgrp_decoders[] = {
+	{"name", offsetof(struct scst_tgrp_params, name), spdk_json_decode_string},
+	{"dgrp_name", offsetof(struct scst_tgrp_params, dgrp_name), spdk_json_decode_string},
+};
+
+static const char *
+scst_tgrp_mgmt_file_path(void *arg)
+{
+	struct scst_tgrp_params *params = arg;
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+				  params->dgrp_name, "target_groups", SCST_MGMT_IO);
+}
+
+static char *
+scst_tgrp_add_data(void *arg)
+{
+	struct scst_tgrp_params *params = arg;
+	return spdk_sprintf_alloc("add %s", params->name);
+}
+
+static char *
+scst_tgrp_del_data(void *arg)
+{
+	struct scst_tgrp_params *params = arg;
+	return spdk_sprintf_alloc("del %s", params->name);
+}
+
+static struct sto_write_req_params tgrp_add_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_decoders,
+					   scst_tgrp_params_alloc, scst_tgrp_params_free),
+	.constructor = {
+		.file_path = scst_tgrp_mgmt_file_path,
+		.data = scst_tgrp_add_data,
+	}
+};
+
+static struct sto_write_req_params tgrp_del_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_decoders,
+					   scst_tgrp_params_alloc, scst_tgrp_params_free),
+	.constructor = {
+		.file_path = scst_tgrp_mgmt_file_path,
+		.data = scst_tgrp_del_data,
 	}
 };
 
@@ -1039,6 +1105,18 @@ static const struct sto_cdbops scst_op_table[] = {
 		.req_constructor = sto_write_req_constructor,
 		.req_ops = &sto_write_req_ops,
 		.params_constructor = &dgrp_del_dev_constructor,
+	},
+	{
+		.name = "tgrp_add",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &tgrp_add_constructor,
+	},
+	{
+		.name = "tgrp_del",
+		.req_constructor = sto_write_req_constructor,
+		.req_ops = &sto_write_req_ops,
+		.params_constructor = &tgrp_del_constructor,
 	},
 	{
 		.name = "target_add",

@@ -134,31 +134,59 @@ def scst_dgrp_list(client):
     }
     return client.call('control', params)
 
-def scst_dgrp_add_dev(client, dgrp_name, dev_name):
-    """Add device <dev_name> to device group <dgrp_name>.
+def scst_dgrp_add_dev(client, name, dev_name):
+    """Add device <dev_name> to device group <name>.
     Args:
-        dgrp_name: SCST device group name
+        name: SCST device group name
         dev_name: SCST device name
     """
     params = {
         'subsystem': 'scst',
         'op': 'dgrp_add_dev',
-        'dgrp_name': dgrp_name,
+        'name': name,
         'dev_name': dev_name,
     }
     return client.call('control', params)
 
-def scst_dgrp_del_dev(client, dgrp_name, dev_name):
-    """Remove device <dev_name> from device group <dgrp_name>.
+def scst_dgrp_del_dev(client, name, dev_name):
+    """Remove device <dev_name> from device group <name>.
     Args:
-        dgrp_name: SCST device group name
+        name: SCST device group name
         dev_name: SCST device name
     """
     params = {
         'subsystem': 'scst',
         'op': 'dgrp_del_dev',
-        'dgrp_name': dgrp_name,
+        'name': name,
         'dev_name': dev_name,
+    }
+    return client.call('control', params)
+
+def scst_tgrp_add(client, name, dgrp_name):
+    """Add target group <name> to device group <dgrp_name>.
+    Args:
+        name: SCST target group name
+        dgrp_name: SCST device group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'tgrp_add',
+        'name': name,
+        'dgrp_name': dgrp_name,
+    }
+    return client.call('control', params)
+
+def scst_tgrp_del(client, name, dgrp_name):
+    """Remove target group <name> from device group <dgrp_name>.
+    Args:
+        name: SCST target group name
+        dgrp_name: SCST device group name
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'tgrp_del',
+        'name': name,
+        'dgrp_name': dgrp_name,
     }
     return client.call('control', params)
 

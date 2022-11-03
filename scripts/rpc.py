@@ -149,7 +149,7 @@ if __name__ == "__main__":
                                       name=args.name)
         print_json(json)
 
-    p = subparsers.add_parser('scst_dgrp_add', help='Add device group <dgrp>')
+    p = subparsers.add_parser('scst_dgrp_add', help='Add device group <name>')
     p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
     p.set_defaults(func=scst_dgrp_add)
 
@@ -158,7 +158,7 @@ if __name__ == "__main__":
                                       name=args.name)
         print_json(json)
 
-    p = subparsers.add_parser('scst_dgrp_del', help='Remove device group <dgrp>')
+    p = subparsers.add_parser('scst_dgrp_del', help='Remove device group <name>')
     p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
     p.set_defaults(func=scst_dgrp_del)
 
@@ -171,25 +171,47 @@ if __name__ == "__main__":
 
     def scst_dgrp_add_dev(args):
         json = rpc.scst.scst_dgrp_add_dev(args.client,
-                                          dgrp_name=args.dgrp_name,
+                                          name=args.name,
                                           dev_name=args.dev_name)
         print_json(json)
 
-    p = subparsers.add_parser('scst_dgrp_add_dev', help='Add device <dev_name> to device group <dgrp_name>')
-    p.add_argument('-n', '--dgrp_name', help='SCST device group name', required=True, type=str)
+    p = subparsers.add_parser('scst_dgrp_add_dev', help='Add device <dev_name> to device group <name>')
+    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
     p.add_argument('-d', '--dev_name', help='SCST device name', required=True, type=str)
     p.set_defaults(func=scst_dgrp_add_dev)
 
     def scst_dgrp_del_dev(args):
         json = rpc.scst.scst_dgrp_del_dev(args.client,
-                                          dgrp_name=args.dgrp_name,
+                                          name=args.name,
                                           dev_name=args.dev_name)
         print_json(json)
 
-    p = subparsers.add_parser('scst_dgrp_del_dev', help='Remove device <dev_name> from device group <dgrp_name>')
-    p.add_argument('-n', '--dgrp_name', help='SCST device group name', required=True, type=str)
+    p = subparsers.add_parser('scst_dgrp_del_dev', help='Remove device <dev_name> from device group <name>')
+    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
     p.add_argument('-d', '--dev_name', help='SCST device name', required=True, type=str)
     p.set_defaults(func=scst_dgrp_del_dev)
+
+    def scst_tgrp_add(args):
+        json = rpc.scst.scst_tgrp_add(args.client,
+                                      name=args.name,
+                                      dgrp_name=args.dgrp_name)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_tgrp_add', help='Add target group <name> to device group <dgrp_name>')
+    p.add_argument('-n', '--name', help='SCST target group name', required=True, type=str)
+    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
+    p.set_defaults(func=scst_tgrp_add)
+
+    def scst_tgrp_del(args):
+        json = rpc.scst.scst_tgrp_del(args.client,
+                                      name=args.name,
+                                      dgrp_name=args.dgrp_name)
+        print_json(json)
+
+    p = subparsers.add_parser('scst_tgrp_del', help='Remove target group <name> from device group <dgrp_name>')
+    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
+    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
+    p.set_defaults(func=scst_tgrp_del)
 
     def scst_target_add(args):
         json = rpc.scst.scst_target_add(args.client,
