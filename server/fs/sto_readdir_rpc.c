@@ -6,18 +6,18 @@
 #include "sto_readdir_back.h"
 
 struct sto_readdir_params {
-	char *dirname;
+	char *dirpath;
 	bool skip_hidden;
 };
 
 static void
 sto_readdir_params_free(struct sto_readdir_params *params)
 {
-	free(params->dirname);
+	free(params->dirpath);
 }
 
 static const struct spdk_json_object_decoder sto_readdir_decoders[] = {
-	{"dirname", offsetof(struct sto_readdir_params, dirname), spdk_json_decode_string},
+	{"dirpath", offsetof(struct sto_readdir_params, dirpath), spdk_json_decode_string},
 	{"skip_hidden", offsetof(struct sto_readdir_params, skip_hidden), spdk_json_decode_bool},
 };
 
@@ -80,7 +80,7 @@ sto_rpc_readdir(struct spdk_jsonrpc_request *request, const struct spdk_json_val
 		return;
 	}
 
-	rc = sto_readdir_back(rd_params.dirname, rd_params.skip_hidden,
+	rc = sto_readdir_back(rd_params.dirpath, rd_params.skip_hidden,
 			      sto_readdir_done, request);
 	if (spdk_unlikely(rc)) {
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));

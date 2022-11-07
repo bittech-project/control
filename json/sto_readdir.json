@@ -6,7 +6,7 @@
         {
           "method": "readdir",
           "params": {
-            "dirname": "/root/gleb/bittech/control"
+            "dirpath": "/root/gleb/bittech/control"
           }
         }
       ]

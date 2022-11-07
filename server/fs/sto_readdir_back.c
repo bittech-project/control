@@ -94,9 +94,9 @@ sto_readdir_exec(void *arg)
 	DIR *dir;
 	int rc = 0;
 
-	dir = opendir(req->dirname);
+	dir = opendir(req->dirpath);
 	if (spdk_unlikely(!dir)) {
-		printf("server: Failed to open %s dir\n", req->dirname);
+		printf("server: Failed to open %s dir\n", req->dirpath);
 		return -errno;
 	}
 
@@ -117,7 +117,7 @@ sto_readdir_exec(void *arg)
 			break;
 		}
 
-		rc = sto_dirent_get_stat(dirent, req->dirname);
+		rc = sto_dirent_get_stat(dirent, req->dirpath);
 		if (spdk_unlikely(rc)) {
 			sto_readdir_dirents_free(req);
 			printf("server: Failed to dirent to get stat\n");
@@ -131,7 +131,7 @@ sto_readdir_exec(void *arg)
 
 	rc = closedir(dir);
 	if (spdk_unlikely(rc == -1)) {
-		printf("server: Failed to close %s dir\n", req->dirname);
+		printf("server: Failed to close %s dir\n", req->dirpath);
 		rc = -errno;
 	}
 
@@ -139,7 +139,7 @@ sto_readdir_exec(void *arg)
 }
 
 static struct sto_readdir_back_req *
-sto_readdir_back_alloc(const char *dirname, bool skip_hidden)
+sto_readdir_back_alloc(const char *dirpath, bool skip_hidden)
 {
 	struct sto_readdir_back_req *req;
 
@@ -149,9 +149,9 @@ sto_readdir_back_alloc(const char *dirname, bool skip_hidden)
 		return NULL;
 	}
 
-	req->dirname = strdup(dirname);
-	if (spdk_unlikely(!req->dirname)) {
-		printf("Cann't allocate memory for dirname: %s\n", dirname);
+	req->dirpath = strdup(dirpath);
+	if (spdk_unlikely(!req->dirpath)) {
+		printf("Cann't allocate memory for dirpath: %s\n", dirpath);
 		goto free_req;
 	}
 
@@ -182,7 +182,7 @@ sto_readdir_back_free(struct sto_readdir_back_req *req)
 {
 	sto_readdir_dirents_free(req);
 
-	free((char *) req->dirname);
+	free((char *) req->dirpath);
 	free(req);
 }
 
@@ -193,13 +193,13 @@ sto_readdir_back_submit(struct sto_readdir_back_req *req)
 }
 
 int
-sto_readdir_back(const char *dirname, bool skip_hidden,
+sto_readdir_back(const char *dirpath, bool skip_hidden,
 		 readdir_back_done_t readdir_back_done, void *priv)
 {
 	struct sto_readdir_back_req *req;
 	int rc;
 
-	req = sto_readdir_back_alloc(dirname, skip_hidden);
+	req = sto_readdir_back_alloc(dirpath, skip_hidden);
 	if (spdk_unlikely(!req)) {
 		printf("server: Failed to alloc memory for back readdir\n");
 		return -ENOMEM;

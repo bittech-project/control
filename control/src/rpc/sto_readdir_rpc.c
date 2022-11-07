@@ -7,17 +7,17 @@
 #include "sto_readdir_front.h"
 
 struct sto_readdir_params {
-	char *dirname;
+	char *dirpath;
 };
 
 static void
 sto_readdir_params_free(struct sto_readdir_params *params)
 {
-	free(params->dirname);
+	free(params->dirpath);
 }
 
 static const struct spdk_json_object_decoder sto_readdir_decoders[] = {
-	{"dirname", offsetof(struct sto_readdir_params, dirname), spdk_json_decode_string},
+	{"dirpath", offsetof(struct sto_readdir_params, dirpath), spdk_json_decode_string},
 };
 
 struct sto_readdir_rpc_ctx {
@@ -89,7 +89,7 @@ sto_rpc_readdir(struct spdk_jsonrpc_request *request, const struct spdk_json_val
 	args.priv = rpc_ctx;
 	args.readdir_done = sto_readdir_done;
 
-	rc = sto_readdir(rd_params.dirname, &args);
+	rc = sto_readdir(rd_params.dirpath, &args);
 	if (spdk_unlikely(rc)) {
 		spdk_jsonrpc_send_error_response(request, rc, spdk_strerror(-rc));
 		goto free_rpc_ctx;

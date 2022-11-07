@@ -63,7 +63,7 @@ sto_readdir_result_free(struct sto_readdir_result *result)
 }
 
 static struct sto_readdir_req *
-sto_readdir_alloc(const char *dirname)
+sto_readdir_alloc(const char *dirpath)
 {
 	struct sto_readdir_req *req;
 
@@ -73,9 +73,9 @@ sto_readdir_alloc(const char *dirname)
 		return NULL;
 	}
 
-	req->dirname = strdup(dirname);
-	if (spdk_unlikely(!req->dirname)) {
-		SPDK_ERRLOG("Cann't allocate memory for dirname: %s\n", dirname);
+	req->dirpath = strdup(dirpath);
+	if (spdk_unlikely(!req->dirpath)) {
+		SPDK_ERRLOG("Cann't allocate memory for dirpath: %s\n", dirpath);
 		goto free_req;
 	}
 
@@ -99,7 +99,7 @@ sto_readdir_init_cb(struct sto_readdir_req *req, readdir_done_t readdir_done, vo
 static void
 sto_readdir_free(struct sto_readdir_req *req)
 {
-	free((char *) req->dirname);
+	free((char *) req->dirpath);
 	rte_free(req);
 }
 
@@ -135,7 +135,7 @@ sto_readdir_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_ct
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_string(w, "dirname", req->dirname);
+	spdk_json_write_named_string(w, "dirpath", req->dirpath);
 	spdk_json_write_named_bool(w, "skip_hidden", req->skip_hidden);
 
 	spdk_json_write_object_end(w);
@@ -149,12 +149,12 @@ sto_readdir_submit(struct sto_readdir_req *req)
 }
 
 int
-sto_readdir(const char *dirname, struct sto_readdir_args *args)
+sto_readdir(const char *dirpath, struct sto_readdir_args *args)
 {
 	struct sto_readdir_req *req;
 	int rc;
 
-	req = sto_readdir_alloc(dirname);
+	req = sto_readdir_alloc(dirpath);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("Failed to alloc memory for readdir req\n");
 		return -ENOMEM;

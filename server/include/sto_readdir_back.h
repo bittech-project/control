@@ -20,7 +20,7 @@ struct sto_readdir_back_req {
 
 	struct {
 		bool skip_hidden;
-		const char *dirname;
+		const char *dirpath;
 	};
 
 	struct {
@@ -33,7 +33,7 @@ struct sto_readdir_back_req {
 	readdir_back_done_t readdir_back_done;
 };
 
-int sto_readdir_back(const char *dirname, bool skip_hidden,
+int sto_readdir_back(const char *dirpath, bool skip_hidden,
 		     readdir_back_done_t readdir_back_done, void *priv);
 void sto_readdir_back_free(struct sto_readdir_back_req *req);
 

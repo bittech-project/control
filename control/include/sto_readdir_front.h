@@ -39,7 +39,7 @@ struct sto_readdir_args {
 struct sto_readdir_req {
 	struct {
 		bool skip_hidden;
-		const char *dirname;
+		const char *dirpath;
 	};
 
 	struct sto_readdir_result *result;
@@ -50,7 +50,7 @@ struct sto_readdir_req {
 
 void sto_readdir_result_free(struct sto_readdir_result *result);
 
-int sto_readdir(const char *dirname, struct sto_readdir_args *args);
+int sto_readdir(const char *dirpath, struct sto_readdir_args *args);
 
 void sto_dirents_info_json(struct sto_dirents *dirents,
 			   struct sto_dirents_json_cfg *cfg, struct spdk_json_write_ctx *w);
