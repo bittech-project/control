@@ -1,7 +1,7 @@
 #
 # Basic configuration options
 #
-SPDK_DIR ?= /root/gleb/SPDK/spdk
+SPDK_DIR ?= /root/gleb/spdk
 
 SPDK_HEADER_DIR=$(SPDK_DIR)/include
 DPDK_HEADER_DIR=$(SPDK_DIR)/dpdk/build/include
