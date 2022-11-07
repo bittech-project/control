@@ -7,7 +7,7 @@ struct spdk_json_write_ctx;
 typedef void (*readdir_done_t)(void *priv);
 
 struct sto_dirent {
-	char *d_name;
+	char *name;
 	uint32_t mode;
 };
 

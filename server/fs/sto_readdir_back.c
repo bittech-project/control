@@ -13,7 +13,7 @@ static struct sto_exec_ops readdir_ops = {
 };
 
 static struct sto_dirent *
-sto_readdir_alloc_dirent(const char *d_name)
+sto_readdir_alloc_dirent(const char *name)
 {
 	struct sto_dirent *dirent;
 
@@ -23,8 +23,8 @@ sto_readdir_alloc_dirent(const char *d_name)
 		return NULL;
 	}
 
-	dirent->d_name = strdup(d_name);
-	if (spdk_unlikely(!dirent->d_name)) {
+	dirent->name = strdup(name);
+	if (spdk_unlikely(!dirent->name)) {
 		printf("server: Failed to alloc dirent name\n");
 		goto free_dirent;
 	}
@@ -44,7 +44,7 @@ sto_dirent_get_stat(struct sto_dirent *dirent, const char *path)
 	char *full_path;
 	int rc = 0;
 
-	full_path = spdk_sprintf_alloc("%s/%s", path, dirent->d_name);
+	full_path = spdk_sprintf_alloc("%s/%s", path, dirent->name);
 	if (spdk_unlikely(!full_path)) {
 		return -ENOMEM;
 	}
@@ -72,7 +72,7 @@ sto_readdir_dirents_free(struct sto_readdir_back_req *req)
 	TAILQ_FOREACH_SAFE(dirent, &req->dirent_list, list, tmp) {
 		TAILQ_REMOVE(&req->dirent_list, dirent, list);
 
-		free(dirent->d_name);
+		free(dirent->name);
 		free(dirent);
 	}
 }

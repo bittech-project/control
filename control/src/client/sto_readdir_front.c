@@ -9,7 +9,7 @@
 #include "sto_readdir_front.h"
 
 static const struct spdk_json_object_decoder sto_dirent_decoders[] = {
-	{"d_name", offsetof(struct sto_dirent, d_name), spdk_json_decode_string},
+	{"name", offsetof(struct sto_dirent, name), spdk_json_decode_string},
 	{"mode", offsetof(struct sto_dirent, mode), spdk_json_decode_uint32},
 };
 
@@ -39,7 +39,7 @@ static const struct spdk_json_object_decoder sto_readdir_result_decoders[] = {
 static void
 sto_dirent_free(struct sto_dirent *dirent)
 {
-	free(dirent->d_name);
+	free(dirent->name);
 }
 
 static void
@@ -208,7 +208,7 @@ sto_dirents_info_json(struct sto_dirents *dirents,
 	for (i = 0; i < dirents->cnt; i++) {
 		struct sto_dirent *dirent = &dirents->dirents[i];
 
-		if (find_match_str(cfg->exclude_list, dirent->d_name)) {
+		if (find_match_str(cfg->exclude_list, dirent->name)) {
 			continue;
 		}
 
@@ -216,7 +216,7 @@ sto_dirents_info_json(struct sto_dirents *dirents,
 			continue;
 		}
 
-		spdk_json_write_string(w, dirent->d_name);
+		spdk_json_write_string(w, dirent->name);
 	}
 
 	spdk_json_write_array_end(w);

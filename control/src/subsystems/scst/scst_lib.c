@@ -128,7 +128,7 @@ scst_tg_list_reqs_alloc(struct sto_req *req, struct sto_dirents *dirents)
 	for (i = 0; i < tg_list_req->driver_cnt; i++) {
 		struct scst_ls_tg_req *tg_req = &tg_list_req->tg_reqs[i];
 
-		tg_req->name = strdup(dirents->dirents[i].d_name);
+		tg_req->name = strdup(dirents->dirents[i].name);
 		if (spdk_unlikely(!tg_req->name)) {
 			SPDK_ERRLOG("Failed to alloc name for tg req\n");
 			goto out_err;

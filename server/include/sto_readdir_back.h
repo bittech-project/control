@@ -9,7 +9,7 @@ struct sto_readdir_back_req;
 typedef void (*readdir_back_done_t)(struct sto_readdir_back_req *req);
 
 struct sto_dirent {
-	char *d_name;
+	char *name;
 	uint32_t mode;
 
 	TAILQ_ENTRY(sto_dirent) list;
