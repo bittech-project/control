@@ -1,7 +1,6 @@
 #ifndef _STO_READDIR_FRONT_H_
 #define _STO_READDIR_FRONT_H_
 
-struct sto_readdir_req;
 struct spdk_json_write_ctx;
 
 typedef void (*readdir_done_t)(void *priv);
