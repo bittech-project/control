@@ -4,28 +4,14 @@
 #include <spdk/util.h>
 
 #include "scst.h"
-#include "sto_readdir_front.h"
-
-struct scst_ls_tg_req {
-	const char *name;
-	char *dirpath;
-
-	struct sto_readdir_result result;
-
-	void *priv;
-};
+#include "sto_tree.h"
 
 struct scst_tg_list_req {
 	struct sto_req req;
 
 	char *dirpath;
 
-	struct sto_readdir_result driver_info;
-
-	int driver_cnt;
-	struct scst_ls_tg_req *tg_reqs;
-
-	int refcnt;
+	struct sto_tree_result result;
 };
 
 static inline struct scst_tg_list_req *

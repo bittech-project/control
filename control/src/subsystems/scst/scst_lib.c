@@ -40,206 +40,57 @@ scst_tg_list_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb
 }
 
 static void
-scst_tg_list_req_release(struct sto_req *req)
-{
-	sto_req_response(req);
-}
-
-static void
-scst_tg_list_req_get_ref(struct sto_req *req)
-{
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-
-	tg_list_req->refcnt++;
-}
-
-static void
-scst_tg_list_req_put_ref(struct sto_req *req)
-{
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-
-	tg_list_req->refcnt--;
-	if (tg_list_req->refcnt == 0) {
-		scst_tg_list_req_release(req);
-	}
-}
-
-static void
-scst_tg_list_done(void *priv)
-{
-	struct scst_ls_tg_req *tg_req = priv;
-	struct sto_req *req = tg_req->priv;
-	struct sto_readdir_result *result = &tg_req->result;
-	int rc;
-
-	rc = result->returncode;
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to readdir targets\n");
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	scst_tg_list_req_put_ref(req);
-}
-
-static void
-scst_tg_list_submit_reqs(struct sto_req *req)
-{
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	int i, rc;
-
-	tg_list_req->refcnt = 1;
-
-	for (i = 0; i < tg_list_req->driver_cnt; i++) {
-		struct scst_ls_tg_req *tg_req = &tg_list_req->tg_reqs[i];
-		struct sto_readdir_args args = {
-			.priv = tg_req,
-			.readdir_done = scst_tg_list_done,
-			.result = &tg_req->result,
-		};
-
-		rc = sto_readdir(tg_req->dirpath, &args);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Failed to submit %d target req\n", i);
-			sto_err(req->ctx.err_ctx, rc);
-			break;
-		}
-
-		scst_tg_list_req_get_ref(req);
-	}
-
-	scst_tg_list_req_put_ref(req);
-
-	return;
-}
-
-static int
-scst_tg_list_reqs_alloc(struct sto_req *req, struct sto_dirents *dirents)
-{
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	int i, j;
-
-	tg_list_req->tg_reqs = rte_calloc(NULL, tg_list_req->driver_cnt, sizeof(struct scst_ls_tg_req), 0);
-	if (spdk_unlikely(!tg_list_req->tg_reqs)) {
-		SPDK_ERRLOG("Failed to alloc tg reqs\n");
-		return -ENOMEM;
-	}
-
-	for (i = 0; i < tg_list_req->driver_cnt; i++) {
-		struct scst_ls_tg_req *tg_req = &tg_list_req->tg_reqs[i];
-
-		tg_req->name = strdup(dirents->dirents[i].name);
-		if (spdk_unlikely(!tg_req->name)) {
-			SPDK_ERRLOG("Failed to alloc name for tg req\n");
-			goto out_err;
-		}
-
-		tg_req->dirpath = spdk_sprintf_alloc("%s/%s", tg_list_req->dirpath, tg_req->name);
-		if (spdk_unlikely(!tg_req->dirpath)) {
-			SPDK_ERRLOG("Failed to alloc dirpath for tg req\n");
-			free((char *) tg_req->name);
-			goto out_err;
-		}
-
-		tg_req->priv = req;
-	}
-
-	return 0;
-
-out_err:
-	for (j = 0; j < i; j++) {
-		struct scst_ls_tg_req *tg_req = &tg_list_req->tg_reqs[j];
-
-		free((char *) tg_req->name);
-		free(tg_req->dirpath);
-	}
-
-	rte_free(tg_list_req->tg_reqs);
-
-	return -ENOMEM;
-}
-
-static void
-scst_tg_list_reqs_free(struct sto_req *req)
-{
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	int i;
-
-	for (i = 0; i < tg_list_req->driver_cnt; i++) {
-		struct scst_ls_tg_req *tg_req = &tg_list_req->tg_reqs[i];
-
-		free((char *) tg_req->name);
-		free(tg_req->dirpath);
-
-		sto_readdir_result_free(&tg_req->result);
-	}
-
-	rte_free(tg_list_req->tg_reqs);
-}
-
-static void
-scst_driver_info_done(void *priv)
+scst_tg_list_req_done(void *priv)
 {
 	struct sto_req *req = priv;
 	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	struct sto_readdir_result *result = &tg_list_req->driver_info;
+	struct sto_tree_result *result = &tg_list_req->result;
 	int rc;
 
 	rc = result->returncode;
 
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to readdir drivers\n");
-		goto out_err;
+		SPDK_ERRLOG("Failed to tree targets\n");
+		sto_err(req->ctx.err_ctx, rc);
+		goto out;
 	}
 
-	tg_list_req->driver_cnt = result->dirents.cnt;
-
-	rc = scst_tg_list_reqs_alloc(req, &result->dirents);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to alloc %d target reqs\n",
-				tg_list_req->driver_cnt);
-		goto out_err;
-	}
-
-	scst_tg_list_submit_reqs(req);
+out:
+	sto_req_response(req);
 
 	return;
-
-out_err:
-	sto_err(req->ctx.err_ctx, rc);
-	sto_req_response(req);
 }
 
 static int
 scst_tg_list_req_exec(struct sto_req *req)
 {
 	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	struct sto_readdir_args args = {
+	struct sto_tree_args args = {
 		.priv = req,
-		.readdir_done = scst_driver_info_done,
-		.result = &tg_list_req->driver_info,
+		.tree_done = scst_tg_list_req_done,
+		.result = &tg_list_req->result,
 	};
 
-	return sto_readdir(tg_list_req->dirpath, &args);
+	return sto_tree(tg_list_req->dirpath, 2, &args);
 }
 
 static void
 scst_tg_list_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	int i;
+	struct sto_inode *tree_root = &tg_list_req->result.tree_root;
+	struct sto_inode *inode;
 
 	spdk_json_write_array_begin(w);
 
-	for (i = 0; i < tg_list_req->driver_cnt; i++) {
-		struct scst_ls_tg_req *tg_req = &tg_list_req->tg_reqs[i];
-		struct sto_readdir_result *result = &tg_req->result;
+	TAILQ_FOREACH(inode, &tree_root->childs, list) {
+		struct sto_readdir_result *info = &inode->info;
 		struct sto_dirents_json_cfg cfg = {
-			.name = tg_req->name,
+			.name = inode->dirent.name,
 			.type = S_IFDIR,
 		};
 
-		sto_dirents_info_json(&result->dirents, &cfg, w);
+		sto_dirents_info_json(&info->dirents, &cfg, w);
 	}
 
 	spdk_json_write_array_end(w);
@@ -252,9 +103,7 @@ scst_tg_list_req_free(struct sto_req *req)
 
 	free(tg_list_req->dirpath);
 
-	sto_readdir_result_free(&tg_list_req->driver_info);
-
-	scst_tg_list_reqs_free(req);
+	sto_tree_result_free(&tg_list_req->result);
 
 	rte_free(tg_list_req);
 }
