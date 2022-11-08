@@ -11,7 +11,7 @@ struct scst_tg_list_req {
 
 	char *dirpath;
 
-	struct sto_tree_result result;
+	struct sto_tree_info info;
 };
 
 static inline struct scst_tg_list_req *

@@ -44,10 +44,10 @@ scst_tg_list_req_done(void *priv)
 {
 	struct sto_req *req = priv;
 	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	struct sto_tree_result *result = &tg_list_req->result;
+	struct sto_tree_info *info = &tg_list_req->info;
 	int rc;
 
-	rc = result->returncode;
+	rc = info->returncode;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to tree targets\n");
@@ -65,10 +65,10 @@ static int
 scst_tg_list_req_exec(struct sto_req *req)
 {
 	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	struct sto_tree_args args = {
+	struct sto_tree_cmd_args args = {
 		.priv = req,
-		.tree_done = scst_tg_list_req_done,
-		.result = &tg_list_req->result,
+		.tree_cmd_done = scst_tg_list_req_done,
+		.info = &tg_list_req->info,
 	};
 
 	return sto_tree(tg_list_req->dirpath, 2, &args);
@@ -78,7 +78,7 @@ static void
 scst_tg_list_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
-	struct sto_inode *tree_root = &tg_list_req->result.tree_root;
+	struct sto_inode *tree_root = &tg_list_req->info.tree_root;
 	struct sto_inode *inode;
 
 	spdk_json_write_array_begin(w);
@@ -103,7 +103,7 @@ scst_tg_list_req_free(struct sto_req *req)
 
 	free(tg_list_req->dirpath);
 
-	sto_tree_result_free(&tg_list_req->result);
+	sto_tree_info_free(&tg_list_req->info);
 
 	rte_free(tg_list_req);
 }

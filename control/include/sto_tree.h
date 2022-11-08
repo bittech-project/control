@@ -3,8 +3,6 @@
 
 #include "sto_readdir_front.h"
 
-typedef void (*tree_done_t)(void *priv);
-
 struct sto_inode {
 	struct sto_inode *root;
 	struct sto_inode *parent;
@@ -20,39 +18,43 @@ struct sto_inode {
 	TAILQ_HEAD(, sto_inode) childs;
 };
 
-struct sto_tree_result {
+struct sto_tree_cmd;
+
+struct sto_tree_info {
 	int returncode;
 
 	struct sto_inode tree_root;
 
 	struct {
-		struct sto_tree_req *req;
+		struct sto_tree_cmd *cmd;
 	} inner;
 };
 
-struct sto_tree_args {
-	void *priv;
-	tree_done_t tree_done;
+typedef void (*tree_cmd_done_t)(void *priv);
 
-	struct sto_tree_result *result;
+struct sto_tree_cmd_args {
+	void *priv;
+	tree_cmd_done_t tree_cmd_done;
+
+	struct sto_tree_info *info;
 };
 
-struct sto_tree_req {
+struct sto_tree_cmd {
 	struct {
 		const char *dirpath;
 		uint32_t depth;
 	};
 
-	struct sto_tree_result *result;
+	struct sto_tree_info *info;
 
 	uint32_t refcnt;
 
 	void *priv;
-	tree_done_t tree_done;
+	tree_cmd_done_t tree_cmd_done;
 };
 
-int sto_tree(const char *dirpath, uint32_t depth, struct sto_tree_args *args);
+void sto_tree_info_free(struct sto_tree_info *info);
 
-void sto_tree_result_free(struct sto_tree_result *result);
+int sto_tree(const char *dirpath, uint32_t depth, struct sto_tree_cmd_args *args);
 
 #endif /* _STO_TREE_H_ */
