@@ -36,7 +36,21 @@ static const struct spdk_json_object_decoder sto_readdir_result_decoders[] = {
 	{"dirents", offsetof(struct sto_readdir_result, dirents), sto_dirents_decode},
 };
 
-static void
+int
+sto_dirent_copy(struct sto_dirent *src, struct sto_dirent *dst)
+{
+	dst->name = strdup(src->name);
+	if (spdk_unlikely(!dst->name)) {
+		SPDK_ERRLOG("Failed to copy dirent name: %s\n", src->name);
+		return -ENOMEM;
+	}
+
+	dst->mode = src->mode;
+
+	return 0;
+}
+
+void
 sto_dirent_free(struct sto_dirent *dirent)
 {
 	free(dirent->name);

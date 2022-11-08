@@ -54,4 +54,7 @@ int sto_readdir(const char *dirpath, struct sto_readdir_args *args);
 void sto_dirents_info_json(struct sto_dirents *dirents,
 			   struct sto_dirents_json_cfg *cfg, struct spdk_json_write_ctx *w);
 
+int sto_dirent_copy(struct sto_dirent *src, struct sto_dirent *dst);
+void sto_dirent_free(struct sto_dirent *dirent);
+
 #endif /* _STO_READDIR_FRONT_H_ */
