@@ -68,7 +68,7 @@ struct sto_req {
 };
 
 static inline struct sto_req *
-to_sto_req(struct sto_context *ctx)
+sto_req(struct sto_context *ctx)
 {
 	return SPDK_CONTAINEROF(ctx, struct sto_req, ctx);
 }
@@ -109,7 +109,7 @@ struct sto_write_req_params {
 extern struct sto_req_ops sto_write_req_ops;
 
 static inline struct sto_write_req *
-to_write_req(struct sto_req *req)
+sto_write_req(struct sto_req *req)
 {
 	return SPDK_CONTAINEROF(req, struct sto_write_req, req);
 }
@@ -142,7 +142,7 @@ struct sto_ls_req_params {
 extern struct sto_req_ops sto_ls_req_ops;
 
 static inline struct sto_ls_req *
-to_ls_req(struct sto_req *req)
+sto_ls_req(struct sto_req *req)
 {
 	return SPDK_CONTAINEROF(req, struct sto_ls_req, req);
 }

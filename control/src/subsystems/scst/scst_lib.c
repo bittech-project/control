@@ -28,7 +28,7 @@ scst_tg_list_req_constructor(const struct sto_cdbops *op)
 static int
 scst_tg_list_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
+	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
 
 	tg_list_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
 	if (spdk_unlikely(!tg_list_req->dirpath)) {
@@ -43,7 +43,7 @@ static void
 scst_tg_list_req_done(void *priv)
 {
 	struct sto_req *req = priv;
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
+	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
 	struct sto_tree_info *info = &tg_list_req->info;
 	int rc;
 
@@ -64,7 +64,7 @@ out:
 static int
 scst_tg_list_req_exec(struct sto_req *req)
 {
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
+	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
 	struct sto_tree_cmd_args args = {
 		.priv = req,
 		.tree_cmd_done = scst_tg_list_req_done,
@@ -77,7 +77,7 @@ scst_tg_list_req_exec(struct sto_req *req)
 static void
 scst_tg_list_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
+	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
 	struct sto_inode *tree_root = &tg_list_req->info.tree_root;
 	struct sto_inode *inode;
 
@@ -99,7 +99,7 @@ scst_tg_list_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w
 static void
 scst_tg_list_req_free(struct sto_req *req)
 {
-	struct scst_tg_list_req *tg_list_req = to_tg_list_req(req);
+	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
 
 	free(tg_list_req->dirpath);
 

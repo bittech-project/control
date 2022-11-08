@@ -204,7 +204,7 @@ free_file:
 static int
 sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_write_req *write_req = to_write_req(req);
+	struct sto_write_req *write_req = sto_write_req(req);
 	struct sto_write_req_params *p = req->params_constructor;
 	int rc = 0;
 
@@ -239,7 +239,7 @@ sto_write_req_done(struct sto_aio *aio)
 static int
 sto_write_req_exec(struct sto_req *req)
 {
-	struct sto_write_req *write_req = to_write_req(req);
+	struct sto_write_req *write_req = sto_write_req(req);
 
 	return sto_aio_write_string(write_req->file, write_req->data,
 				    sto_write_req_done, req);
@@ -254,7 +254,7 @@ sto_write_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 static void
 sto_write_req_free(struct sto_req *req)
 {
-	struct sto_write_req *write_req = to_write_req(req);
+	struct sto_write_req *write_req = sto_write_req(req);
 
 	free((char *) write_req->file);
 	free(write_req->data);
@@ -327,7 +327,7 @@ free_name:
 static int
 sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_ls_req *ls_req = to_ls_req(req);
+	struct sto_ls_req *ls_req = sto_ls_req(req);
 	struct sto_ls_req_params *p = req->params_constructor;
 	int rc = 0;
 
@@ -345,7 +345,7 @@ static void
 sto_ls_req_done(void *priv)
 {
 	struct sto_req *req = priv;
-	struct sto_ls_req *ls_req = to_ls_req(req);
+	struct sto_ls_req *ls_req = sto_ls_req(req);
 	struct sto_readdir_result *result = &ls_req->result;
 	int rc;
 
@@ -364,7 +364,7 @@ out:
 static int
 sto_ls_req_exec(struct sto_req *req)
 {
-	struct sto_ls_req *ls_req = to_ls_req(req);
+	struct sto_ls_req *ls_req = sto_ls_req(req);
 	struct sto_readdir_args args = {
 		.priv = req,
 		.readdir_done = sto_ls_req_done,
@@ -377,7 +377,7 @@ sto_ls_req_exec(struct sto_req *req)
 static void
 sto_ls_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_ls_req *ls_req = to_ls_req(req);
+	struct sto_ls_req *ls_req = sto_ls_req(req);
 	struct sto_readdir_result *result = &ls_req->result;
 	struct sto_dirents_json_cfg cfg = {
 		.name = ls_req->name,
@@ -390,7 +390,7 @@ sto_ls_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 static void
 sto_ls_req_free(struct sto_req *req)
 {
-	struct sto_ls_req *ls_req = to_ls_req(req);
+	struct sto_ls_req *ls_req = sto_ls_req(req);
 
 	free((char *) ls_req->name);
 	free(ls_req->dirpath);

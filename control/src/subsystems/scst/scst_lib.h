@@ -15,7 +15,7 @@ struct scst_tg_list_req {
 };
 
 static inline struct scst_tg_list_req *
-to_tg_list_req(struct sto_req *req)
+scst_tg_list_req(struct sto_req *req)
 {
 	return SPDK_CONTAINEROF(req, struct scst_tg_list_req, req);
 }

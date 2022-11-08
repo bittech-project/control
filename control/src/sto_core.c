@@ -191,7 +191,7 @@ sto_exec_done(void *priv)
 static int
 sto_core_req_exec(struct sto_core_req *core_req)
 {
-	struct sto_req *req = to_sto_req(core_req->ctx);
+	struct sto_req *req = sto_req(core_req->ctx);
 	struct sto_req_ops *ops = req->ops;
 
 	return ops->exec(req);
@@ -216,7 +216,7 @@ sto_core_req_end_response(struct sto_core_req *core_req, struct spdk_json_write_
 		sto_status_failed(w, err);
 
 		if (core_req->ctx) {
-			req = to_sto_req(core_req->ctx);
+			req = sto_req(core_req->ctx);
 			ops = req->ops;
 
 			ops->free(req);
@@ -226,7 +226,7 @@ sto_core_req_end_response(struct sto_core_req *core_req, struct spdk_json_write_
 		return;
 	}
 
-	req = to_sto_req(core_req->ctx);
+	req = sto_req(core_req->ctx);
 	ops = req->ops;
 
 	ops->end_response(req, w);
