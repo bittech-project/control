@@ -7,113 +7,6 @@
 
 #include "sto_lib.h"
 #include "scst.h"
-#include "scst_lib.h"
-
-struct sto_req *
-scst_tg_list_req_constructor(const struct sto_cdbops *op)
-{
-	struct scst_tg_list_req *tg_list_req;
-
-	tg_list_req = rte_zmalloc(NULL, sizeof(*tg_list_req), 0);
-	if (spdk_unlikely(!tg_list_req)) {
-		SPDK_ERRLOG("Failed to alloc sto ls req\n");
-		return NULL;
-	}
-
-	sto_req_init(&tg_list_req->req, op);
-
-	return &tg_list_req->req;
-}
-
-static int
-scst_tg_list_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
-{
-	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
-
-	tg_list_req->dirpath = spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
-	if (spdk_unlikely(!tg_list_req->dirpath)) {
-		SPDK_ERRLOG("Failed to alloc dirpath for tg_list_req\n");
-		return -ENOMEM;
-	}
-
-	return 0;
-}
-
-static void
-scst_tg_list_req_done(void *priv)
-{
-	struct sto_req *req = priv;
-	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
-	struct sto_tree_info *info = &tg_list_req->info;
-	int rc;
-
-	rc = info->returncode;
-
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to tree targets\n");
-		sto_err(req->ctx.err_ctx, rc);
-		goto out;
-	}
-
-out:
-	sto_req_response(req);
-
-	return;
-}
-
-static int
-scst_tg_list_req_exec(struct sto_req *req)
-{
-	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
-	struct sto_tree_cmd_args args = {
-		.priv = req,
-		.tree_cmd_done = scst_tg_list_req_done,
-		.info = &tg_list_req->info,
-	};
-
-	return sto_tree(tg_list_req->dirpath, 2, &args);
-}
-
-static void
-scst_tg_list_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
-{
-	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
-	struct sto_inode *tree_root = &tg_list_req->info.tree_root;
-	struct sto_inode *inode;
-
-	spdk_json_write_array_begin(w);
-
-	TAILQ_FOREACH(inode, &tree_root->childs, list) {
-		struct sto_readdir_result *info = &inode->info;
-		struct sto_dirents_json_cfg cfg = {
-			.name = inode->dirent.name,
-			.type = S_IFDIR,
-		};
-
-		sto_dirents_info_json(&info->dirents, &cfg, w);
-	}
-
-	spdk_json_write_array_end(w);
-}
-
-static void
-scst_tg_list_req_free(struct sto_req *req)
-{
-	struct scst_tg_list_req *tg_list_req = scst_tg_list_req(req);
-
-	free(tg_list_req->dirpath);
-
-	sto_tree_info_free(&tg_list_req->info);
-
-	rte_free(tg_list_req);
-}
-
-static struct sto_req_ops scst_tg_list_req_ops = {
-	.decode_cdb = scst_tg_list_req_decode_cdb,
-	.exec = scst_tg_list_req_exec,
-	.end_response = scst_tg_list_req_end_response,
-	.free = scst_tg_list_req_free,
-};
 
 static const char *
 scst_handler_list_name(void *arg)
@@ -795,6 +688,47 @@ static struct sto_write_req_params target_del_constructor = {
 	}
 };
 
+static char *
+scst_target_list_dirpath(void *arg)
+{
+	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
+}
+
+static uint32_t
+scst_target_list_depth(void *arg)
+{
+	return 2;
+}
+
+static void
+scst_target_list_info_json(struct sto_tree_req *tree_req, struct spdk_json_write_ctx *w)
+{
+	struct sto_inode *tree_root = &tree_req->info.tree_root;
+	struct sto_inode *inode;
+
+	spdk_json_write_array_begin(w);
+
+	TAILQ_FOREACH(inode, &tree_root->childs, list) {
+		struct sto_readdir_result *info = &inode->info;
+		struct sto_dirents_json_cfg cfg = {
+			.name = inode->dirent.name,
+			.type = S_IFDIR,
+		};
+
+		sto_dirents_info_json(&info->dirents, &cfg, w);
+	}
+
+	spdk_json_write_array_end(w);
+}
+
+static struct sto_tree_req_params target_list_constructor = {
+	.constructor = {
+		.dirpath = scst_target_list_dirpath,
+		.depth = scst_target_list_depth,
+	},
+	.info_json = scst_target_list_info_json,
+};
+
 static const char *
 scst_target_enable_file_path(void *arg)
 {
@@ -1245,8 +1179,9 @@ static const struct sto_cdbops scst_op_table[] = {
 	},
 	{
 		.name = "target_list",
-		.req_constructor = scst_tg_list_req_constructor,
-		.req_ops = &scst_tg_list_req_ops,
+		.req_constructor = sto_tree_req_constructor,
+		.req_ops = &sto_tree_req_ops,
+		.params_constructor = &target_list_constructor,
 	},
 	{
 		.name = "target_enable",

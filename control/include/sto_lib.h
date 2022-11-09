@@ -5,6 +5,7 @@
 
 #include "sto_subsystem.h"
 #include "sto_readdir_front.h"
+#include "sto_tree.h"
 
 typedef void *(*sto_params_alloc)(void);
 typedef void (*sto_params_free)(void *params);
@@ -103,7 +104,9 @@ struct sto_write_req_params {
 		char *(*data)(void *params);
 	} constructor;
 
-	struct sto_write_req *req;
+	struct {
+		struct sto_write_req *req;
+	} inner;
 };
 
 extern struct sto_req_ops sto_write_req_ops;
@@ -136,7 +139,9 @@ struct sto_ls_req_params {
 		int (*exclude)(const char **arr);
 	} constructor;
 
-	struct sto_ls_req *req;
+	struct {
+		struct sto_ls_req *req;
+	} inner;
 };
 
 extern struct sto_req_ops sto_ls_req_ops;
@@ -148,6 +153,42 @@ sto_ls_req(struct sto_req *req)
 }
 
 struct sto_req *sto_ls_req_constructor(const struct sto_cdbops *op);
+
+struct sto_tree_req {
+	struct sto_req req;
+
+	char *dirpath;
+	uint32_t depth;
+
+	struct sto_tree_info info;
+};
+
+typedef void (*sto_tree_req_info_json)(struct sto_tree_req *tree_req, struct spdk_json_write_ctx *w);
+
+struct sto_tree_req_params {
+	struct sto_decoder decoder;
+
+	struct {
+		char *(*dirpath)(void *params);
+		uint32_t (*depth)(void *params);
+	} constructor;
+
+	sto_tree_req_info_json info_json;
+
+	struct {
+		struct sto_tree_req *req;
+	} inner;
+};
+
+extern struct sto_req_ops sto_tree_req_ops;
+
+static inline struct sto_tree_req *
+sto_tree_req(struct sto_req *req)
+{
+	return SPDK_CONTAINEROF(req, struct sto_tree_req, req);
+}
+
+struct sto_req *sto_tree_req_constructor(const struct sto_cdbops *op);
 
 int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 		      sto_params_parse params_parse, void *priv);

@@ -179,7 +179,7 @@ static int
 sto_write_req_params_parse(void *priv, void *params)
 {
 	struct sto_write_req_params *p = priv;
-	struct sto_write_req *req = p->req;
+	struct sto_write_req *req = p->inner.req;
 
 	req->file = p->constructor.file_path(params);
 	if (spdk_unlikely(!req->file)) {
@@ -208,7 +208,7 @@ sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	struct sto_write_req_params *p = req->params_constructor;
 	int rc = 0;
 
-	p->req = write_req;
+	p->inner.req = write_req;
 
 	rc = sto_decoder_parse(&p->decoder, cdb, sto_write_req_params_parse, p);
 	if (spdk_unlikely(rc)) {
@@ -289,11 +289,11 @@ static int
 sto_ls_req_params_parse(void *priv, void *params)
 {
 	struct sto_ls_req_params *p = priv;
-	struct sto_ls_req *req = p->req;
+	struct sto_ls_req *req = p->inner.req;
 
 	req->name = p->constructor.name(params);
 	if (spdk_unlikely(!req->name)) {
-		SPDK_ERRLOG("Failed to alloc memory for targets\n");
+		SPDK_ERRLOG("Failed to alloc memory for name\n");
 		return -ENOMEM;
 	}
 
@@ -331,7 +331,7 @@ sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	struct sto_ls_req_params *p = req->params_constructor;
 	int rc = 0;
 
-	p->req = ls_req;
+	p->inner.req = ls_req;
 
 	rc = sto_decoder_parse(&p->decoder, cdb, sto_ls_req_params_parse, p);
 	if (spdk_unlikely(rc)) {
@@ -405,4 +405,143 @@ struct sto_req_ops sto_ls_req_ops = {
 	.exec = sto_ls_req_exec,
 	.end_response = sto_ls_req_end_response,
 	.free = sto_ls_req_free,
+};
+
+struct sto_req *
+sto_tree_req_constructor(const struct sto_cdbops *op)
+{
+	struct sto_tree_req *tree_req;
+
+	tree_req = rte_zmalloc(NULL, sizeof(*tree_req), 0);
+	if (spdk_unlikely(!tree_req)) {
+		SPDK_ERRLOG("Failed to alloc sto ls req\n");
+		return NULL;
+	}
+
+	sto_req_init(&tree_req->req, op);
+
+	return &tree_req->req;
+}
+
+static int
+sto_tree_req_params_parse(void *priv, void *params)
+{
+	struct sto_tree_req_params *p = priv;
+	struct sto_tree_req *req = p->inner.req;
+
+	req->dirpath = p->constructor.dirpath(params);
+	if (spdk_unlikely(!req->dirpath)) {
+		SPDK_ERRLOG("Failed to alloc memory for dirpath\n");
+		return -ENOMEM;
+	}
+
+	if (p->constructor.depth) {
+		req->depth = p->constructor.depth(params);
+	}
+
+	return 0;
+}
+
+static int
+sto_tree_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+{
+	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_req_params *p = req->params_constructor;
+	int rc = 0;
+
+	p->inner.req = tree_req;
+
+	rc = sto_decoder_parse(&p->decoder, cdb, sto_tree_req_params_parse, p);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to parse params for ls req\n");
+	}
+
+	return rc;
+}
+
+static void
+sto_tree_req_done(void *priv)
+{
+	struct sto_req *req = priv;
+	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_info *info = &tree_req->info;
+	int rc;
+
+	rc = info->returncode;
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to tree\n");
+		sto_err(req->ctx.err_ctx, rc);
+		goto out;
+	}
+
+out:
+	sto_req_response(req);
+}
+
+static int
+sto_tree_req_exec(struct sto_req *req)
+{
+	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_cmd_args args = {
+		.priv = req,
+		.tree_cmd_done = sto_tree_req_done,
+		.info = &tree_req->info,
+	};
+
+	return sto_tree(tree_req->dirpath, tree_req->depth, &args);
+}
+
+static void
+sto_tree_req_g_info_json(struct sto_tree_req *tree_req, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_info *info = &tree_req->info;
+	struct sto_inode *tree_root = &info->tree_root;
+	struct sto_inode *inode;
+
+	spdk_json_write_array_begin(w);
+
+	TAILQ_FOREACH(inode, &tree_root->childs, list) {
+		struct sto_readdir_result *info = &inode->info;
+		struct sto_dirents_json_cfg cfg = {
+			.name = inode->dirent.name,
+		};
+
+		sto_dirents_info_json(&info->dirents, &cfg, w);
+	}
+
+	spdk_json_write_array_end(w);
+}
+
+static void
+sto_tree_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_req_params *p = req->params_constructor;
+
+	if (p->info_json) {
+		p->info_json(tree_req, w);
+		return;
+	}
+
+	sto_tree_req_g_info_json(tree_req, w);
+}
+
+static void
+sto_tree_req_free(struct sto_req *req)
+{
+	struct sto_tree_req *tree_req = sto_tree_req(req);
+
+	free(tree_req->dirpath);
+
+	sto_tree_info_free(&tree_req->info);
+
+	rte_free(tree_req);
+}
+
+struct sto_req_ops sto_tree_req_ops = {
+	.decode_cdb = sto_tree_req_decode_cdb,
+	.exec = sto_tree_req_exec,
+	.end_response = sto_tree_req_end_response,
+	.free = sto_tree_req_free,
 };
