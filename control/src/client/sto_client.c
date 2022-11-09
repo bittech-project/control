@@ -189,11 +189,10 @@ sto_client_submit(struct sto_rpc_request *req)
 
 	if (req->params_json) {
 		spdk_json_write_name(w, "params");
-
 		req->params_json(req, w);
-
-		spdk_jsonrpc_end_request(request, w);
 	}
+
+	spdk_jsonrpc_end_request(request, w);
 
 	/* TODO: use a hash table or sorted list */
 	SLIST_INSERT_HEAD(&g_rpc_req_list, req, slist);
