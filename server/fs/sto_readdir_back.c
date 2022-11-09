@@ -49,7 +49,7 @@ sto_dirent_get_stat(struct sto_dirent *dirent, const char *path)
 		return -ENOMEM;
 	}
 
-	if (stat(full_path, &sb) == -1) {
+	if (lstat(full_path, &sb) == -1) {
 		printf("server: Failed to get stat for file %s: %s\n",
 		       full_path, strerror(errno));
 		rc = -errno;
