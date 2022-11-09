@@ -33,6 +33,7 @@ struct sto_client_group {
 static struct sto_client_group g_sto_client_group;
 
 static TAILQ_HEAD(, sto_rpc_request) g_rpc_req_list = TAILQ_HEAD_INITIALIZER(g_rpc_req_list);
+static TAILQ_HEAD(, sto_rpc_request) g_rpc_req_busy_list = TAILQ_HEAD_INITIALIZER(g_rpc_req_busy_list);
 
 
 static struct sto_rpc_request *
@@ -47,6 +48,27 @@ _get_rpc_request(int id)
 	}
 
 	return NULL;
+}
+
+static int sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req);
+
+static bool
+sto_client_check_busy_list(struct sto_client *client)
+{
+	struct sto_rpc_request *req;
+	int rc;
+
+	if (TAILQ_EMPTY(&g_rpc_req_busy_list)) {
+		return false;
+	}
+
+	req = TAILQ_FIRST(&g_rpc_req_busy_list);
+	TAILQ_REMOVE(&g_rpc_req_busy_list, req, list);
+
+	rc = sto_client_send_request(client, req);
+	assert(!rc);
+
+	return true;
 }
 
 static void
@@ -91,6 +113,10 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 	TAILQ_REMOVE(&g_rpc_req_list, req, list);
 
 	req->resp_handler(req, resp);
+
+	if (sto_client_check_busy_list(client)) {
+		goto out;
+	}
 
 	TAILQ_REMOVE(&cgroup->clients, client, list);
 	TAILQ_INSERT_HEAD(&cgroup->free_clients, client, list);
@@ -160,31 +186,22 @@ sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler)
 	req->resp_handler = resp_handler;
 }
 
-int
-sto_client_submit(struct sto_rpc_request *req)
+static int
+sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req)
 {
-	struct sto_client_group *group;
-	struct sto_client *client;
 	struct spdk_jsonrpc_client_request *request;
 	struct spdk_json_write_ctx *w;
 
-	group = &g_sto_client_group;
-
-	if (spdk_unlikely(!group->initialized)) {
-		SPDK_ERRLOG("FAILED: STO client has been failed to initialize\n");
-		return -EFAULT;
-	}
-
 	request = spdk_jsonrpc_client_create_request();
-	if (!request) {
-		SPDK_ERRLOG("Failed to create STO rpc request\n");
+	if (spdk_unlikely(!request)) {
+		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
 		return -ENOMEM;
 	}
 
 	w = spdk_jsonrpc_begin_request(request, req->id, req->method_name);
 	if (!w) {
 		spdk_jsonrpc_client_free_request(request);
-		return -EFAULT;
+		return -ENOMEM;
 	}
 
 	if (req->params_json) {
@@ -197,14 +214,41 @@ sto_client_submit(struct sto_rpc_request *req)
 	/* TODO: use a hash table? */
 	TAILQ_INSERT_TAIL(&g_rpc_req_list, req, list);
 
-	client = TAILQ_FIRST(&group->free_clients);
-	assert(client != NULL);
-
 	spdk_jsonrpc_client_send_request(client->rpc_client, request);
+
+	return 0;
+}
+
+int
+sto_client_submit(struct sto_rpc_request *req)
+{
+	struct sto_client_group *group;
+	struct sto_client *client;
+	int rc = 0;
+
+	group = &g_sto_client_group;
+
+	if (spdk_unlikely(!group->initialized)) {
+		SPDK_ERRLOG("FAILED: STO client has been failed to initialize\n");
+		return -EFAULT;
+	}
+
+	client = TAILQ_FIRST(&group->free_clients);
+	if (!client) {
+		TAILQ_INSERT_TAIL(&g_rpc_req_busy_list, req, list);
+		goto out;
+	}
+
+	rc = sto_client_send_request(client, req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to send STO rpc client request\n");
+		return rc;
+	}
 
 	TAILQ_REMOVE(&group->free_clients, client, list);
 	TAILQ_INSERT_TAIL(&group->clients, client, list);
 
+out:
 	return 0;
 }
 
@@ -212,21 +256,21 @@ int
 sto_client_send(const char *method_name, sto_dump_params_json params_json,
 		resp_handler resp_handler, void *priv)
 {
-	struct sto_rpc_request *rpc_req;
+	struct sto_rpc_request *req;
 	int rc = 0;
 
-	rpc_req = sto_rpc_req_alloc(method_name, params_json, priv);
-	if (spdk_unlikely(!rpc_req)) {
+	req = sto_rpc_req_alloc(method_name, params_json, priv);
+	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("Failed to alloc `%s` RPC req\n", method_name);
 		return -ENOMEM;
 	}
 
-	sto_rpc_req_init_cb(rpc_req, resp_handler);
+	sto_rpc_req_init_cb(req, resp_handler);
 
-	rc = sto_client_submit(rpc_req);
+	rc = sto_client_submit(req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to send RPC req, rc=%d\n", rc);
-		sto_rpc_req_free(rpc_req);
+		sto_rpc_req_free(req);
 	}
 
 	return rc;
