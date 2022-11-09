@@ -1,6 +1,8 @@
 #ifndef _STO_TREE_H_
 #define _STO_TREE_H_
 
+#include <spdk/queue.h>
+
 #include "sto_readdir_front.h"
 
 struct sto_inode {

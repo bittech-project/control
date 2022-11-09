@@ -1,6 +1,8 @@
 #ifndef _STO_CORE_H_
 #define _STO_CORE_H_
 
+#include <spdk/queue.h>
+
 #include "sto_lib.h"
 
 struct spdk_json_write_ctx;

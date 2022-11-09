@@ -1,6 +1,7 @@
 #ifndef _STO_CLIENT_H_
 #define _STO_CLIENT_H_
 
+#include <spdk/queue.h>
 #include <spdk/jsonrpc.h>
 
 #define STO_LOCAL_SERVER_ADDR "/var/tmp/sto_server.sock"
@@ -20,7 +21,7 @@ struct sto_rpc_request {
 	sto_dump_params_json params_json;
 
 	int id;
-	SLIST_ENTRY(sto_rpc_request) slist;
+	TAILQ_ENTRY(sto_rpc_request) list;
 };
 
 int sto_client_connect(const char *addr, int addr_family);
@@ -30,8 +31,8 @@ struct sto_rpc_request *sto_rpc_req_alloc(const char *method_name,
 		sto_dump_params_json params_json, void *priv);
 void sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler);
 void sto_rpc_req_free(struct sto_rpc_request *req);
-
 int sto_client_submit(struct sto_rpc_request *req);
+
 int sto_client_send(const char *method_name, sto_dump_params_json params_json,
 		    resp_handler resp_handler, void *priv);
 

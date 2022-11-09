@@ -32,7 +32,7 @@ struct sto_client_group {
 
 static struct sto_client_group g_sto_client_group;
 
-static SLIST_HEAD(, sto_rpc_request) g_rpc_req_list = SLIST_HEAD_INITIALIZER(sto_rpc_request);
+static TAILQ_HEAD(, sto_rpc_request) g_rpc_req_list = TAILQ_HEAD_INITIALIZER(g_rpc_req_list);
 
 
 static struct sto_rpc_request *
@@ -40,7 +40,7 @@ _get_rpc_request(int id)
 {
 	struct sto_rpc_request *req;
 
-	SLIST_FOREACH(req, &g_rpc_req_list, slist) {
+	TAILQ_FOREACH(req, &g_rpc_req_list, list) {
 		if (req->id == id) {
 			return req;
 		}
@@ -88,7 +88,7 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 	req = _get_rpc_request(id);
 	assert(req);
 
-	SLIST_REMOVE(&g_rpc_req_list, req, sto_rpc_request, slist);
+	TAILQ_REMOVE(&g_rpc_req_list, req, list);
 
 	req->resp_handler(req, resp);
 
@@ -194,8 +194,8 @@ sto_client_submit(struct sto_rpc_request *req)
 
 	spdk_jsonrpc_end_request(request, w);
 
-	/* TODO: use a hash table or sorted list */
-	SLIST_INSERT_HEAD(&g_rpc_req_list, req, slist);
+	/* TODO: use a hash table? */
+	TAILQ_INSERT_TAIL(&g_rpc_req_list, req, list);
 
 	client = TAILQ_FIRST(&group->free_clients);
 	assert(client != NULL);
