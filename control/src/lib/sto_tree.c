@@ -162,6 +162,8 @@ sto_subtree_alloc(struct sto_inode *parent)
 		TAILQ_INSERT_TAIL(&parent->childs, child, list);
 	}
 
+	sto_readdir_result_free(info);
+
 	return 0;
 }
 

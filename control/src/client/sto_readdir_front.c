@@ -68,6 +68,8 @@ sto_dirents_free(struct sto_dirents *dirents)
 	for (i = 0; i < dirents->cnt; i++) {
 		sto_dirent_free(&dirents->dirents[i]);
 	}
+
+	dirents->cnt = 0;
 }
 
 void
