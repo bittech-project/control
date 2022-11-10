@@ -253,10 +253,12 @@ if __name__ == "__main__":
     p.set_defaults(func=scst_target_del)
 
     def scst_target_list(args):
-        json = rpc.scst.scst_target_list(args.client)
+        json = rpc.scst.scst_target_list(args.client,
+                                         driver=args.driver)
         print_json(json)
 
     p = subparsers.add_parser('scst_target_list', help='List all available targets')
+    p.add_argument('-d', '--driver', help='SCST driver name', required=False, type=str)
     p.set_defaults(func=scst_target_list)
 
     def scst_target_enable(args):

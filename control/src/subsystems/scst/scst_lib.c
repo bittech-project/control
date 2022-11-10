@@ -688,19 +688,52 @@ static struct sto_write_req_params target_del_constructor = {
 	}
 };
 
+struct scst_target_list_params {
+	char *driver;
+};
+
+static void *
+scst_target_list_params_alloc(void)
+{
+	return calloc(1, sizeof(struct scst_target_list_params));
+}
+
+static void
+scst_target_list_params_free(void *arg)
+{
+	struct scst_target_list_params *params = arg;
+
+	free(params->driver);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder scst_target_list_decoders[] = {
+	{"driver", offsetof(struct scst_target_list_params, driver), spdk_json_decode_string, true},
+};
+
 static char *
 scst_target_list_dirpath(void *arg)
 {
+	struct scst_target_list_params *params = arg;
+
+	if (params) {
+		return spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_TARGETS, params->driver);
+	}
+
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
 }
 
 static uint32_t
 scst_target_list_depth(void *arg)
 {
-	return 3;
+	struct scst_target_list_params *params = arg;
+
+	return params ? 2 : 3;
 }
 
 static struct sto_tree_req_params target_list_constructor = {
+	.decoder = STO_DECODER_INITIALIZER_EMPTY(scst_target_list_decoders,
+						 scst_target_list_params_alloc, scst_target_list_params_free),
 	.constructor = {
 		.dirpath = scst_target_list_dirpath,
 		.depth = scst_target_list_depth,

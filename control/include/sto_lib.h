@@ -19,10 +19,14 @@ struct sto_decoder {
 	sto_params_alloc params_alloc;
 	sto_params_free params_free;
 
+	bool allow_empty;
 	bool initialized;
 };
 #define STO_DECODER_INITIALIZER(decoders, params_alloc, params_free)	\
-	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free, true}
+	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free, false, true}
+
+#define STO_DECODER_INITIALIZER_EMPTY(decoders, params_alloc, params_free)	\
+	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free, true, true}
 
 struct sto_err_context {
 	int rc;

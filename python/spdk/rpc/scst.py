@@ -237,7 +237,7 @@ def scst_target_del(client, target, driver):
     }
     return client.call('control', params)
 
-def scst_target_list(client):
+def scst_target_list(client, driver):
     """List all available targets.
     Args:
     """
@@ -245,6 +245,10 @@ def scst_target_list(client):
         'subsystem': 'scst',
         'op': 'target_list',
     }
+
+    if driver is not None:
+        params['driver'] = driver
+
     return client.call('control', params)
 
 def scst_target_enable(client, target, driver):

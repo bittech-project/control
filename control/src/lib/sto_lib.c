@@ -16,7 +16,7 @@ sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 	void *params;
 	int rc = 0;
 
-	if (!decoder->initialized) {
+	if (!decoder->initialized || (!data && decoder->allow_empty)) {
 		return params_parse(priv, NULL);
 	}
 
@@ -453,7 +453,7 @@ sto_tree_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 
 	rc = sto_decoder_parse(&p->decoder, cdb, sto_tree_req_params_parse, p);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to parse params for ls req\n");
+		SPDK_ERRLOG("Failed to parse params for tree req\n");
 	}
 
 	return rc;
