@@ -163,8 +163,6 @@ struct sto_tree_req {
 	struct sto_tree_info info;
 };
 
-typedef void (*sto_tree_req_info_json)(struct sto_tree_req *tree_req, struct spdk_json_write_ctx *w);
-
 struct sto_tree_req_params {
 	struct sto_decoder decoder;
 
@@ -172,8 +170,6 @@ struct sto_tree_req_params {
 		char *(*dirpath)(void *params);
 		uint32_t (*depth)(void *params);
 	} constructor;
-
-	sto_tree_req_info_json info_json;
 
 	struct {
 		struct sto_tree_req *req;

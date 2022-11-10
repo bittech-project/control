@@ -1,5 +1,6 @@
 #include <spdk/log.h>
 #include <spdk/likely.h>
+#include <spdk/json.h>
 #include <spdk/util.h>
 #include <spdk/string.h>
 
@@ -131,6 +132,12 @@ sto_inode_free(struct sto_inode *inode)
 	rte_free(inode);
 }
 
+static struct sto_inode *
+sto_inode_get_next_child(struct sto_inode *inode)
+{
+	return !inode->cur_child ? TAILQ_FIRST(&inode->childs) : TAILQ_NEXT(inode->cur_child, list);
+}
+
 static int
 sto_subtree_alloc(struct sto_inode *parent)
 {
@@ -201,18 +208,50 @@ sto_tree_free(struct sto_inode *tree_root)
 	}
 }
 
+static void
+sto_subtree_info_json(struct sto_inode *parent, struct spdk_json_write_ctx *w)
+{
+	struct sto_inode *node, *next_node = NULL;
+
+	for (node = parent; node != parent->parent; node = next_node) {
+		if (TAILQ_EMPTY(&node->childs)) {
+			spdk_json_write_string(w, node->dirent.name);
+
+			next_node = node->parent;
+			continue;
+		}
+
+		node->cur_child = sto_inode_get_next_child(node);
+
+		if (!node->cur_child) {
+			spdk_json_write_array_end(w);
+			spdk_json_write_object_end(w);
+
+			next_node = node->parent;
+			continue;
+		}
+
+		if (node->cur_child == TAILQ_FIRST(&node->childs)) {
+			spdk_json_write_object_begin(w);
+			spdk_json_write_named_array_begin(w, node->dirent.name);
+		}
+
+		next_node = node->cur_child;
+	}
+}
+
 static void sto_tree_read(struct sto_inode *inode);
 
 static bool
-sto_subtree_read(struct sto_inode *inode)
+sto_subtree_read(struct sto_inode *parent)
 {
 	struct sto_inode *child;
 
-	if (TAILQ_EMPTY(&inode->childs)) {
+	if (TAILQ_EMPTY(&parent->childs)) {
 		return false;
 	}
 
-	TAILQ_FOREACH(child, &inode->childs, list) {
+	TAILQ_FOREACH(child, &parent->childs, list) {
 		sto_tree_read(child);
 	}
 
@@ -303,6 +342,21 @@ sto_tree_info_init(struct sto_tree_info *info, struct sto_tree_cmd *cmd)
 void sto_tree_info_free(struct sto_tree_info *info)
 {
 	sto_tree_free(&info->tree_root);
+}
+
+void
+sto_tree_info_json(struct sto_tree_info *info, struct spdk_json_write_ctx *w)
+{
+	struct sto_inode *tree_root = &info->tree_root;
+	struct sto_inode *inode;
+
+	spdk_json_write_array_begin(w);
+
+	TAILQ_FOREACH(inode, &tree_root->childs, list) {
+		sto_subtree_info_json(inode, w);
+	}
+
+	spdk_json_write_array_end(w);
 }
 
 static struct sto_tree_cmd *

@@ -697,28 +697,7 @@ scst_target_list_dirpath(void *arg)
 static uint32_t
 scst_target_list_depth(void *arg)
 {
-	return 2;
-}
-
-static void
-scst_target_list_info_json(struct sto_tree_req *tree_req, struct spdk_json_write_ctx *w)
-{
-	struct sto_inode *tree_root = &tree_req->info.tree_root;
-	struct sto_inode *inode;
-
-	spdk_json_write_array_begin(w);
-
-	TAILQ_FOREACH(inode, &tree_root->childs, list) {
-		struct sto_readdir_result *info = &inode->info;
-		struct sto_dirents_json_cfg cfg = {
-			.name = inode->dirent.name,
-			.type = S_IFDIR,
-		};
-
-		sto_dirents_info_json(&info->dirents, &cfg, w);
-	}
-
-	spdk_json_write_array_end(w);
+	return 3;
 }
 
 static struct sto_tree_req_params target_list_constructor = {
@@ -726,7 +705,6 @@ static struct sto_tree_req_params target_list_constructor = {
 		.dirpath = scst_target_list_dirpath,
 		.depth = scst_target_list_depth,
 	},
-	.info_json = scst_target_list_info_json,
 };
 
 static const char *

@@ -493,38 +493,11 @@ sto_tree_req_exec(struct sto_req *req)
 }
 
 static void
-sto_tree_req_g_info_json(struct sto_tree_req *tree_req, struct spdk_json_write_ctx *w)
-{
-	struct sto_tree_info *info = &tree_req->info;
-	struct sto_inode *tree_root = &info->tree_root;
-	struct sto_inode *inode;
-
-	spdk_json_write_array_begin(w);
-
-	TAILQ_FOREACH(inode, &tree_root->childs, list) {
-		struct sto_readdir_result *info = &inode->info;
-		struct sto_dirents_json_cfg cfg = {
-			.name = inode->dirent.name,
-		};
-
-		sto_dirents_info_json(&info->dirents, &cfg, w);
-	}
-
-	spdk_json_write_array_end(w);
-}
-
-static void
 sto_tree_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_req *tree_req = sto_tree_req(req);
-	struct sto_tree_req_params *p = req->params_constructor;
 
-	if (p->info_json) {
-		p->info_json(tree_req, w);
-		return;
-	}
-
-	sto_tree_req_g_info_json(tree_req, w);
+	sto_tree_info_json(&tree_req->info, w);
 }
 
 static void
