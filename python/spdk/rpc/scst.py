@@ -1,5 +1,15 @@
 from .cmd_parser import *
 
+def scst_config_write(client):
+    """Writes the current configuration to stdout.
+    Args:
+    """
+    params = {
+        'subsystem': 'scst',
+        'op': 'config_write',
+    }
+    return client.call('control', params)
+
 def scst_handler_list(client):
     """List all available handlers.
     Args:

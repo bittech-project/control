@@ -32,6 +32,16 @@
 #define SCST_RESYNC_IO	"resync_size"
 #define SCST_T10_IO	"t10_dev_id"
 
+static char *
+scst_config_write_dirpath(void *arg)
+{
+	return spdk_sprintf_alloc("%s", SCST_ROOT);
+}
+
+static struct sto_tree_req_params_constructor config_write_constructor = {
+	.dirpath = scst_config_write_dirpath,
+};
+
 static const char *
 scst_handler_list_name(void *arg)
 {
@@ -1057,6 +1067,12 @@ static struct sto_write_req_params_constructor lun_clear_constructor = {
 };
 
 static const struct sto_cdbops scst_op_table[] = {
+	{
+		.name = "config_write",
+		.req_constructor = sto_tree_req_constructor,
+		.req_ops = &sto_tree_req_ops,
+		.params_constructor = &config_write_constructor,
+	},
 	{
 		.name = "handler_list",
 		.req_constructor = sto_readdir_req_constructor,
