@@ -69,7 +69,7 @@ sto_dirents_free(struct sto_dirents *dirents)
 		sto_dirent_free(&dirents->dirents[i]);
 	}
 
-	dirents->cnt = 0;
+	memset(dirents, 0, sizeof(*dirents));
 }
 
 void
