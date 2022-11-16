@@ -133,10 +133,14 @@ out:
 }
 
 static void
-sto_fstat_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp)
+sto_fstat_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp, int rc)
 {
 	struct sto_fstat_req *req = priv;
-	int rc;
+
+	if (spdk_unlikely(rc)) {
+		req->returncode = rc;
+		goto out;
+	}
 
 	rc = sto_decoder_parse(&sto_fstat_result_decoder, resp->result,
 			       sto_fstat_parse_result, req);
@@ -145,6 +149,7 @@ sto_fstat_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp)
 		req->returncode = rc;
 	}
 
+out:
 	req->fstat_done(req);
 }
 

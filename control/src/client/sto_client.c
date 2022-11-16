@@ -71,12 +71,72 @@ sto_client_check_busy_list(struct sto_client *client)
 	return true;
 }
 
+struct json_write_buf {
+	char data[1024];
+	unsigned cur_off;
+};
+
+static int
+__json_write_stdout(void *cb_ctx, const void *data, size_t size)
+{
+	struct json_write_buf *buf = cb_ctx;
+	size_t rc;
+
+	rc = snprintf(buf->data + buf->cur_off, sizeof(buf->data) - buf->cur_off,
+		      "%s", (const char *)data);
+	if (rc > 0) {
+		buf->cur_off += rc;
+	}
+	return rc == size ? 0 : -1;
+}
+
+static void sto_rpc_req_free(struct sto_rpc_request *req);
+
+static void
+sto_client_response(struct spdk_jsonrpc_client_response *response)
+{
+	struct sto_rpc_request *req;
+	int id, rc;
+
+	rc = spdk_json_decode_int32(response->id, &id);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("CRITICAL: Failed to decode request ID, rc=%d\n!!!", rc);
+		return;
+	}
+
+	SPDK_NOTICELOG("Got response for %d req\n", id);
+
+	/* Check for error response */
+	if (response->error != NULL) {
+		struct json_write_buf buf = {};
+		struct spdk_json_write_ctx *w = spdk_json_write_begin(__json_write_stdout,
+						&buf, SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE);
+
+		if (w == NULL) {
+			SPDK_ERRLOG("error response: (?)\n");
+		} else {
+			spdk_json_write_val(w, response->error);
+			spdk_json_write_end(w);
+			SPDK_ERRLOG("error response: \n%s\n", buf.data);
+		}
+		rc = -EFAULT;
+	}
+
+	req = _get_rpc_request(id);
+	assert(req);
+
+	TAILQ_REMOVE(&g_rpc_req_list, req, list);
+
+	req->response_handler(req->priv, response, rc);
+
+	sto_rpc_req_free(req);
+}
+
 static void
 sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 {
-	struct spdk_jsonrpc_client_response *resp;
-	struct sto_rpc_request *req;
-	int rc = 0, id;
+	struct spdk_jsonrpc_client_response *response;
+	int rc = 0;
 
 	rc = spdk_jsonrpc_client_poll(client->rpc_client, 0);
 	if (rc == 0 || rc == -ENOTCONN) {
@@ -86,45 +146,23 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 
 	if (rc < 0) {
 		/* TODO: What should we do? */
-		SPDK_ERRLOG("CRIT: GLEB\n");
+		SPDK_ERRLOG("CRITICAL: spdk_jsonrpc_client_poll return ERROR, rc=%d\n", rc);
 		return;
 	}
 
-	resp = spdk_jsonrpc_client_get_response(client->rpc_client);
-	assert(resp);
+	response = spdk_jsonrpc_client_get_response(client->rpc_client);
+	assert(response);
 
-	/* Check for error response */
-	if (resp->error != NULL) {
-		SPDK_ERRLOG("Get error response\n");
-		goto out;
-	}
+	sto_client_response(response);
 
-	rc = spdk_json_decode_int32(resp->id, &id);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to decode request ID\n");
-		goto out;
-	}
-
-	SPDK_NOTICELOG("Get response for %d req\n", id);
-
-	req = _get_rpc_request(id);
-	assert(req);
-
-	TAILQ_REMOVE(&g_rpc_req_list, req, list);
-
-	req->response_handler(req->priv, resp);
-
-	sto_rpc_req_free(req);
+	spdk_jsonrpc_client_free_response(response);
 
 	if (sto_client_check_busy_list(client)) {
-		goto out;
+		return;
 	}
 
 	TAILQ_REMOVE(&cgroup->clients, client, list);
 	TAILQ_INSERT_HEAD(&cgroup->free_clients, client, list);
-
-out:
-	spdk_jsonrpc_client_free_response(resp);
 }
 
 static int

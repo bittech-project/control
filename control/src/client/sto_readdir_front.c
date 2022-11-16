@@ -120,10 +120,15 @@ sto_readdir_free(struct sto_readdir_req *req)
 }
 
 static void
-sto_readdir_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp)
+sto_readdir_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp, int rc)
 {
 	struct sto_readdir_req *req = priv;
 	struct sto_readdir_result *result = req->result;
+
+	if (spdk_unlikely(rc)) {
+		result->returncode = rc;
+		goto out;
+	}
 
 	if (spdk_json_decode_object(resp->result, sto_readdir_result_decoders,
 				    SPDK_COUNTOF(sto_readdir_result_decoders), result)) {

@@ -70,10 +70,15 @@ static const struct spdk_json_object_decoder sto_subprocess_result_decoders[] = 
 };
 
 static void
-sto_subprocess_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp)
+sto_subprocess_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp, int rc)
 {
 	struct sto_subprocess *subp = priv;
 	struct sto_subprocess_result result;
+
+	if (spdk_unlikely(rc)) {
+		subp->returncode = rc;
+		goto out;
+	}
 
 	memset(&result, 0, sizeof(result));
 

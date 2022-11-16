@@ -10,7 +10,7 @@ struct sto_rpc_request;
 typedef void (*sto_dump_params_json)(struct sto_rpc_request *req,
 				     struct spdk_json_write_ctx *w);
 
-typedef void (*response_handler_t)(void *priv, struct spdk_jsonrpc_client_response *resp);
+typedef void (*response_handler_t)(void *priv, struct spdk_jsonrpc_client_response *resp, int rc);
 
 struct sto_rpc_request {
 	void *priv;
