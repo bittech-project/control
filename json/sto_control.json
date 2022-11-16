@@ -6,17 +6,9 @@
         {
           "method": "control",
           "params": {
-            "subsystem": "scst",
-            "op": "driver_init",
-            "drivers": ["scst_local", "scst_vdisk"]
-          }
-	},
-	{
-          "method": "control",
-          "params": {
-            "subsystem": "scst",
-            "op": "driver_deinit",
-            "drivers": ["scst_local", "scst_vdisk"]
+            "subsystem": "sys",
+            "op": "readdir",
+            "dirpath": "/root/gleb/control"
           }
         }
       ]
