@@ -112,7 +112,9 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 
 	TAILQ_REMOVE(&g_rpc_req_list, req, list);
 
-	req->resp_handler(req, resp);
+	req->response_handler(req->priv, resp);
+
+	sto_rpc_req_free(req);
 
 	if (sto_client_check_busy_list(client)) {
 		goto out;
@@ -206,13 +208,13 @@ sto_rpc_req_alloc(const char *method_name, sto_dump_params_json params_json)
 }
 
 static void
-sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler, void *priv)
+sto_rpc_req_init_cb(struct sto_rpc_request *req, response_handler_t response_handler, void *priv)
 {
-	req->resp_handler = resp_handler;
+	req->response_handler = response_handler;
 	req->priv = priv;
 }
 
-void
+static void
 sto_rpc_req_free(struct sto_rpc_request *req)
 {
 	free((char *) req->method_name);
@@ -254,7 +256,7 @@ out:
 
 int
 sto_client_send(const char *method_name, sto_dump_params_json params_json,
-		resp_handler resp_handler, void *priv)
+		response_handler_t response_handler, void *priv)
 {
 	struct sto_rpc_request *req;
 	int rc = 0;
@@ -265,7 +267,7 @@ sto_client_send(const char *method_name, sto_dump_params_json params_json,
 		return -ENOMEM;
 	}
 
-	sto_rpc_req_init_cb(req, resp_handler, priv);
+	sto_rpc_req_init_cb(req, response_handler, priv);
 
 	rc = sto_rpc_req_submit(req);
 	if (spdk_unlikely(rc)) {

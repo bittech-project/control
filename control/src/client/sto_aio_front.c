@@ -67,13 +67,10 @@ static const struct spdk_json_object_decoder sto_aio_read_result_decoders[] = {
 };
 
 static void
-sto_aio_read_resp_handler(struct sto_rpc_request *rpc_req,
-			  struct spdk_jsonrpc_client_response *resp)
+sto_aio_read_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp)
 {
-	struct sto_aio *aio = rpc_req->priv;
+	struct sto_aio *aio = priv;
 	struct sto_aio_read_result result;
-
-	sto_rpc_req_free(rpc_req);
 
 	memset(&result, 0, sizeof(result));
 
@@ -118,13 +115,10 @@ static const struct spdk_json_object_decoder sto_aio_write_result_decoders[] = {
 };
 
 static void
-sto_aio_write_resp_handler(struct sto_rpc_request *rpc_req,
-			   struct spdk_jsonrpc_client_response *resp)
+sto_aio_write_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp)
 {
-	struct sto_aio *aio = rpc_req->priv;
+	struct sto_aio *aio = priv;
 	struct sto_aio_write_result result;
-
-	sto_rpc_req_free(rpc_req);
 
 	memset(&result, 0, sizeof(result));
 

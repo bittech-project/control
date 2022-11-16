@@ -133,13 +133,10 @@ out:
 }
 
 static void
-sto_fstat_resp_handler(struct sto_rpc_request *rpc_req,
-		       struct spdk_jsonrpc_client_response *resp)
+sto_fstat_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp)
 {
-	struct sto_fstat_req *req = rpc_req->priv;
+	struct sto_fstat_req *req = priv;
 	int rc;
-
-	sto_rpc_req_free(rpc_req);
 
 	rc = sto_decoder_parse(&sto_fstat_result_decoder, resp->result,
 			       sto_fstat_parse_result, req);
