@@ -142,50 +142,6 @@ sto_client_group_poll(void *ctx)
 	return SPDK_POLLER_BUSY;
 }
 
-struct sto_rpc_request *
-sto_rpc_req_alloc(const char *method_name, sto_dump_params_json params_json, void *priv)
-{
-	struct sto_rpc_request *req;
-	static int id;
-
-	if (spdk_unlikely(!method_name)) {
-		SPDK_ERRLOG("Method name is not set\n");
-		return NULL;
-	}
-
-	req = rte_zmalloc(NULL, sizeof(*req), 0);
-	if (spdk_unlikely(!req)) {
-		SPDK_ERRLOG("Cann't allocate memory for a RPC req\n");
-		return NULL;
-	}
-
-	req->method_name = strdup(method_name);
-	if (spdk_unlikely(!req->method_name)) {
-		SPDK_ERRLOG("Cann't allocate memory for the method name\n");
-		rte_free(req);
-		return NULL;
-	}
-
-	req->params_json = params_json;
-	req->priv = priv;
-	req->id = ++id;
-
-	return req;
-}
-
-void
-sto_rpc_req_free(struct sto_rpc_request *req)
-{
-	free((char *) req->method_name);
-	rte_free(req);
-}
-
-void
-sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler)
-{
-	req->resp_handler = resp_handler;
-}
-
 static int
 sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req)
 {
@@ -219,8 +175,52 @@ sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req)
 	return 0;
 }
 
-int
-sto_client_submit(struct sto_rpc_request *req)
+static struct sto_rpc_request *
+sto_rpc_req_alloc(const char *method_name, sto_dump_params_json params_json)
+{
+	struct sto_rpc_request *req;
+	static int id;
+
+	if (spdk_unlikely(!method_name)) {
+		SPDK_ERRLOG("Method name is not set\n");
+		return NULL;
+	}
+
+	req = rte_zmalloc(NULL, sizeof(*req), 0);
+	if (spdk_unlikely(!req)) {
+		SPDK_ERRLOG("Cann't allocate memory for a RPC req\n");
+		return NULL;
+	}
+
+	req->method_name = strdup(method_name);
+	if (spdk_unlikely(!req->method_name)) {
+		SPDK_ERRLOG("Cann't allocate memory for the method name\n");
+		rte_free(req);
+		return NULL;
+	}
+
+	req->params_json = params_json;
+	req->id = ++id;
+
+	return req;
+}
+
+static void
+sto_rpc_req_init_cb(struct sto_rpc_request *req, resp_handler resp_handler, void *priv)
+{
+	req->resp_handler = resp_handler;
+	req->priv = priv;
+}
+
+void
+sto_rpc_req_free(struct sto_rpc_request *req)
+{
+	free((char *) req->method_name);
+	rte_free(req);
+}
+
+static int
+sto_rpc_req_submit(struct sto_rpc_request *req)
 {
 	struct sto_client_group *group;
 	struct sto_client *client;
@@ -259,15 +259,15 @@ sto_client_send(const char *method_name, sto_dump_params_json params_json,
 	struct sto_rpc_request *req;
 	int rc = 0;
 
-	req = sto_rpc_req_alloc(method_name, params_json, priv);
+	req = sto_rpc_req_alloc(method_name, params_json);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("Failed to alloc `%s` RPC req\n", method_name);
 		return -ENOMEM;
 	}
 
-	sto_rpc_req_init_cb(req, resp_handler);
+	sto_rpc_req_init_cb(req, resp_handler, priv);
 
-	rc = sto_client_submit(req);
+	rc = sto_rpc_req_submit(req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to send RPC req, rc=%d\n", rc);
 		sto_rpc_req_free(req);
