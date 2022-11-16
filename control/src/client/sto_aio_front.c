@@ -73,6 +73,8 @@ sto_aio_read_resp_handler(struct sto_rpc_request *rpc_req,
 	struct sto_aio *aio = rpc_req->priv;
 	struct sto_aio_read_result result;
 
+	sto_rpc_req_free(rpc_req);
+
 	memset(&result, 0, sizeof(result));
 
 	if (spdk_json_decode_object(resp->result, sto_aio_read_result_decoders,
@@ -91,8 +93,6 @@ sto_aio_read_resp_handler(struct sto_rpc_request *rpc_req,
 	sto_aio_read_result_free(&result);
 
 out:
-	sto_rpc_req_free(rpc_req);
-
 	aio->aio_end_io(aio);
 }
 
@@ -124,6 +124,8 @@ sto_aio_write_resp_handler(struct sto_rpc_request *rpc_req,
 	struct sto_aio *aio = rpc_req->priv;
 	struct sto_aio_write_result result;
 
+	sto_rpc_req_free(rpc_req);
+
 	memset(&result, 0, sizeof(result));
 
 	if (spdk_json_decode_object(resp->result, sto_aio_write_result_decoders,
@@ -138,8 +140,6 @@ sto_aio_write_resp_handler(struct sto_rpc_request *rpc_req,
 		       aio->returncode);
 
 out:
-	sto_rpc_req_free(rpc_req);
-
 	aio->aio_end_io(aio);
 }
 
@@ -156,62 +156,16 @@ sto_aio_write_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_
 	spdk_json_write_object_end(w);
 }
 
-static struct sto_rpc_request *
-__alloc_rpc_read_req(struct sto_aio *aio)
-{
-	struct sto_rpc_request *rpc_req;
-
-	rpc_req = sto_rpc_req_alloc("aio_read", sto_aio_read_info_json, aio);
-	if (spdk_unlikely(!rpc_req)) {
-		SPDK_ERRLOG("Failed to alloc AIO RPC READ req\n");
-		return NULL;
-	}
-
-	sto_rpc_req_init_cb(rpc_req, sto_aio_read_resp_handler);
-
-	return rpc_req;
-}
-
-static struct sto_rpc_request *
-__alloc_rpc_write_req(struct sto_aio *aio)
-{
-	struct sto_rpc_request *rpc_req;
-
-	rpc_req = sto_rpc_req_alloc("aio_write", sto_aio_write_info_json, aio);
-	if (spdk_unlikely(!rpc_req)) {
-		SPDK_ERRLOG("Failed to alloc AIO RPC WRITE req\n");
-		return NULL;
-	}
-
-	sto_rpc_req_init_cb(rpc_req, sto_aio_write_resp_handler);
-
-	return rpc_req;
-}
-
 int
 sto_aio_submit(struct sto_aio *aio)
 {
-	struct sto_rpc_request *rpc_req;
-	int rc = 0;
-
 	if (aio->dir == STO_WRITE) {
-		rpc_req = __alloc_rpc_write_req(aio);
+		return sto_client_send("aio_write", sto_aio_write_info_json,
+				       sto_aio_write_resp_handler, aio);
 	} else {
-		rpc_req = __alloc_rpc_read_req(aio);
+		return sto_client_send("aio_read", sto_aio_read_info_json,
+				       sto_aio_read_resp_handler, aio);
 	}
-
-	if (spdk_unlikely(!rpc_req)) {
-		SPDK_ERRLOG("Failed to alloc RPC req\n");
-		return -ENOMEM;
-	}
-
-	rc = sto_client_submit(rpc_req);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to send RPC req, rc=%d\n", rc);
-		sto_rpc_req_free(rpc_req);
-	}
-
-	return rc;
 }
 
 int

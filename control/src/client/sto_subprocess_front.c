@@ -76,6 +76,8 @@ sto_subprocess_resp_handler(struct sto_rpc_request *rpc_req,
 	struct sto_subprocess *subp = rpc_req->priv;
 	struct sto_subprocess_result result;
 
+	sto_rpc_req_free(rpc_req);
+
 	memset(&result, 0, sizeof(result));
 
 	if (spdk_json_decode_object(resp->result, sto_subprocess_result_decoders,
@@ -102,8 +104,6 @@ free_params:
 	sto_subprocess_result_free(&result);
 
 out:
-	sto_rpc_req_free(rpc_req);
-
 	subp->subprocess_done(subp);
 }
 

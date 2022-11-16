@@ -139,14 +139,14 @@ sto_fstat_resp_handler(struct sto_rpc_request *rpc_req,
 	struct sto_fstat_req *req = rpc_req->priv;
 	int rc;
 
+	sto_rpc_req_free(rpc_req);
+
 	rc = sto_decoder_parse(&sto_fstat_result_decoder, resp->result,
 			       sto_fstat_parse_result, req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to parse fstat result, rc=%d\n", rc);
 		req->returncode = rc;
 	}
-
-	sto_rpc_req_free(rpc_req);
 
 	req->fstat_done(req);
 }
