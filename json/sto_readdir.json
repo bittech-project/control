@@ -4,9 +4,11 @@
       "subsystem": "sto_control",
       "config": [
         {
-          "method": "readdir",
+          "method": "control",
           "params": {
-            "dirpath": "/root/gleb/bittech/control"
+            "subsystem": "sys",
+            "op": "readdir",
+            "dirpath": "/root/gleb/control"
           }
         }
       ]
