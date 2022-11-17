@@ -9,7 +9,7 @@
 typedef void (*sto_client_dump_json_params_t)(void *priv, struct spdk_json_write_ctx *w);
 typedef void (*sto_client_response_handler_t)(void *priv, struct spdk_jsonrpc_client_response *resp, int rc);
 
-struct sto_rpc_request {
+struct sto_rpc_cmd {
 	void *priv;
 	sto_client_response_handler_t response_handler;
 
@@ -17,7 +17,7 @@ struct sto_rpc_request {
 	sto_client_dump_json_params_t dump_json_params;
 
 	int id;
-	TAILQ_ENTRY(sto_rpc_request) list;
+	TAILQ_ENTRY(sto_rpc_cmd) list;
 };
 
 int sto_client_connect(const char *addr, int addr_family);
