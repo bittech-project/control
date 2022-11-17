@@ -122,7 +122,7 @@ __sto_inode_free(struct sto_inode *inode)
 	sto_dirent_free(&inode->dirent);
 	free(inode->path);
 
-	sto_readdir_result_free(&inode->info);
+	sto_dirents_free(&inode->dirents);
 }
 
 static void
@@ -141,8 +141,7 @@ sto_inode_get_next_child(struct sto_inode *inode)
 static int
 sto_subtree_alloc(struct sto_inode *parent)
 {
-	struct sto_readdir_result *info = &parent->info;
-	struct sto_dirents *dirents = &info->dirents;
+	struct sto_dirents *dirents = &parent->dirents;
 	int i;
 
 	for (i = 0; i < dirents->cnt; i++) {
@@ -162,7 +161,7 @@ sto_subtree_alloc(struct sto_inode *parent)
 		TAILQ_INSERT_TAIL(&parent->childs, child, list);
 	}
 
-	sto_readdir_result_free(info);
+	sto_dirents_free(dirents);
 
 	return 0;
 }
@@ -261,14 +260,10 @@ sto_subtree_read(struct sto_inode *parent)
 }
 
 static void
-sto_tree_read_done(void *priv)
+sto_tree_read_done(void *priv, int rc)
 {
 	struct sto_inode *inode = priv;
-	struct sto_readdir_result *info = &inode->info;
 	struct sto_tree_cmd *cmd = sto_tree_cmd(inode);
-	int rc;
-
-	rc = info->returncode;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to readdir\n");
@@ -307,16 +302,16 @@ out_err:
 static void
 sto_tree_read(struct sto_inode *inode)
 {
-	struct sto_readdir_args args = {
+	struct sto_rpc_readdir_args args = {
 		.priv = inode,
-		.readdir_done = sto_tree_read_done,
-		.result = &inode->info,
+		.done = sto_tree_read_done,
+		.dirents = &inode->dirents,
 	};
 	int rc;
 
 	sto_tree_get_ref(inode);
 
-	rc = sto_readdir(inode->path, &args);
+	rc = sto_rpc_readdir(inode->path, &args);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to read %s inode\n", inode->path);
 		sto_tree_set_error(inode, rc);

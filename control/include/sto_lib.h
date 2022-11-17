@@ -4,7 +4,7 @@
 #include <spdk/util.h>
 
 #include "sto_subsystem.h"
-#include "sto_readdir.h"
+#include "sto_rpc_readdir.h"
 #include "sto_tree.h"
 
 typedef void *(*sto_params_alloc)(void);
@@ -136,7 +136,7 @@ struct sto_ls_req {
 	struct sto_req req;
 
 	struct sto_ls_req_params params;
-	struct sto_readdir_result result;
+	struct sto_dirents dirents;
 };
 
 struct sto_ls_req_params_constructor {

@@ -354,14 +354,9 @@ sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 }
 
 static void
-sto_ls_req_done(void *priv)
+sto_ls_req_done(void *priv, int rc)
 {
 	struct sto_req *req = priv;
-	struct sto_ls_req *ls_req = sto_ls_req(req);
-	struct sto_readdir_result *result = &ls_req->result;
-	int rc;
-
-	rc = result->returncode;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to list directories\n");
@@ -378,13 +373,13 @@ sto_ls_req_exec(struct sto_req *req)
 {
 	struct sto_ls_req *ls_req = sto_ls_req(req);
 	struct sto_ls_req_params *params = &ls_req->params;
-	struct sto_readdir_args args = {
+	struct sto_rpc_readdir_args args = {
 		.priv = req,
-		.readdir_done = sto_ls_req_done,
-		.result = &ls_req->result,
+		.done = sto_ls_req_done,
+		.dirents = &ls_req->dirents,
 	};
 
-	return sto_readdir(params->dirpath, &args);
+	return sto_rpc_readdir(params->dirpath, &args);
 }
 
 static void
@@ -392,13 +387,12 @@ sto_ls_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_ls_req *ls_req = sto_ls_req(req);
 	struct sto_ls_req_params *params = &ls_req->params;
-	struct sto_readdir_result *result = &ls_req->result;
 	struct sto_dirents_json_cfg cfg = {
 		.name = params->name,
 		.exclude_list = params->exclude_list,
 	};
 
-	sto_dirents_info_json(&result->dirents, &cfg, w);
+	sto_dirents_info_json(&ls_req->dirents, &cfg, w);
 }
 
 static void
@@ -408,7 +402,7 @@ sto_ls_req_free(struct sto_req *req)
 
 	sto_ls_req_params_free(&ls_req->params);
 
-	sto_readdir_result_free(&ls_req->result);
+	sto_dirents_free(&ls_req->dirents);
 
 	rte_free(ls_req);
 }

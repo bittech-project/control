@@ -3,7 +3,7 @@
 
 #include <spdk/queue.h>
 
-#include "sto_readdir.h"
+#include "sto_rpc_readdir.h"
 
 struct sto_inode {
 	struct sto_inode *root;
@@ -13,7 +13,7 @@ struct sto_inode {
 	struct sto_dirent dirent;
 	char *path;
 
-	struct sto_readdir_result info;
+	struct sto_dirents dirents;
 
 	uint32_t level;
 
