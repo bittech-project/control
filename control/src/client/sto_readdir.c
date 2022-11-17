@@ -6,7 +6,7 @@
 
 #include "sto_lib.h"
 #include "sto_client.h"
-#include "sto_readdir_front.h"
+#include "sto_readdir.h"
 
 static const struct spdk_json_object_decoder sto_dirent_decoders[] = {
 	{"name", offsetof(struct sto_dirent, name), spdk_json_decode_string},

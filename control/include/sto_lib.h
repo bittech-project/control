@@ -4,7 +4,7 @@
 #include <spdk/util.h>
 
 #include "sto_subsystem.h"
-#include "sto_readdir_front.h"
+#include "sto_readdir.h"
 #include "sto_tree.h"
 
 typedef void *(*sto_params_alloc)(void);

@@ -3,7 +3,7 @@
 
 #include <spdk/queue.h>
 
-#include "sto_readdir_front.h"
+#include "sto_readdir.h"
 
 struct sto_inode {
 	struct sto_inode *root;
