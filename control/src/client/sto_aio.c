@@ -5,7 +5,7 @@
 #include <rte_malloc.h>
 
 #include "sto_client.h"
-#include "sto_aio_front.h"
+#include "sto_aio.h"
 
 struct sto_aio *
 sto_aio_alloc(const char *filename, void *buf, size_t size, int dir)
@@ -154,7 +154,7 @@ sto_aio_write_info_json(void *priv, struct spdk_json_write_ctx *w)
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_string(w, "filename", aio->filename);
+	spdk_json_write_named_string(w, "filepath", aio->filename);
 	spdk_json_write_named_string(w, "buf", aio->buf);
 
 	spdk_json_write_object_end(w);
@@ -169,7 +169,7 @@ sto_aio_submit(struct sto_aio *aio)
 			.response_handler = sto_aio_write_resp_handler,
 		};
 
-		return sto_client_send("aio_write", aio, sto_aio_write_info_json, &args);
+		return sto_client_send("writefile", aio, sto_aio_write_info_json, &args);
 	} else {
 		struct sto_client_args args = {
 			.priv = aio,

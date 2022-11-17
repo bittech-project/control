@@ -1,5 +1,5 @@
-#ifndef _STO_AIO_FRONT_H_
-#define _STO_AIO_FRONT_H_
+#ifndef _STO_AIO_H_
+#define _STO_AIO_H_
 
 /* generic data direction definitions */
 #define STO_READ	0
@@ -31,4 +31,4 @@ int sto_aio_submit(struct sto_aio *aio);
 
 int sto_aio_write_string(const char *filename, char *str, aio_end_io_t aio_end_io, void *priv);
 
-#endif /* _STO_AIO_FRONT_H_ */
+#endif /* _STO_AIO_H_ */

@@ -6,7 +6,7 @@
 #include <rte_malloc.h>
 
 #include "sto_lib.h"
-#include "sto_aio_front.h"
+#include "sto_aio.h"
 #include "err.h"
 
 int
