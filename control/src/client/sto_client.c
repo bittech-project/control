@@ -32,6 +32,16 @@ struct sto_client_group {
 
 static struct sto_client_group g_sto_client_group;
 
+struct sto_rpc_cmd {
+	int id;
+	TAILQ_ENTRY(sto_rpc_cmd) list;
+
+	struct spdk_jsonrpc_client_request *request;
+
+	void *priv;
+	sto_client_response_handler_t response_handler;
+};
+
 static TAILQ_HEAD(, sto_rpc_cmd) g_rpc_cmd_list = TAILQ_HEAD_INITIALIZER(g_rpc_cmd_list);
 static TAILQ_HEAD(, sto_rpc_cmd) g_rpc_cmd_busy_list = TAILQ_HEAD_INITIALIZER(g_rpc_cmd_busy_list);
 
@@ -50,13 +60,12 @@ _get_rpc_cmd(int id)
 	return NULL;
 }
 
-static int sto_client_send_request(struct sto_client *client, struct sto_rpc_cmd *cmd);
+static void sto_client_submit_cmd(struct sto_client *client, struct sto_rpc_cmd *cmd);
 
 static bool
 sto_client_check_busy_list(struct sto_client *client)
 {
 	struct sto_rpc_cmd *cmd;
-	int rc;
 
 	if (TAILQ_EMPTY(&g_rpc_cmd_busy_list)) {
 		return false;
@@ -65,8 +74,7 @@ sto_client_check_busy_list(struct sto_client *client)
 	cmd = TAILQ_FIRST(&g_rpc_cmd_busy_list);
 	TAILQ_REMOVE(&g_rpc_cmd_busy_list, cmd, list);
 
-	rc = sto_client_send_request(client, cmd);
-	assert(!rc);
+	sto_client_submit_cmd(client, cmd);
 
 	return true;
 }
@@ -183,7 +191,8 @@ sto_client_group_poll(void *ctx)
 }
 
 static struct spdk_jsonrpc_client_request *
-sto_client_alloc_request(struct sto_rpc_cmd *cmd)
+sto_client_alloc_request(const char *method_name, int id,
+			 void *params, sto_client_dump_json_params_t dump_json_params)
 {
 	struct spdk_jsonrpc_client_request *request;
 	struct spdk_json_write_ctx *w;
@@ -194,15 +203,15 @@ sto_client_alloc_request(struct sto_rpc_cmd *cmd)
 		return NULL;
 	}
 
-	w = spdk_jsonrpc_begin_request(request, cmd->id, cmd->method_name);
+	w = spdk_jsonrpc_begin_request(request, id, method_name);
 	if (!w) {
 		spdk_jsonrpc_client_free_request(request);
 		return NULL;
 	}
 
-	if (cmd->dump_json_params) {
+	if (dump_json_params) {
 		spdk_json_write_name(w, "params");
-		cmd->dump_json_params(cmd->priv, w);
+		dump_json_params(params, w);
 	}
 
 	spdk_jsonrpc_end_request(request, w);
@@ -210,27 +219,19 @@ sto_client_alloc_request(struct sto_rpc_cmd *cmd)
 	return request;
 }
 
-static int
-sto_client_send_request(struct sto_client *client, struct sto_rpc_cmd *cmd)
+static void
+sto_client_submit_cmd(struct sto_client *client, struct sto_rpc_cmd *cmd)
 {
-	struct spdk_jsonrpc_client_request *request;
-
-	request = sto_client_alloc_request(cmd);
-	if (spdk_unlikely(!request)) {
-		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
-		return -ENOMEM;
-	}
-
 	/* TODO: use a hash table? */
 	TAILQ_INSERT_TAIL(&g_rpc_cmd_list, cmd, list);
 
-	spdk_jsonrpc_client_send_request(client->rpc_client, request);
-
-	return 0;
+	spdk_jsonrpc_client_send_request(client->rpc_client, cmd->request);
+	cmd->request = NULL;
 }
 
 static struct sto_rpc_cmd *
-sto_rpc_cmd_alloc(const char *method_name, sto_client_dump_json_params_t dump_json_params)
+sto_rpc_cmd_alloc(const char *method_name, void *params,
+		  sto_client_dump_json_params_t dump_json_params)
 {
 	struct sto_rpc_cmd *cmd;
 	static int id;
@@ -246,21 +247,21 @@ sto_rpc_cmd_alloc(const char *method_name, sto_client_dump_json_params_t dump_js
 		return NULL;
 	}
 
-	cmd->method_name = strdup(method_name);
-	if (spdk_unlikely(!cmd->method_name)) {
-		SPDK_ERRLOG("Cann't allocate memory for the method name\n");
+	cmd->id = ++id;
+
+	cmd->request = sto_client_alloc_request(method_name, cmd->id, params, dump_json_params);
+	if (spdk_unlikely(!cmd->request)) {
+		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
 		rte_free(cmd);
 		return NULL;
 	}
-
-	cmd->dump_json_params = dump_json_params;
-	cmd->id = ++id;
 
 	return cmd;
 }
 
 static void
-sto_rpc_cmd_init_cb(struct sto_rpc_cmd *cmd, sto_client_response_handler_t response_handler, void *priv)
+sto_rpc_cmd_init_cb(struct sto_rpc_cmd *cmd,
+		    sto_client_response_handler_t response_handler, void *priv)
 {
 	cmd->response_handler = response_handler;
 	cmd->priv = priv;
@@ -269,7 +270,10 @@ sto_rpc_cmd_init_cb(struct sto_rpc_cmd *cmd, sto_client_response_handler_t respo
 static void
 sto_rpc_cmd_free(struct sto_rpc_cmd *cmd)
 {
-	free((char *) cmd->method_name);
+	if (cmd->request) {
+		spdk_jsonrpc_client_free_request(cmd->request);
+	}
+
 	rte_free(cmd);
 }
 
@@ -278,7 +282,6 @@ sto_rpc_cmd_run(struct sto_rpc_cmd *cmd)
 {
 	struct sto_client_group *group;
 	struct sto_client *client;
-	int rc = 0;
 
 	group = &g_sto_client_group;
 
@@ -293,11 +296,7 @@ sto_rpc_cmd_run(struct sto_rpc_cmd *cmd)
 		goto out;
 	}
 
-	rc = sto_client_send_request(client, cmd);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to send STO rpc client request\n");
-		return rc;
-	}
+	sto_client_submit_cmd(client, cmd);
 
 	TAILQ_REMOVE(&group->free_clients, client, list);
 	TAILQ_INSERT_TAIL(&group->clients, client, list);
@@ -307,19 +306,20 @@ out:
 }
 
 int
-sto_client_send(const char *method_name, sto_client_dump_json_params_t dump_json_params,
-		sto_client_response_handler_t response_handler, void *priv)
+sto_client_send(const char *method_name, void *params,
+		sto_client_dump_json_params_t dump_json_params,
+		struct sto_client_args *args)
 {
 	struct sto_rpc_cmd *cmd;
 	int rc = 0;
 
-	cmd = sto_rpc_cmd_alloc(method_name, dump_json_params);
+	cmd = sto_rpc_cmd_alloc(method_name, params, dump_json_params);
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to alloc `%s` RPC cmd\n", method_name);
 		return -ENOMEM;
 	}
 
-	sto_rpc_cmd_init_cb(cmd, response_handler, priv);
+	sto_rpc_cmd_init_cb(cmd, args->response_handler, args->priv);
 
 	rc = sto_rpc_cmd_run(cmd);
 	if (spdk_unlikely(rc)) {

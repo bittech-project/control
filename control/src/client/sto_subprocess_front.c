@@ -131,8 +131,12 @@ sto_subprocess_info_json(void *priv, struct spdk_json_write_ctx *w)
 int
 sto_subprocess_run(struct sto_subprocess *subp)
 {
-	return sto_client_send("subprocess", sto_subprocess_info_json,
-			       sto_subprocess_resp_handler, subp);
+	struct sto_client_args args = {
+		.priv = subp,
+		.response_handler = sto_subprocess_resp_handler,
+	};
+
+	return sto_client_send("subprocess", subp, sto_subprocess_info_json, &args);
 }
 
 int

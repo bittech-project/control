@@ -168,8 +168,12 @@ sto_fstat_info_json(void *priv, struct spdk_json_write_ctx *w)
 static int
 sto_fstat_submit(struct sto_fstat_req *req)
 {
-	return sto_client_send("fstat", sto_fstat_info_json,
-			       sto_fstat_resp_handler, req);
+	struct sto_client_args args = {
+		.priv = req,
+		.response_handler = sto_fstat_resp_handler,
+	};
+
+	return sto_client_send("fstat", req, sto_fstat_info_json, &args);
 }
 
 int

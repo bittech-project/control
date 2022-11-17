@@ -164,11 +164,19 @@ int
 sto_aio_submit(struct sto_aio *aio)
 {
 	if (aio->dir == STO_WRITE) {
-		return sto_client_send("aio_write", sto_aio_write_info_json,
-				       sto_aio_write_resp_handler, aio);
+		struct sto_client_args args = {
+			.priv = aio,
+			.response_handler = sto_aio_write_resp_handler,
+		};
+
+		return sto_client_send("aio_write", aio, sto_aio_write_info_json, &args);
 	} else {
-		return sto_client_send("aio_read", sto_aio_read_info_json,
-				       sto_aio_read_resp_handler, aio);
+		struct sto_client_args args = {
+			.priv = aio,
+			.response_handler = sto_aio_read_resp_handler,
+		};
+
+		return sto_client_send("aio_read", aio, sto_aio_read_info_json, &args);
 	}
 }
 

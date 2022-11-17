@@ -162,8 +162,12 @@ sto_readdir_info_json(void *priv, struct spdk_json_write_ctx *w)
 static int
 sto_readdir_submit(struct sto_readdir_req *req)
 {
-	return sto_client_send("readdir", sto_readdir_info_json,
-			       sto_readdir_resp_handler, req);
+	struct sto_client_args args = {
+		.priv = req,
+		.response_handler = sto_readdir_resp_handler,
+	};
+
+	return sto_client_send("readdir", req, sto_readdir_info_json, &args);
 }
 
 int
