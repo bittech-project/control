@@ -275,33 +275,33 @@ struct sto_req_ops sto_write_req_ops = {
 };
 
 struct sto_req *
-sto_ls_req_constructor(const struct sto_cdbops *op)
+sto_readdir_req_constructor(const struct sto_cdbops *op)
 {
-	struct sto_ls_req *ls_req;
+	struct sto_readdir_req *readdir_req;
 
-	ls_req = rte_zmalloc(NULL, sizeof(*ls_req), 0);
-	if (spdk_unlikely(!ls_req)) {
+	readdir_req = rte_zmalloc(NULL, sizeof(*readdir_req), 0);
+	if (spdk_unlikely(!readdir_req)) {
 		SPDK_ERRLOG("Failed to alloc sto ls req\n");
 		return NULL;
 	}
 
-	sto_req_init(&ls_req->req, op);
+	sto_req_init(&readdir_req->req, op);
 
-	return &ls_req->req;
+	return &readdir_req->req;
 }
 
 static void
-sto_ls_req_params_free(struct sto_ls_req_params *params)
+sto_readdir_req_params_free(struct sto_readdir_req_params *params)
 {
 	free((char *) params->name);
 	free(params->dirpath);
 }
 
 static int
-sto_ls_req_params_parse(void *priv, void *params)
+sto_readdir_req_params_parse(void *priv, void *params)
 {
-	struct sto_ls_req_params_constructor *constructor = priv;
-	struct sto_ls_req_params *p = constructor->inner.params;
+	struct sto_readdir_req_params_constructor *constructor = priv;
+	struct sto_readdir_req_params *p = constructor->inner.params;
 
 	p->name = constructor->name(params);
 	if (spdk_unlikely(!p->name)) {
@@ -337,15 +337,15 @@ free_name:
 }
 
 static int
-sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+sto_readdir_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_ls_req *ls_req = sto_ls_req(req);
-	struct sto_ls_req_params_constructor *constructor = req->params_constructor;
+	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
+	struct sto_readdir_req_params_constructor *constructor = req->params_constructor;
 	int rc = 0;
 
-	constructor->inner.params = &ls_req->params;
+	constructor->inner.params = &readdir_req->params;
 
-	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_ls_req_params_parse, constructor);
+	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_readdir_req_params_parse, constructor);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to parse params for ls req\n");
 	}
@@ -354,7 +354,7 @@ sto_ls_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 }
 
 static void
-sto_ls_req_done(void *priv, int rc)
+sto_readdir_req_done(void *priv, int rc)
 {
 	struct sto_req *req = priv;
 
@@ -369,49 +369,49 @@ out:
 }
 
 static int
-sto_ls_req_exec(struct sto_req *req)
+sto_readdir_req_exec(struct sto_req *req)
 {
-	struct sto_ls_req *ls_req = sto_ls_req(req);
-	struct sto_ls_req_params *params = &ls_req->params;
+	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
+	struct sto_readdir_req_params *params = &readdir_req->params;
 	struct sto_rpc_readdir_args args = {
 		.priv = req,
-		.done = sto_ls_req_done,
-		.dirents = &ls_req->dirents,
+		.done = sto_readdir_req_done,
+		.dirents = &readdir_req->dirents,
 	};
 
 	return sto_rpc_readdir(params->dirpath, &args);
 }
 
 static void
-sto_ls_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_readdir_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_ls_req *ls_req = sto_ls_req(req);
-	struct sto_ls_req_params *params = &ls_req->params;
+	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
+	struct sto_readdir_req_params *params = &readdir_req->params;
 	struct sto_dirents_json_cfg cfg = {
 		.name = params->name,
 		.exclude_list = params->exclude_list,
 	};
 
-	sto_dirents_info_json(&ls_req->dirents, &cfg, w);
+	sto_dirents_info_json(&readdir_req->dirents, &cfg, w);
 }
 
 static void
-sto_ls_req_free(struct sto_req *req)
+sto_readdir_req_free(struct sto_req *req)
 {
-	struct sto_ls_req *ls_req = sto_ls_req(req);
+	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
 
-	sto_ls_req_params_free(&ls_req->params);
+	sto_readdir_req_params_free(&readdir_req->params);
 
-	sto_dirents_free(&ls_req->dirents);
+	sto_dirents_free(&readdir_req->dirents);
 
-	rte_free(ls_req);
+	rte_free(readdir_req);
 }
 
-struct sto_req_ops sto_ls_req_ops = {
-	.decode_cdb = sto_ls_req_decode_cdb,
-	.exec = sto_ls_req_exec,
-	.end_response = sto_ls_req_end_response,
-	.free = sto_ls_req_free,
+struct sto_req_ops sto_readdir_req_ops = {
+	.decode_cdb = sto_readdir_req_decode_cdb,
+	.exec = sto_readdir_req_exec,
+	.end_response = sto_readdir_req_end_response,
+	.free = sto_readdir_req_free,
 };
 
 struct sto_req *

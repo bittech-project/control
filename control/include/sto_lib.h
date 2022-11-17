@@ -125,21 +125,21 @@ sto_write_req(struct sto_req *req)
 
 struct sto_req *sto_write_req_constructor(const struct sto_cdbops *op);
 
-struct sto_ls_req_params {
+struct sto_readdir_req_params {
 	const char *name;
 	char *dirpath;
 #define EXCLUDE_LIST_MAX 20
 	const char *exclude_list[EXCLUDE_LIST_MAX];
 };
 
-struct sto_ls_req {
+struct sto_readdir_req {
 	struct sto_req req;
 
-	struct sto_ls_req_params params;
+	struct sto_readdir_req_params params;
 	struct sto_dirents dirents;
 };
 
-struct sto_ls_req_params_constructor {
+struct sto_readdir_req_params_constructor {
 	struct sto_decoder decoder;
 
 	const char *(*name)(void *params);
@@ -147,19 +147,19 @@ struct sto_ls_req_params_constructor {
 	int (*exclude)(const char **arr);
 
 	struct {
-		struct sto_ls_req_params *params;
+		struct sto_readdir_req_params *params;
 	} inner;
 };
 
-extern struct sto_req_ops sto_ls_req_ops;
+extern struct sto_req_ops sto_readdir_req_ops;
 
-static inline struct sto_ls_req *
-sto_ls_req(struct sto_req *req)
+static inline struct sto_readdir_req *
+sto_readdir_req(struct sto_req *req)
 {
-	return SPDK_CONTAINEROF(req, struct sto_ls_req, req);
+	return SPDK_CONTAINEROF(req, struct sto_readdir_req, req);
 }
 
-struct sto_req *sto_ls_req_constructor(const struct sto_cdbops *op);
+struct sto_req *sto_readdir_req_constructor(const struct sto_cdbops *op);
 
 struct sto_tree_req_params {
 	char *dirpath;

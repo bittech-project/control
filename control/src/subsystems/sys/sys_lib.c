@@ -91,7 +91,7 @@ sys_readdir_dirpath(void *arg)
 	return spdk_sprintf_alloc("%s", params->dirpath);
 }
 
-static struct sto_ls_req_params_constructor readdir_constructor = {
+static struct sto_readdir_req_params_constructor readdir_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(sys_readdir_decoders,
 					   sys_readdir_params_alloc, sys_readdir_params_free),
 	.name = sys_readdir_name,
@@ -107,8 +107,8 @@ static const struct sto_cdbops sys_op_table[] = {
 	},
 	{
 		.name = "readdir",
-		.req_constructor = sto_ls_req_constructor,
-		.req_ops = &sto_ls_req_ops,
+		.req_constructor = sto_readdir_req_constructor,
+		.req_ops = &sto_readdir_req_ops,
 		.params_constructor = &readdir_constructor,
 	},
 };

@@ -44,7 +44,7 @@ scst_handler_list_dirpath(void *arg)
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_HANDLERS);
 }
 
-static struct sto_ls_req_params_constructor handler_list_constructor = {
+static struct sto_readdir_req_params_constructor handler_list_constructor = {
 	.name = scst_handler_list_name,
 	.dirpath = scst_handler_list_dirpath,
 };
@@ -61,7 +61,7 @@ scst_driver_list_dirpath(void *arg)
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_TARGETS);
 }
 
-static struct sto_ls_req_params_constructor driver_list_constructor = {
+static struct sto_readdir_req_params_constructor driver_list_constructor = {
 	.name = scst_driver_list_name,
 	.dirpath = scst_driver_list_dirpath,
 };
@@ -282,7 +282,7 @@ scst_dev_list_dirpath(void *arg)
 	return spdk_sprintf_alloc("%s/%s", SCST_ROOT, SCST_DEVICES);
 }
 
-static struct sto_ls_req_params_constructor dev_list_constructor = {
+static struct sto_readdir_req_params_constructor dev_list_constructor = {
 	.name = scst_dev_list_name,
 	.dirpath = scst_dev_list_dirpath,
 };
@@ -363,7 +363,7 @@ scst_dgrp_list_exclude(const char **exclude_list)
 	return 0;
 }
 
-static struct sto_ls_req_params_constructor dgrp_list_constructor = {
+static struct sto_readdir_req_params_constructor dgrp_list_constructor = {
 	.name = scst_dgrp_list_name,
 	.dirpath = scst_dgrp_list_dirpath,
 	.exclude = scst_dgrp_list_exclude,
@@ -539,7 +539,7 @@ scst_tgrp_list_exclude(const char **exclude_list)
 	return 0;
 }
 
-static struct sto_ls_req_params_constructor tgrp_list_constructor = {
+static struct sto_readdir_req_params_constructor tgrp_list_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_list_decoders,
 					   scst_tgrp_list_params_alloc, scst_tgrp_list_params_free),
 	.name = scst_tgrp_list_name,
@@ -1052,14 +1052,14 @@ static struct sto_write_req_params_constructor lun_clear_constructor = {
 static const struct sto_cdbops scst_op_table[] = {
 	{
 		.name = "handler_list",
-		.req_constructor = sto_ls_req_constructor,
-		.req_ops = &sto_ls_req_ops,
+		.req_constructor = sto_readdir_req_constructor,
+		.req_ops = &sto_readdir_req_ops,
 		.params_constructor = &handler_list_constructor,
 	},
 	{
 		.name = "driver_list",
-		.req_constructor = sto_ls_req_constructor,
-		.req_ops = &sto_ls_req_ops,
+		.req_constructor = sto_readdir_req_constructor,
+		.req_ops = &sto_readdir_req_ops,
 		.params_constructor = &driver_list_constructor,
 	},
 	{
@@ -1082,8 +1082,8 @@ static const struct sto_cdbops scst_op_table[] = {
 	},
 	{
 		.name = "dev_list",
-		.req_constructor = sto_ls_req_constructor,
-		.req_ops = &sto_ls_req_ops,
+		.req_constructor = sto_readdir_req_constructor,
+		.req_ops = &sto_readdir_req_ops,
 		.params_constructor = &dev_list_constructor,
 	},
 	{
@@ -1100,8 +1100,8 @@ static const struct sto_cdbops scst_op_table[] = {
 	},
 	{
 		.name = "dgrp_list",
-		.req_constructor = sto_ls_req_constructor,
-		.req_ops = &sto_ls_req_ops,
+		.req_constructor = sto_readdir_req_constructor,
+		.req_ops = &sto_readdir_req_ops,
 		.params_constructor = &dgrp_list_constructor,
 	},
 	{
@@ -1130,8 +1130,8 @@ static const struct sto_cdbops scst_op_table[] = {
 	},
 	{
 		.name = "tgrp_list",
-		.req_constructor = sto_ls_req_constructor,
-		.req_ops = &sto_ls_req_ops,
+		.req_constructor = sto_readdir_req_constructor,
+		.req_ops = &sto_readdir_req_ops,
 		.params_constructor = &tgrp_list_constructor,
 	},
 	{
