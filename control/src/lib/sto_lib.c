@@ -6,7 +6,7 @@
 #include <rte_malloc.h>
 
 #include "sto_lib.h"
-#include "sto_aio.h"
+#include "sto_rpc_aio.h"
 #include "err.h"
 
 int
@@ -226,14 +226,9 @@ sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 }
 
 static void
-sto_write_req_done(struct sto_aio *aio)
+sto_write_req_done(void *priv, int rc)
 {
-	struct sto_req *req = aio->priv;
-	int rc;
-
-	rc = aio->returncode;
-
-	sto_aio_free(aio);
+	struct sto_req *req = priv;
 
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to device group add\n");
@@ -248,9 +243,12 @@ sto_write_req_exec(struct sto_req *req)
 {
 	struct sto_write_req *write_req = sto_write_req(req);
 	struct sto_write_req_params *params = &write_req->params;
+	struct sto_rpc_writefile_args args = {
+		.priv = req,
+		.done = sto_write_req_done,
+	};
 
-	return sto_aio_write_string(params->file, params->data,
-				    sto_write_req_done, req);
+	return sto_rpc_writefile(params->file, params->data, &args);
 }
 
 static void
