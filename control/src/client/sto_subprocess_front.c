@@ -110,9 +110,9 @@ out:
 }
 
 static void
-sto_subprocess_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_ctx *w)
+sto_subprocess_info_json(void *priv, struct spdk_json_write_ctx *w)
 {
-	struct sto_subprocess *subp = rpc_req->priv;
+	struct sto_subprocess *subp = priv;
 	int i;
 
 	spdk_json_write_object_begin(w);

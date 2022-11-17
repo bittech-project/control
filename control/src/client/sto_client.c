@@ -182,8 +182,8 @@ sto_client_group_poll(void *ctx)
 	return SPDK_POLLER_BUSY;
 }
 
-static int
-sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req)
+static struct spdk_jsonrpc_client_request *
+sto_client_alloc_request(struct sto_rpc_request *req)
 {
 	struct spdk_jsonrpc_client_request *request;
 	struct spdk_json_write_ctx *w;
@@ -191,21 +191,35 @@ sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req)
 	request = spdk_jsonrpc_client_create_request();
 	if (spdk_unlikely(!request)) {
 		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
-		return -ENOMEM;
+		return NULL;
 	}
 
 	w = spdk_jsonrpc_begin_request(request, req->id, req->method_name);
 	if (!w) {
 		spdk_jsonrpc_client_free_request(request);
-		return -ENOMEM;
+		return NULL;
 	}
 
-	if (req->params_json) {
+	if (req->dump_json_params) {
 		spdk_json_write_name(w, "params");
-		req->params_json(req, w);
+		req->dump_json_params(req->priv, w);
 	}
 
 	spdk_jsonrpc_end_request(request, w);
+
+	return request;
+}
+
+static int
+sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req)
+{
+	struct spdk_jsonrpc_client_request *request;
+
+	request = sto_client_alloc_request(req);
+	if (spdk_unlikely(!request)) {
+		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
+		return -ENOMEM;
+	}
 
 	/* TODO: use a hash table? */
 	TAILQ_INSERT_TAIL(&g_rpc_req_list, req, list);
@@ -216,7 +230,7 @@ sto_client_send_request(struct sto_client *client, struct sto_rpc_request *req)
 }
 
 static struct sto_rpc_request *
-sto_rpc_req_alloc(const char *method_name, sto_dump_params_json params_json)
+sto_rpc_req_alloc(const char *method_name, sto_client_dump_json_params_t dump_json_params)
 {
 	struct sto_rpc_request *req;
 	static int id;
@@ -239,14 +253,14 @@ sto_rpc_req_alloc(const char *method_name, sto_dump_params_json params_json)
 		return NULL;
 	}
 
-	req->params_json = params_json;
+	req->dump_json_params = dump_json_params;
 	req->id = ++id;
 
 	return req;
 }
 
 static void
-sto_rpc_req_init_cb(struct sto_rpc_request *req, response_handler_t response_handler, void *priv)
+sto_rpc_req_init_cb(struct sto_rpc_request *req, sto_client_response_handler_t response_handler, void *priv)
 {
 	req->response_handler = response_handler;
 	req->priv = priv;
@@ -293,13 +307,13 @@ out:
 }
 
 int
-sto_client_send(const char *method_name, sto_dump_params_json params_json,
-		response_handler_t response_handler, void *priv)
+sto_client_send(const char *method_name, sto_client_dump_json_params_t dump_json_params,
+		sto_client_response_handler_t response_handler, void *priv)
 {
 	struct sto_rpc_request *req;
 	int rc = 0;
 
-	req = sto_rpc_req_alloc(method_name, params_json);
+	req = sto_rpc_req_alloc(method_name, dump_json_params);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("Failed to alloc `%s` RPC req\n", method_name);
 		return -ENOMEM;

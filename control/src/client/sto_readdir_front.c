@@ -147,9 +147,9 @@ out:
 }
 
 static void
-sto_readdir_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_ctx *w)
+sto_readdir_info_json(void *priv, struct spdk_json_write_ctx *w)
 {
-	struct sto_readdir_req *req = rpc_req->priv;
+	struct sto_readdir_req *req = priv;
 
 	spdk_json_write_object_begin(w);
 

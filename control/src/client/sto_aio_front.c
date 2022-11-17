@@ -99,9 +99,9 @@ out:
 }
 
 static void
-sto_aio_read_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_ctx *w)
+sto_aio_read_info_json(void *priv, struct spdk_json_write_ctx *w)
 {
-	struct sto_aio *aio = rpc_req->priv;
+	struct sto_aio *aio = priv;
 
 	spdk_json_write_object_begin(w);
 
@@ -148,9 +148,9 @@ out:
 }
 
 static void
-sto_aio_write_info_json(struct sto_rpc_request *rpc_req, struct spdk_json_write_ctx *w)
+sto_aio_write_info_json(void *priv, struct spdk_json_write_ctx *w)
 {
-	struct sto_aio *aio = rpc_req->priv;
+	struct sto_aio *aio = priv;
 
 	spdk_json_write_object_begin(w);
 
