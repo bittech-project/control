@@ -134,3 +134,147 @@ free_cmd:
 
 	return rc;
 }
+
+struct sto_rpc_readfile_info {
+	int returncode;
+	char **buf;
+};
+
+static int
+sto_rpc_readfile_buf_decode(const struct spdk_json_val *val, void *out)
+{
+	char **buf = *(char ***) out;
+
+	return spdk_json_decode_string(val, buf);
+}
+
+static const struct spdk_json_object_decoder sto_rpc_readfile_info_decoders[] = {
+	{"returncode", offsetof(struct sto_rpc_readfile_info, returncode), spdk_json_decode_int32},
+	{"buf", offsetof(struct sto_rpc_readfile_info, buf), sto_rpc_readfile_buf_decode},
+};
+
+struct sto_rpc_readfile_params {
+	const char *filepath;
+	uint32_t size;
+};
+
+struct sto_rpc_readfile_cmd {
+	void *priv;
+	sto_rpc_readfile_done_t done;
+
+	char **buf;
+};
+
+static struct sto_rpc_readfile_cmd *
+sto_rpc_readfile_cmd_alloc(void)
+{
+	struct sto_rpc_readfile_cmd *cmd;
+
+	cmd = rte_zmalloc(NULL, sizeof(*cmd), 0);
+	if (spdk_unlikely(!cmd)) {
+		SPDK_ERRLOG("Cann't allocate memory for STO RPC readfile cmd\n");
+		return NULL;
+	}
+
+	return cmd;
+}
+
+static void
+sto_rpc_readfile_cmd_init_cb(struct sto_rpc_readfile_cmd *cmd,
+			     sto_rpc_readfile_done_t done, void *priv)
+{
+	cmd->done = done;
+	cmd->priv = priv;
+}
+
+static void
+sto_rpc_readfile_cmd_free(struct sto_rpc_readfile_cmd *cmd)
+{
+	rte_free(cmd);
+}
+
+static void
+sto_rpc_readfile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp, int rc)
+{
+	struct sto_rpc_readfile_cmd *cmd = priv;
+	struct sto_rpc_readfile_info info = {
+		.buf = cmd->buf,
+	};
+
+	if (spdk_unlikely(rc)) {
+		goto out;
+	}
+
+	if (spdk_json_decode_object(resp->result, sto_rpc_readfile_info_decoders,
+				    SPDK_COUNTOF(sto_rpc_readfile_info_decoders), &info)) {
+		SPDK_ERRLOG("Failed to decode response for STO RPC readfile cmd\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	rc = info.returncode;
+
+	SPDK_NOTICELOG("GLEB: Get result from STO RPC readfile response: returncode[%d]\n", rc);
+
+out:
+	cmd->done(cmd->priv, rc);
+	sto_rpc_readfile_cmd_free(cmd);
+}
+
+static void
+sto_rpc_readfile_info_json(void *priv, struct spdk_json_write_ctx *w)
+{
+	struct sto_rpc_readfile_params *params = priv;
+
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_string(w, "filepath", params->filepath);
+	spdk_json_write_named_uint32(w, "size", params->size);
+
+	spdk_json_write_object_end(w);
+}
+
+static int
+sto_rpc_readfile_cmd_run(struct sto_rpc_readfile_cmd *cmd, struct sto_rpc_readfile_params *params)
+{
+	struct sto_client_args args = {
+		.priv = cmd,
+		.response_handler = sto_rpc_readfile_resp_handler,
+	};
+
+	return sto_client_send("readfile", params, sto_rpc_readfile_info_json, &args);
+}
+
+int
+sto_rpc_readfile(const char *filepath, uint32_t size, struct sto_rpc_readfile_args *args)
+{
+	struct sto_rpc_readfile_cmd *cmd;
+	struct sto_rpc_readfile_params params = {
+		.filepath = filepath,
+		.size = size,
+	};
+	int rc;
+
+	cmd = sto_rpc_readfile_cmd_alloc();
+	if (spdk_unlikely(!cmd)) {
+		SPDK_ERRLOG("Failed to allocate RPC readfile cmd\n");
+		return -ENOMEM;
+	}
+
+	cmd->buf = args->buf;
+
+	sto_rpc_readfile_cmd_init_cb(cmd, args->done, args->priv);
+
+	rc = sto_rpc_readfile_cmd_run(cmd, &params);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to run RPC readfile cmd, rc=%d\n", rc);
+		goto free_cmd;
+	}
+
+	return 0;
+
+free_cmd:
+	sto_rpc_readfile_cmd_free(cmd);
+
+	return rc;
+}
