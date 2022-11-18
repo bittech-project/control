@@ -3,6 +3,8 @@
 #include <spdk/util.h>
 #include <spdk/string.h>
 
+#include "sto_exec.h"
+#include "sto_srv_fs.h"
 #include "sto_srv_readdir.h"
 
 static int sto_srv_readdir_exec(void *arg);
@@ -13,115 +15,6 @@ static struct sto_exec_ops srv_readdir_ops = {
 	.exec = sto_srv_readdir_exec,
 	.exec_done = sto_srv_readdir_exec_done,
 };
-
-static struct sto_srv_dirent *
-sto_srv_dirent_alloc(const char *name)
-{
-	struct sto_srv_dirent *dirent;
-
-	dirent = calloc(1, sizeof(*dirent));
-	if (spdk_unlikely(!dirent)) {
-		printf("server: Failed to alloc dirent\n");
-		return NULL;
-	}
-
-	dirent->name = strdup(name);
-	if (spdk_unlikely(!dirent->name)) {
-		printf("server: Failed to alloc dirent name\n");
-		goto free_dirent;
-	}
-
-	return dirent;
-
-free_dirent:
-	free(dirent);
-
-	return NULL;
-}
-
-static void
-sto_srv_dirent_free(struct sto_srv_dirent *dirent)
-{
-	free(dirent->name);
-	free(dirent);
-}
-
-static int
-sto_srv_dirent_get_stat(struct sto_srv_dirent *dirent, const char *path)
-{
-	struct stat sb;
-	char *full_path;
-	int rc = 0;
-
-	full_path = spdk_sprintf_alloc("%s/%s", path, dirent->name);
-	if (spdk_unlikely(!full_path)) {
-		return -ENOMEM;
-	}
-
-	if (lstat(full_path, &sb) == -1) {
-		printf("server: Failed to get stat for file %s: %s\n",
-		       full_path, strerror(errno));
-		rc = -errno;
-		goto out;
-	}
-
-	dirent->mode = sb.st_mode;
-
-out:
-	free(full_path);
-
-	return rc;
-}
-
-static void
-sto_srv_dirent_info_json(struct sto_srv_dirent *dirent, struct spdk_json_write_ctx *w)
-{
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_string(w, "name", dirent->name);
-	spdk_json_write_named_uint32(w, "mode", dirent->mode);
-
-	spdk_json_write_object_end(w);
-}
-
-static void
-sto_srv_dirents_init(struct sto_srv_dirents *dirents)
-{
-	TAILQ_INIT(&dirents->dirents);
-}
-
-static void
-sto_srv_dirents_free(struct sto_srv_dirents *dirents)
-{
-	struct sto_srv_dirent *dirent, *tmp;
-
-	TAILQ_FOREACH_SAFE(dirent, &dirents->dirents, list, tmp) {
-		TAILQ_REMOVE(&dirents->dirents, dirent, list);
-
-		sto_srv_dirent_free(dirent);
-	}
-}
-
-static void
-sto_srv_dirents_add(struct sto_srv_dirents *dirents, struct sto_srv_dirent *dirent)
-{
-	TAILQ_INSERT_TAIL(&dirents->dirents, dirent, list);
-}
-
-void
-sto_srv_dirents_info_json(struct sto_srv_dirents *dirents,
-			  struct spdk_json_write_ctx *w)
-{
-	struct sto_srv_dirent *dirent;
-
-	spdk_json_write_named_array_begin(w, "dirents");
-
-	TAILQ_FOREACH(dirent, &dirents->dirents, list) {
-		sto_srv_dirent_info_json(dirent, w);
-	}
-
-	spdk_json_write_array_end(w);
-}
 
 struct sto_srv_readdir_params {
 	char *dirpath;
@@ -149,6 +42,68 @@ struct sto_srv_readdir_req {
 	void *priv;
 	sto_srv_readdir_done_t done;
 };
+
+static void sto_srv_readdir_req_free(struct sto_srv_readdir_req *req);
+
+static void
+sto_srv_readdir_exec_done(void *arg, int rc)
+{
+	struct sto_srv_readdir_req *req = arg;
+
+	req->done(req->priv, &req->dirents, rc);
+
+	sto_srv_readdir_req_free(req);
+}
+
+static int
+sto_srv_readdir_exec(void *arg)
+{
+	struct sto_srv_readdir_req *req = arg;
+	struct sto_srv_readdir_params *params = &req->params;
+	struct dirent *entry;
+	DIR *dir;
+	int rc = 0;
+
+	dir = opendir(params->dirpath);
+	if (spdk_unlikely(!dir)) {
+		printf("server: Failed to open %s dir\n", params->dirpath);
+		return -errno;
+	}
+
+	for (entry = readdir(dir); entry != NULL; entry = readdir(dir)) {
+		struct sto_srv_dirent *dirent;
+
+		if (params->skip_hidden && entry->d_name[0] == '.') {
+			continue;
+		}
+
+		dirent = sto_srv_dirent_alloc(entry->d_name);
+		if (spdk_unlikely(!dirent)) {
+			sto_srv_dirents_free(&req->dirents);
+			printf("server: Failed to alloc dirent\n");
+			break;
+		}
+
+		rc = sto_srv_dirent_get_stat(dirent, params->dirpath);
+		if (spdk_unlikely(rc)) {
+			sto_srv_dirent_free(dirent);
+			sto_srv_dirents_free(&req->dirents);
+			printf("server: Failed to dirent to get stat\n");
+			break;
+		}
+
+		sto_srv_dirents_add(&req->dirents, dirent);
+	}
+
+	rc = closedir(dir);
+	if (spdk_unlikely(rc == -1)) {
+		sto_srv_dirents_free(&req->dirents);
+		printf("server: Failed to close %s dir\n", params->dirpath);
+		rc = -errno;
+	}
+
+	return rc;
+}
 
 static struct sto_srv_readdir_req *
 sto_srv_readdir_req_alloc(const struct spdk_json_val *params)
@@ -226,69 +181,6 @@ sto_srv_readdir(const struct spdk_json_val *params,
 
 free_req:
 	sto_srv_readdir_req_free(req);
-
-	return rc;
-}
-
-static void
-sto_srv_readdir_exec_done(void *arg, int rc)
-{
-	struct sto_srv_readdir_req *req = arg;
-
-	req->done(req->priv, &req->dirents, rc);
-
-	sto_srv_readdir_req_free(req);
-}
-
-static int
-sto_srv_readdir_exec(void *arg)
-{
-	struct sto_srv_readdir_req *req = arg;
-	struct sto_srv_readdir_params *params = &req->params;
-	struct dirent *entry;
-	DIR *dir;
-	int rc = 0;
-
-	dir = opendir(params->dirpath);
-	if (spdk_unlikely(!dir)) {
-		printf("server: Failed to open %s dir\n", params->dirpath);
-		return -errno;
-	}
-
-	entry = readdir(dir);
-
-	while (entry != NULL) {
-		struct sto_srv_dirent *dirent;
-
-		if (params->skip_hidden && entry->d_name[0] == '.') {
-			entry = readdir(dir);
-			continue;
-		}
-
-		dirent = sto_srv_dirent_alloc(entry->d_name);
-		if (spdk_unlikely(!dirent)) {
-			sto_srv_dirents_free(&req->dirents);
-			printf("server: Failed to alloc dirent\n");
-			break;
-		}
-
-		rc = sto_srv_dirent_get_stat(dirent, params->dirpath);
-		if (spdk_unlikely(rc)) {
-			sto_srv_dirents_free(&req->dirents);
-			printf("server: Failed to dirent to get stat\n");
-			break;
-		}
-
-		sto_srv_dirents_add(&req->dirents, dirent);
-
-		entry = readdir(dir);
-	}
-
-	rc = closedir(dir);
-	if (spdk_unlikely(rc == -1)) {
-		printf("server: Failed to close %s dir\n", params->dirpath);
-		rc = -errno;
-	}
 
 	return rc;
 }

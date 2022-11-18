@@ -3,6 +3,7 @@
 #include <spdk/likely.h>
 
 #include "sto_rpc.h"
+#include "sto_srv_fs.h"
 #include "sto_srv_aio.h"
 #include "sto_srv_readdir.h"
 
