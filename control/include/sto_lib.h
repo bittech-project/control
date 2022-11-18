@@ -125,6 +125,39 @@ sto_write_req(struct sto_req *req)
 
 struct sto_req *sto_write_req_constructor(const struct sto_cdbops *op);
 
+struct sto_read_req_params {
+	const char *file;
+	uint32_t size;
+};
+
+struct sto_read_req {
+	struct sto_req req;
+
+	struct sto_read_req_params params;
+	char *buf;
+};
+
+struct sto_read_req_params_constructor {
+	struct sto_decoder decoder;
+
+	const char *(*file_path)(void *params);
+	uint32_t (*size)(void *params);
+
+	struct {
+		struct sto_read_req_params *params;
+	} inner;
+};
+
+extern struct sto_req_ops sto_read_req_ops;
+
+static inline struct sto_read_req *
+sto_read_req(struct sto_req *req)
+{
+	return SPDK_CONTAINEROF(req, struct sto_read_req, req);
+}
+
+struct sto_req *sto_read_req_constructor(const struct sto_cdbops *op);
+
 struct sto_readdir_req_params {
 	const char *name;
 	char *dirpath;
