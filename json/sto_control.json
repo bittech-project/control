@@ -10,7 +10,24 @@
             "op": "readdir",
             "dirpath": "/root/gleb/control"
           }
-        }
+        },
+        {
+          "method": "control",
+          "params": {
+            "subsystem": "sys",
+            "op": "writefile",
+            "filepath": "/root/gleb/control/test",
+            "data": "Hello World"
+          }
+        },
+        {
+          "method": "control",
+          "params": {
+            "subsystem": "sys",
+            "op": "readfile",
+            "filepath": "/root/gleb/control/test"
+          }
+	}
       ]
     }
   ]

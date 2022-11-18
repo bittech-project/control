@@ -27,7 +27,7 @@ sys_writefile_params_free(void *arg)
 }
 
 static const struct spdk_json_object_decoder sys_writefile_decoders[] = {
-	{"path", offsetof(struct sys_writefile_params, filepath), spdk_json_decode_string},
+	{"filepath", offsetof(struct sys_writefile_params, filepath), spdk_json_decode_string},
 	{"data", offsetof(struct sys_writefile_params, data), spdk_json_decode_string},
 };
 
@@ -52,6 +52,54 @@ static struct sto_write_req_params_constructor writefile_constructor = {
 					   sys_writefile_params_alloc, sys_writefile_params_free),
 	.file_path = sys_writefile_path,
 	.data = sys_writefile_data,
+};
+
+struct sys_readfile_params {
+	char *filepath;
+	uint32_t size;
+};
+
+static void *
+sys_readfile_params_alloc(void)
+{
+	return calloc(1, sizeof(struct sys_readfile_params));
+}
+
+static void
+sys_readfile_params_free(void *arg)
+{
+	struct sys_readfile_params *params = arg;
+
+	free(params->filepath);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder sys_readfile_decoders[] = {
+	{"filepath", offsetof(struct sys_readfile_params, filepath), spdk_json_decode_string},
+	{"size", offsetof(struct sys_readfile_params, size), spdk_json_decode_uint32, true},
+};
+
+static const char *
+sys_readfile_path(void *arg)
+{
+	struct sys_readfile_params *params = arg;
+
+	return spdk_sprintf_alloc("%s", params->filepath);
+}
+
+static uint32_t
+sys_readfile_size(void *arg)
+{
+	struct sys_readfile_params *params = arg;
+
+	return params->size;
+}
+
+static struct sto_read_req_params_constructor readfile_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(sys_readfile_decoders,
+					   sys_readfile_params_alloc, sys_readfile_params_free),
+	.file_path = sys_readfile_path,
+	.size = sys_readfile_size,
 };
 
 struct sys_readdir_params {
@@ -104,6 +152,12 @@ static const struct sto_cdbops sys_op_table[] = {
 		.req_constructor = sto_write_req_constructor,
 		.req_ops = &sto_write_req_ops,
 		.params_constructor = &writefile_constructor,
+	},
+	{
+		.name = "readfile",
+		.req_constructor = sto_read_req_constructor,
+		.req_ops = &sto_read_req_ops,
+		.params_constructor = &readfile_constructor,
 	},
 	{
 		.name = "readdir",
