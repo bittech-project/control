@@ -716,7 +716,7 @@ scst_target_list_depth(void *arg)
 {
 	struct scst_target_list_params *params = arg;
 
-	return params ? 2 : 3;
+	return params ? 1 : 2;
 }
 
 static struct sto_tree_req_params_constructor target_list_constructor = {

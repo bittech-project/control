@@ -243,20 +243,14 @@ sto_subtree_info_json(struct sto_inode *parent, struct spdk_json_write_ctx *w)
 
 static void sto_tree_read(struct sto_inode *inode);
 
-static bool
+static void
 sto_subtree_read(struct sto_inode *parent)
 {
 	struct sto_inode *child;
 
-	if (TAILQ_EMPTY(&parent->childs)) {
-		return false;
-	}
-
 	TAILQ_FOREACH(child, &parent->childs, list) {
 		sto_tree_read(child);
 	}
-
-	return true;
 }
 
 static void
@@ -266,16 +260,12 @@ sto_tree_read_done(void *priv, int rc)
 	struct sto_tree_cmd *cmd = sto_tree_cmd(inode);
 
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to readdir\n");
+		SPDK_ERRLOG("Failed to read tree, rc=%d\n", rc);
 		goto out_err;
 	}
 
 	if (spdk_unlikely(cmd->info->returncode)) {
 		SPDK_ERRLOG("Some readdir command failed, go out\n");
-		goto out;
-	}
-
-	if (cmd->depth && inode->level == cmd->depth) {
 		goto out;
 	}
 
@@ -285,9 +275,11 @@ sto_tree_read_done(void *priv, int rc)
 		goto out_err;
 	}
 
-	if (!sto_subtree_read(inode)) {
+	if (cmd->depth && inode->level == cmd->depth) {
 		goto out;
 	}
+
+	sto_subtree_read(inode);
 
 out:
 	sto_tree_put_ref(inode);
