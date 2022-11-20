@@ -328,7 +328,8 @@ sto_tree_info_init(struct sto_tree_info *info, struct sto_tree_cmd *cmd)
 	return 0;
 }
 
-void sto_tree_info_free(struct sto_tree_info *info)
+void
+sto_tree_info_free(struct sto_tree_info *info)
 {
 	sto_tree_free(&info->tree_root);
 }
