@@ -153,8 +153,9 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 	}
 
 	if (rc < 0) {
-		/* TODO: What should we do? */
 		SPDK_ERRLOG("CRITICAL: spdk_jsonrpc_client_poll return ERROR, rc=%d\n", rc);
+		/* TODO: What should we do? */
+		assert(false);
 		return;
 	}
 
