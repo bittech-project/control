@@ -185,8 +185,11 @@ sto_file_inode_read_done(struct sto_inode *inode)
 static int
 sto_file_inode_handle_error(struct sto_inode *inode, int rc)
 {
+	struct sto_file_inode *file_inode = sto_file_inode(inode);
+
 	if (rc == -EACCES) {
-		return 0;
+		file_inode->buf = strdup(spdk_strerror(-rc));
+		rc = file_inode->buf ? 0 : -ENOMEM;
 	}
 
 	return rc;
