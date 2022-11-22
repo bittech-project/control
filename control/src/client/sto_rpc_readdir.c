@@ -122,9 +122,6 @@ sto_rpc_readdir_resp_handler(void *priv, struct spdk_jsonrpc_client_response *re
 		goto out;
 	}
 
-	SPDK_NOTICELOG("GLEB: Get result from READDIR response: dir_cnt %d\n",
-		       (int) dirents->cnt);
-
 out:
 	cmd->done(cmd->priv, rc);
 

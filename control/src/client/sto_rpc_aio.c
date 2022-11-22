@@ -72,8 +72,6 @@ sto_rpc_writefile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *
 
 	rc = info.returncode;
 
-	SPDK_NOTICELOG("GLEB: Get result from STO RPC writefile response: returncode[%d]\n", rc);
-
 out:
 	cmd->done(cmd->priv, rc);
 	sto_rpc_writefile_cmd_free(cmd);
@@ -213,8 +211,6 @@ sto_rpc_readfile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *r
 	}
 
 	rc = info.returncode;
-
-	SPDK_NOTICELOG("GLEB: Get result from STO RPC readfile response: returncode[%d]\n", rc);
 
 out:
 	cmd->done(cmd->priv, rc);

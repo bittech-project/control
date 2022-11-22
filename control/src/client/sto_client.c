@@ -112,8 +112,6 @@ sto_client_response(struct spdk_jsonrpc_client_response *response)
 		return;
 	}
 
-	SPDK_NOTICELOG("Got response for %d RPC cmd\n", id);
-
 	/* Check for error response */
 	if (response->error != NULL) {
 		struct json_write_buf buf = {};

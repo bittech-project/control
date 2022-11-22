@@ -99,9 +99,6 @@ sto_subprocess_resp_handler(void *priv, struct spdk_jsonrpc_client_response *res
 		}
 	}
 
-	SPDK_NOTICELOG("GLEB: Get result from subprocess response: returncode[%d] output: %s\n",
-		       subp->returncode, subp->output);
-
 free_params:
 	sto_subprocess_result_free(&result);
 
