@@ -375,13 +375,13 @@ static int
 sto_lnk_inode_read(struct sto_inode *inode)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
-	struct sto_rpc_readfile_args args = {
+	struct sto_rpc_readlink_args args = {
 		.priv = inode,
 		.done = sto_inode_read_done,
 		.buf = &file_inode->buf,
 	};
 
-	return sto_rpc_readfile(inode->path, 0, &args);
+	return sto_rpc_readlink(inode->path, &args);
 }
 
 static struct sto_inode_ops sto_lnk_inode_ops = {

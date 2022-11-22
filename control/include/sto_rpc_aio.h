@@ -27,4 +27,16 @@ struct sto_rpc_readfile_args {
 int sto_rpc_readfile(const char *filepath, uint32_t size,
 		     struct sto_rpc_readfile_args *args);
 
+typedef void (*sto_rpc_readlink_done_t)(void *priv, int rc);
+
+struct sto_rpc_readlink_args {
+	void *priv;
+	sto_rpc_readlink_done_t done;
+
+	char **buf;
+};
+
+int sto_rpc_readlink(const char *filepath,
+		     struct sto_rpc_readlink_args *args);
+
 #endif /* _STO_RPC_AIO_H_ */
