@@ -187,12 +187,18 @@ sto_file_inode_handle_error(struct sto_inode *inode, int rc)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
 
-	if (rc == -EACCES) {
-		file_inode->buf = strdup(spdk_strerror(-rc));
-		rc = file_inode->buf ? 0 : -ENOMEM;
+	if (rc != -EACCES) {
+		return rc;
 	}
 
-	return rc;
+	free(file_inode->buf);
+
+	file_inode->buf = strdup(spdk_strerror(-rc));
+	if (spdk_unlikely(!file_inode->buf)) {
+		return -ENOMEM;
+	}
+
+	return 0;
 }
 
 static void
