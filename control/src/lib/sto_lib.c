@@ -608,9 +608,9 @@ sto_tree_req_exec(struct sto_req *req)
 {
 	struct sto_tree_req *tree_req = sto_tree_req(req);
 	struct sto_tree_req_params *params = &tree_req->params;
-	struct sto_tree_cmd_args args = {
+	struct sto_tree_args args = {
 		.priv = req,
-		.tree_cmd_done = sto_tree_req_done,
+		.done = sto_tree_req_done,
 		.info = &tree_req->info,
 	};
 

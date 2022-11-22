@@ -31,21 +31,7 @@ sto_dirents_decode(const struct spdk_json_val *val, void *out)
 				      STO_DIRENT_MAX_CNT, &dirents->cnt, sizeof(struct sto_dirent));
 }
 
-int
-sto_dirent_copy(struct sto_dirent *src, struct sto_dirent *dst)
-{
-	dst->name = strdup(src->name);
-	if (spdk_unlikely(!dst->name)) {
-		SPDK_ERRLOG("Failed to copy dirent name: %s\n", src->name);
-		return -ENOMEM;
-	}
-
-	dst->mode = src->mode;
-
-	return 0;
-}
-
-void
+static void
 sto_dirent_free(struct sto_dirent *dirent)
 {
 	free(dirent->name);
