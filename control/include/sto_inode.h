@@ -16,6 +16,7 @@ struct sto_inode;
 
 typedef int (*sto_inode_read_t)(struct sto_inode *inode);
 typedef int (*sto_inode_read_done_t)(struct sto_inode *inode);
+typedef int (*sto_inode_handle_error_t)(struct sto_inode *inode, int rc);
 typedef void (*sto_inode_json_info_t)(struct sto_inode *inode, struct spdk_json_write_ctx *w);
 typedef void (*sto_inode_destroy_t)(struct sto_inode *inode);
 
@@ -25,6 +26,7 @@ struct sto_inode {
 
 	sto_inode_read_t read;
 	sto_inode_read_done_t read_done;
+	sto_inode_handle_error_t handle_error;
 	sto_inode_json_info_t json_info;
 	sto_inode_destroy_t destroy;
 

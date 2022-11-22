@@ -118,14 +118,18 @@ sto_inode_read_done(void *priv, int rc)
 {
 	struct sto_inode *inode = priv;
 
+	if (spdk_unlikely(sto_inode_check_error(inode))) {
+		SPDK_ERRLOG("Some inode failed, go out\n");
+		goto out;
+	}
+
+	if (rc && inode->handle_error) {
+		rc = inode->handle_error(inode, rc);
+	}
+
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to read tree, rc=%d\n", rc);
 		goto out_err;
-	}
-
-	if (spdk_unlikely(sto_inode_check_error(inode))) {
-		SPDK_ERRLOG("Some readdir command failed, go out\n");
-		goto out;
 	}
 
 	rc = inode->read_done(inode);
@@ -160,12 +164,6 @@ sto_inode_read(struct sto_inode *inode)
 }
 
 static int
-sto_file_inode_read_done(struct sto_inode *inode)
-{
-	return 0;
-}
-
-static int
 sto_file_inode_read(struct sto_inode *inode)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
@@ -176,6 +174,22 @@ sto_file_inode_read(struct sto_inode *inode)
 	};
 
 	return sto_rpc_readfile(inode->path, 0, &args);
+}
+
+static int
+sto_file_inode_read_done(struct sto_inode *inode)
+{
+	return 0;
+}
+
+static int
+sto_file_inode_handle_error(struct sto_inode *inode, int rc)
+{
+	if (rc == -EACCES) {
+		return 0;
+	}
+
+	return rc;
 }
 
 static void
@@ -215,6 +229,7 @@ sto_file_inode_create(void)
 
 	inode->read = sto_file_inode_read;
 	inode->read_done = sto_file_inode_read_done;
+	inode->handle_error = sto_file_inode_handle_error;
 	inode->json_info = sto_file_inode_json_info;
 	inode->destroy = sto_file_inode_destroy;
 
@@ -255,6 +270,24 @@ free_inode:
 }
 
 static int
+sto_dir_inode_read(struct sto_inode *inode)
+{
+	struct sto_dir_inode *dir_inode = sto_dir_inode(inode);
+	struct sto_rpc_readdir_args args = {
+		.priv = inode,
+		.done = sto_inode_read_done,
+		.dirents = &dir_inode->dirents,
+	};
+
+	if (sto_inode_check_tree_depth(inode)) {
+		sto_inode_put_ref(inode);
+		return 0;
+	}
+
+	return sto_rpc_readdir(inode->path, &args);
+}
+
+static int
 sto_dir_inode_read_done(struct sto_inode *inode)
 {
 	struct sto_dir_inode *dir_inode = sto_dir_inode(inode);
@@ -282,24 +315,6 @@ out:
 	sto_dirents_free(dirents);
 
 	return rc;
-}
-
-static int
-sto_dir_inode_read(struct sto_inode *inode)
-{
-	struct sto_dir_inode *dir_inode = sto_dir_inode(inode);
-	struct sto_rpc_readdir_args args = {
-		.priv = inode,
-		.done = sto_inode_read_done,
-		.dirents = &dir_inode->dirents,
-	};
-
-	if (sto_inode_check_tree_depth(inode)) {
-		sto_inode_put_ref(inode);
-		return 0;
-	}
-
-	return sto_rpc_readdir(inode->path, &args);
 }
 
 static void
@@ -342,12 +357,6 @@ sto_dir_inode_create(void)
 }
 
 static int
-sto_lnk_inode_read_done(struct sto_inode *inode)
-{
-	return 0;
-}
-
-static int
 sto_lnk_inode_read(struct sto_inode *inode)
 {
 	struct sto_lnk_inode *lnk_inode = sto_lnk_inode(inode);
@@ -358,6 +367,12 @@ sto_lnk_inode_read(struct sto_inode *inode)
 	};
 
 	return sto_rpc_readfile(inode->path, 0, &args);
+}
+
+static int
+sto_lnk_inode_read_done(struct sto_inode *inode)
+{
+	return 0;
 }
 
 static void
