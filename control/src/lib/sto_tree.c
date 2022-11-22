@@ -176,7 +176,7 @@ __sto_tree_node_free(struct sto_tree_node *node)
 {
 	struct sto_inode *inode = node->inode;
 
-	inode->destroy(inode);
+	inode->ops->destroy(inode);
 	node->inode = NULL;
 }
 
@@ -248,7 +248,7 @@ sto_subtree_info_json(struct sto_tree_node *parent, struct spdk_json_write_ctx *
 	for (node = parent; node != parent->parent; node = next_node) {
 		if (TAILQ_EMPTY(&node->childs)) {
 			struct sto_inode *inode = node->inode;
-			inode->json_info(inode, w);
+			inode->ops->json_info(inode, w);
 
 			next_node = node->parent;
 			continue;

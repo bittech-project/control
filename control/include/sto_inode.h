@@ -20,16 +20,19 @@ typedef int (*sto_inode_handle_error_t)(struct sto_inode *inode, int rc);
 typedef void (*sto_inode_json_info_t)(struct sto_inode *inode, struct spdk_json_write_ctx *w);
 typedef void (*sto_inode_destroy_t)(struct sto_inode *inode);
 
-struct sto_inode {
-	const char *name;
-	char *path;
-
+struct sto_inode_ops {
 	sto_inode_read_t read;
 	sto_inode_read_done_t read_done;
 	sto_inode_handle_error_t handle_error;
 	sto_inode_json_info_t json_info;
 	sto_inode_destroy_t destroy;
+};
 
+struct sto_inode {
+	const char *name;
+	char *path;
+
+	struct sto_inode_ops *ops;
 	struct sto_tree_node *node;
 };
 
@@ -53,17 +56,6 @@ static inline struct sto_dir_inode *
 sto_dir_inode(struct sto_inode *inode)
 {
 	return SPDK_CONTAINEROF(inode, struct sto_dir_inode, inode);
-}
-
-struct sto_lnk_inode {
-	struct sto_inode inode;
-	char *buf;
-};
-
-static inline struct sto_lnk_inode *
-sto_lnk_inode(struct sto_inode *inode)
-{
-	return SPDK_CONTAINEROF(inode, struct sto_lnk_inode, inode);
 }
 
 struct sto_inode *sto_inode_create(const char *name, const char *path, enum sto_inode_type type, ...);

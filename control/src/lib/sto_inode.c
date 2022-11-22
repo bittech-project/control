@@ -101,7 +101,7 @@ free_name:
 	free((char *) inode->name);
 
 free_inode:
-	inode->destroy(inode);
+	inode->ops->destroy(inode);
 
 	return NULL;
 }
@@ -123,8 +123,8 @@ sto_inode_read_done(void *priv, int rc)
 		goto out;
 	}
 
-	if (rc && inode->handle_error) {
-		rc = inode->handle_error(inode, rc);
+	if (rc && inode->ops->handle_error) {
+		rc = inode->ops->handle_error(inode, rc);
 	}
 
 	if (spdk_unlikely(rc)) {
@@ -132,7 +132,7 @@ sto_inode_read_done(void *priv, int rc)
 		goto out_err;
 	}
 
-	rc = inode->read_done(inode);
+	rc = inode->ops->read_done(inode);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to alloc childs\n");
 		goto out_err;
@@ -155,7 +155,7 @@ sto_inode_read(struct sto_inode *inode)
 
 	sto_inode_get_ref(inode);
 
-	rc = inode->read(inode);
+	rc = inode->ops->read(inode);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to read %s inode\n", inode->path);
 		sto_inode_set_error(inode, rc);
@@ -213,6 +213,14 @@ sto_file_inode_destroy(struct sto_inode *inode)
 	rte_free(file_inode);
 }
 
+static struct sto_inode_ops sto_file_inode_ops = {
+	.read = sto_file_inode_read,
+	.read_done = sto_file_inode_read_done,
+	.handle_error = sto_file_inode_handle_error,
+	.json_info = sto_file_inode_json_info,
+	.destroy = sto_file_inode_destroy,
+};
+
 static struct sto_inode *
 sto_file_inode_create(void)
 {
@@ -226,12 +234,7 @@ sto_file_inode_create(void)
 	}
 
 	inode = &file_inode->inode;
-
-	inode->read = sto_file_inode_read;
-	inode->read_done = sto_file_inode_read_done;
-	inode->handle_error = sto_file_inode_handle_error;
-	inode->json_info = sto_file_inode_json_info;
-	inode->destroy = sto_file_inode_destroy;
+	inode->ops = &sto_file_inode_ops;
 
 	return inode;
 }
@@ -264,7 +267,7 @@ sto_dir_inode_parse(struct sto_dirent *dirent, struct sto_tree_node *parent_node
 	return 0;
 
 free_inode:
-	inode->destroy(inode);
+	inode->ops->destroy(inode);
 
 	return rc;
 }
@@ -334,6 +337,13 @@ sto_dir_inode_destroy(struct sto_inode *inode)
 	rte_free(dir_inode);
 }
 
+static struct sto_inode_ops sto_dir_inode_ops = {
+	.read = sto_dir_inode_read,
+	.read_done = sto_dir_inode_read_done,
+	.json_info = sto_dir_inode_json_info,
+	.destroy = sto_dir_inode_destroy,
+};
+
 static struct sto_inode *
 sto_dir_inode_create(void)
 {
@@ -347,11 +357,7 @@ sto_dir_inode_create(void)
 	}
 
 	inode = &dir_inode->inode;
-
-	inode->read = sto_dir_inode_read;
-	inode->read_done = sto_dir_inode_read_done;
-	inode->json_info = sto_dir_inode_json_info;
-	inode->destroy = sto_dir_inode_destroy;
+	inode->ops = &sto_dir_inode_ops;
 
 	return inode;
 }
@@ -359,61 +365,38 @@ sto_dir_inode_create(void)
 static int
 sto_lnk_inode_read(struct sto_inode *inode)
 {
-	struct sto_lnk_inode *lnk_inode = sto_lnk_inode(inode);
+	struct sto_file_inode *file_inode = sto_file_inode(inode);
 	struct sto_rpc_readfile_args args = {
 		.priv = inode,
 		.done = sto_inode_read_done,
-		.buf = &lnk_inode->buf,
+		.buf = &file_inode->buf,
 	};
 
 	return sto_rpc_readfile(inode->path, 0, &args);
 }
 
-static int
-sto_lnk_inode_read_done(struct sto_inode *inode)
-{
-	return 0;
-}
-
-static void
-sto_lnk_inode_json_info(struct sto_inode *inode, struct spdk_json_write_ctx *w)
-{
-	struct sto_lnk_inode *lnk_inode = sto_lnk_inode(inode);
-
-	spdk_json_write_object_begin(w);
-	spdk_json_write_named_string(w, inode->name, lnk_inode->buf);
-	spdk_json_write_object_end(w);
-}
-
-static void
-sto_lnk_inode_destroy(struct sto_inode *inode)
-{
-	struct sto_lnk_inode *lnk_inode = sto_lnk_inode(inode);
-
-	sto_inode_free(inode);
-
-	free(lnk_inode->buf);
-	rte_free(lnk_inode);
-}
+static struct sto_inode_ops sto_lnk_inode_ops = {
+	.read = sto_lnk_inode_read,
+	.read_done = sto_file_inode_read_done,
+	.handle_error = sto_file_inode_handle_error,
+	.json_info = sto_file_inode_json_info,
+	.destroy = sto_file_inode_destroy,
+};
 
 static struct sto_inode *
 sto_lnk_inode_create(void)
 {
-	struct sto_lnk_inode *lnk_inode;
+	struct sto_file_inode *file_inode;
 	struct sto_inode *inode;
 
-	lnk_inode = rte_zmalloc(NULL, sizeof(*lnk_inode), 0);
-	if (spdk_unlikely(!lnk_inode)) {
+	file_inode = rte_zmalloc(NULL, sizeof(*file_inode), 0);
+	if (spdk_unlikely(!file_inode)) {
 		SPDK_ERRLOG("Failed to create lnk node\n");
 		return NULL;
 	}
 
-	inode = &lnk_inode->inode;
-
-	inode->read = sto_lnk_inode_read;
-	inode->read_done = sto_lnk_inode_read_done;
-	inode->json_info = sto_lnk_inode_json_info;
-	inode->destroy = sto_lnk_inode_destroy;
+	inode = &file_inode->inode;
+	inode->ops = &sto_lnk_inode_ops;
 
 	return inode;
 }
