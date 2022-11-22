@@ -386,6 +386,113 @@ struct sto_req_ops sto_read_req_ops = {
 };
 
 struct sto_req *
+sto_readlink_req_constructor(const struct sto_cdbops *op)
+{
+	struct sto_readlink_req *readlink_req;
+
+	readlink_req = rte_zmalloc(NULL, sizeof(*readlink_req), 0);
+	if (spdk_unlikely(!readlink_req)) {
+		SPDK_ERRLOG("Failed to alloc sto readlink req\n");
+		return NULL;
+	}
+
+	sto_req_init(&readlink_req->req, op);
+
+	return &readlink_req->req;
+}
+
+static void
+sto_readlink_req_params_free(struct sto_readlink_req_params *params)
+{
+	free((char *) params->file);
+}
+
+static int
+sto_readlink_req_params_parse(void *priv, void *params)
+{
+	struct sto_readlink_req_params_constructor *constructor = priv;
+	struct sto_readlink_req_params *p = constructor->inner.params;
+
+	p->file = constructor->file_path(params);
+	if (spdk_unlikely(!p->file)) {
+		SPDK_ERRLOG("Failed to alloc memory for file path\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int
+sto_readlink_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+{
+	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+	struct sto_readlink_req_params_constructor *constructor = req->params_constructor;
+	int rc = 0;
+
+	constructor->inner.params = &readlink_req->params;
+
+	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_readlink_req_params_parse, constructor);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to parse params for readlink req\n");
+	}
+
+	return rc;
+}
+
+static void
+sto_readlink_req_done(void *priv, int rc)
+{
+	struct sto_req *req = priv;
+
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("READ req failed, rc=%d\n", rc);
+		sto_err(req->ctx.err_ctx, rc);
+	}
+
+	sto_req_response(req);
+}
+
+static int
+sto_readlink_req_exec(struct sto_req *req)
+{
+	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+	struct sto_readlink_req_params *params = &readlink_req->params;
+	struct sto_rpc_readlink_args args = {
+		.priv = req,
+		.done = sto_readlink_req_done,
+		.buf = &readlink_req->buf,
+	};
+
+	return sto_rpc_readlink(params->file, &args);
+}
+
+static void
+sto_readlink_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+{
+	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+
+	spdk_json_write_string(w, readlink_req->buf);
+}
+
+static void
+sto_readlink_req_free(struct sto_req *req)
+{
+	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+
+	sto_readlink_req_params_free(&readlink_req->params);
+	free(readlink_req->buf);
+
+	rte_free(readlink_req);
+}
+
+struct sto_req_ops sto_readlink_req_ops = {
+	.decode_cdb = sto_readlink_req_decode_cdb,
+	.exec = sto_readlink_req_exec,
+	.end_response = sto_readlink_req_end_response,
+	.free = sto_readlink_req_free,
+};
+
+struct sto_req *
 sto_readdir_req_constructor(const struct sto_cdbops *op)
 {
 	struct sto_readdir_req *readdir_req;
