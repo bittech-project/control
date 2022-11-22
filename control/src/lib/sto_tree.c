@@ -10,10 +10,10 @@
 #include "sto_inode.h"
 
 struct sto_tree_cmd {
-	uint32_t depth;
-	uint32_t refcnt;
-
+	struct sto_tree_params params;
 	struct sto_tree_info *info;
+
+	uint32_t refcnt;
 
 	void *priv;
 	sto_tree_done_t done;
@@ -105,12 +105,20 @@ bool
 sto_tree_check_depth(struct sto_tree_node *node)
 {
 	struct sto_tree_cmd *cmd = sto_tree_cmd(node);
+	uint32_t depth = cmd->params.depth;
 
-	if (cmd->depth && node->level == cmd->depth) {
+	if (depth && node->level == depth) {
 		return true;
 	}
 
 	return false;
+}
+
+struct sto_tree_params *
+sto_tree_params(struct sto_tree_node *node)
+{
+	struct sto_tree_cmd *cmd = sto_tree_cmd(node);
+	return &cmd->params;
 }
 
 static void
@@ -304,7 +312,7 @@ sto_tree_info_json(struct sto_tree_info *info, struct spdk_json_write_ctx *w)
 }
 
 int
-sto_tree(const char *dirpath, uint32_t depth, struct sto_tree_args *args)
+sto_tree(const char *dirpath, uint32_t depth, bool only_dirs, struct sto_tree_args *args)
 {
 	struct sto_tree_cmd *cmd;
 	int rc;
@@ -322,7 +330,9 @@ sto_tree(const char *dirpath, uint32_t depth, struct sto_tree_args *args)
 		return rc;
 	}
 
-	cmd->depth = depth;
+	cmd->params.depth = depth;
+	cmd->params.only_dirs = only_dirs;
+
 	sto_tree_cmd_init_cb(cmd, args->done, args->priv);
 
 	sto_tree_cmd_run(cmd);

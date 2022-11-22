@@ -563,6 +563,10 @@ sto_tree_req_params_parse(void *priv, void *params)
 		p->depth = constructor->depth(params);
 	}
 
+	if (constructor->depth) {
+		p->only_dirs = constructor->only_dirs(params);
+	}
+
 	return 0;
 }
 
@@ -614,7 +618,7 @@ sto_tree_req_exec(struct sto_req *req)
 		.info = &tree_req->info,
 	};
 
-	return sto_tree(params->dirpath, params->depth, &args);
+	return sto_tree(params->dirpath, params->depth, params->only_dirs, &args);
 }
 
 static void

@@ -719,11 +719,18 @@ scst_target_list_depth(void *arg)
 	return params ? 1 : 2;
 }
 
+static bool
+scst_target_list_only_dirs(void *arg)
+{
+	return true;
+}
+
 static struct sto_tree_req_params_constructor target_list_constructor = {
 	.decoder = STO_DECODER_INITIALIZER_EMPTY(scst_target_list_decoders,
 						 scst_target_list_params_alloc, scst_target_list_params_free),
 	.dirpath = scst_target_list_dirpath,
 	.depth = scst_target_list_depth,
+	.only_dirs = scst_target_list_only_dirs,
 };
 
 static const char *

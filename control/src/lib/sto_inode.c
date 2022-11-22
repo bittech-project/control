@@ -54,7 +54,7 @@ sto_inode_check_error(struct sto_inode *inode)
 }
 
 static bool
-sto_inode_check_depth(struct sto_inode *inode)
+sto_inode_check_tree_depth(struct sto_inode *inode)
 {
 	return sto_tree_check_depth(inode->node);
 }
@@ -225,11 +225,16 @@ static int
 sto_dir_inode_parse(struct sto_dirent *dirent, struct sto_tree_node *parent_node)
 {
 	struct sto_inode *inode;
+	enum sto_inode_type inode_type = sto_inode_type(dirent->mode);
+	struct sto_tree_params *tree_params = sto_tree_params(parent_node);
 	int rc = 0;
 
+	if (tree_params->only_dirs && inode_type != STO_INODE_TYPE_DIR) {
+		return 0;
+	}
+
 	inode = sto_inode_create(dirent->name, "%s/%s",
-				 sto_inode_type(dirent->mode),
-				 parent_node->inode->path, dirent->name);
+				 inode_type, parent_node->inode->path, dirent->name);
 	if (spdk_unlikely(!inode)) {
 		SPDK_ERRLOG("Failed to allod inode\n");
 		return -ENOMEM;
@@ -289,7 +294,7 @@ sto_dir_inode_read(struct sto_inode *inode)
 		.dirents = &dir_inode->dirents,
 	};
 
-	if (sto_inode_check_depth(inode)) {
+	if (sto_inode_check_tree_depth(inode)) {
 		sto_inode_put_ref(inode);
 		return 0;
 	}

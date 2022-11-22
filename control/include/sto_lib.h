@@ -197,6 +197,7 @@ struct sto_req *sto_readdir_req_constructor(const struct sto_cdbops *op);
 struct sto_tree_req_params {
 	char *dirpath;
 	uint32_t depth;
+	bool only_dirs;
 };
 
 struct sto_tree_req {
@@ -211,6 +212,7 @@ struct sto_tree_req_params_constructor {
 
 	char *(*dirpath)(void *params);
 	uint32_t (*depth)(void *params);
+	bool (*only_dirs)(void *params);
 
 	struct {
 		struct sto_tree_req_params *params;
