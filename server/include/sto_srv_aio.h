@@ -22,4 +22,14 @@ struct sto_srv_readfile_args {
 int sto_srv_readfile(const struct spdk_json_val *params,
 		     struct sto_srv_readfile_args *args);
 
+typedef void (*sto_srv_readlink_done_t)(void *priv, char *buf, int rc);
+
+struct sto_srv_readlink_args {
+	void *priv;
+	sto_srv_readlink_done_t done;
+};
+
+int sto_srv_readlink(const struct spdk_json_val *params,
+		     struct sto_srv_readlink_args *args);
+
 #endif /* _STO_SRV_AIO_H_ */
