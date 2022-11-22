@@ -102,6 +102,43 @@ static struct sto_read_req_params_constructor readfile_constructor = {
 	.size = sys_readfile_size,
 };
 
+struct sys_readlink_params {
+	char *filepath;
+};
+
+static void *
+sys_readlink_params_alloc(void)
+{
+	return calloc(1, sizeof(struct sys_readlink_params));
+}
+
+static void
+sys_readlink_params_free(void *arg)
+{
+	struct sys_readlink_params *params = arg;
+
+	free(params->filepath);
+	free(params);
+}
+
+static const struct spdk_json_object_decoder sys_readlink_decoders[] = {
+	{"filepath", offsetof(struct sys_readlink_params, filepath), spdk_json_decode_string},
+};
+
+static const char *
+sys_readlink_path(void *arg)
+{
+	struct sys_readlink_params *params = arg;
+
+	return spdk_sprintf_alloc("%s", params->filepath);
+}
+
+static struct sto_readlink_req_params_constructor readlink_constructor = {
+	.decoder = STO_DECODER_INITIALIZER(sys_readlink_decoders,
+					   sys_readlink_params_alloc, sys_readlink_params_free),
+	.file_path = sys_readlink_path,
+};
+
 struct sys_readdir_params {
 	char *dirpath;
 };
@@ -158,6 +195,12 @@ static const struct sto_cdbops sys_op_table[] = {
 		.req_constructor = sto_read_req_constructor,
 		.req_ops = &sto_read_req_ops,
 		.params_constructor = &readfile_constructor,
+	},
+	{
+		.name = "readlink",
+		.req_constructor = sto_readlink_req_constructor,
+		.req_ops = &sto_readlink_req_ops,
+		.params_constructor = &readlink_constructor,
 	},
 	{
 		.name = "readdir",
