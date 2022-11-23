@@ -191,15 +191,13 @@ sto_tree_node_find(struct sto_tree_node *root, const char *path)
 struct sto_tree_node *
 sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
 {
-	struct sto_file_inode *file_inode;
 	struct sto_tree_node *node;
 	char path[PATH_MAX + 1] = {};
 	char *tokens[STO_LNK_MAX_TOKENS] = {};
 	char *buf;
 	int ret, i;
 
-	file_inode = sto_file_inode(lnk_node->inode);
-	buf = file_inode->buf;
+	buf = sto_file_inode_buf(lnk_node->inode);
 
 	memcpy(path, buf, spdk_min(strlen(buf), PATH_MAX));
 
