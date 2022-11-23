@@ -5,6 +5,7 @@
 #include <spdk/string.h>
 
 #include <rte_malloc.h>
+#include <rte_string_fns.h>
 
 #include "sto_tree.h"
 #include "sto_inode.h"
@@ -171,6 +172,60 @@ sto_tree_add_inode(struct sto_tree_node *parent_node, struct sto_inode *inode)
 	return 0;
 }
 
+struct sto_tree_node *
+sto_tree_node_find(struct sto_tree_node *root, const char *path)
+{
+	struct sto_tree_node *node;
+
+	TAILQ_FOREACH(node, &root->childs, list) {
+		if (!strcmp(node->inode->name, path)) {
+			return node;
+		}
+	}
+
+	return NULL;
+}
+
+#define STO_LNK_MAX_TOKENS 16
+
+struct sto_tree_node *
+sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
+{
+	struct sto_file_inode *file_inode;
+	struct sto_tree_node *node;
+	char path[PATH_MAX + 1] = {};
+	char *tokens[STO_LNK_MAX_TOKENS] = {};
+	char *buf;
+	int ret, i;
+
+	file_inode = sto_file_inode(lnk_node->inode);
+	buf = file_inode->buf;
+
+	memcpy(path, buf, spdk_min(strlen(buf), PATH_MAX));
+
+	ret = rte_strsplit(path, sizeof(path), tokens, SPDK_COUNTOF(tokens), '/');
+	if (spdk_unlikely(ret <= 0)) {
+		SPDK_ERRLOG("Failed to split link\n");
+		return NULL;
+	}
+
+	node = lnk_node->parent;
+
+	for (i = 0; i < STO_LNK_MAX_TOKENS && tokens[i]; i++) {
+		SPDK_ERRLOG("GLEB: node[%s], token[%s]\n", node->inode->name, tokens[i]);
+
+		if (!strcmp(tokens[i], "..")) {
+			node = node->parent;
+			continue;
+		}
+
+		node = sto_tree_node_find(node, tokens[i]);
+		assert(node);
+	}
+
+	return node;
+}
+
 static void
 __sto_tree_node_free(struct sto_tree_node *node)
 {
@@ -185,12 +240,6 @@ sto_tree_node_free(struct sto_tree_node *node)
 {
 	__sto_tree_node_free(node);
 	rte_free(node);
-}
-
-static struct sto_tree_node *
-sto_tree_node_get_next_child(struct sto_tree_node *node)
-{
-	return !node->cur_child ? TAILQ_FIRST(&node->childs) : TAILQ_NEXT(node->cur_child, list);
 }
 
 static int
@@ -254,7 +303,7 @@ sto_subtree_info_json(struct sto_tree_node *parent, struct spdk_json_write_ctx *
 			continue;
 		}
 
-		node->cur_child = sto_tree_node_get_next_child(node);
+		node->cur_child = sto_tree_node_next_child(node->cur_child, node);
 
 		if (!node->cur_child) {
 			spdk_json_write_array_end(w);

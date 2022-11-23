@@ -49,6 +49,13 @@ sto_file_inode(struct sto_inode *inode)
 	return SPDK_CONTAINEROF(inode, struct sto_file_inode, inode);
 }
 
+static inline char *
+sto_file_inode_buf(struct sto_inode *inode)
+{
+	struct sto_file_inode *file_inode = sto_file_inode(inode);
+	return file_inode->buf;
+}
+
 struct sto_dir_inode {
 	struct sto_inode inode;
 	struct sto_dirents dirents;

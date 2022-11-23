@@ -38,10 +38,111 @@ scst_config_write_dirpath(void *arg)
 	return spdk_sprintf_alloc("%s", SCST_ROOT);
 }
 
+static int
+scst_config_dev_info_json(struct sto_tree_node *dev_lnk_node, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *dev_node, *node;
+
+	dev_node = sto_tree_node_resolv_lnk(dev_lnk_node);
+	assert(dev_node);
+
+	spdk_json_write_name(w, dev_lnk_node->inode->name);
+
+	spdk_json_write_object_begin(w);
+
+	STO_TREE_FOREACH_TYPE(node, dev_node, STO_INODE_TYPE_FILE) {
+		struct sto_inode *inode = node->inode;
+		char *buf = sto_file_inode_buf(inode);
+
+		spdk_json_write_named_string(w, inode->name, buf);
+	}
+
+	spdk_json_write_object_end(w);
+
+	return 0;
+}
+
+static int
+scst_config_handler_info_json(struct sto_tree_node *dh_node, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *dev_node;
+
+	spdk_json_write_name(w, dh_node->inode->name);
+
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_array_begin(w, "devices");
+
+	STO_TREE_FOREACH_TYPE(dev_node, dh_node, STO_INODE_TYPE_LNK) {
+		spdk_json_write_object_begin(w);
+		scst_config_dev_info_json(dev_node, w);
+		spdk_json_write_object_end(w);
+	}
+
+	spdk_json_write_array_end(w);
+
+	spdk_json_write_object_end(w);
+
+	return 0;
+}
+
+static bool
+scst_config_handlers_is_empty(struct sto_tree_node *handlers_node)
+{
+	struct sto_tree_node *dh_node;
+
+	if (sto_tree_node_first_child_type(handlers_node, STO_INODE_TYPE_DIR) == NULL) {
+		return true;
+	}
+
+	STO_TREE_FOREACH_TYPE(dh_node, handlers_node, STO_INODE_TYPE_DIR) {
+		if (sto_tree_node_first_child_type(dh_node, STO_INODE_TYPE_LNK) != NULL) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static int
+scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *handlers_node, *dh_node;
+
+	SPDK_ERRLOG("GLEB: SCST config handlers info json\n");
+
+	handlers_node = sto_tree_node_find(tree_root, "handlers");
+	assert(handlers_node);
+
+	if (scst_config_handlers_is_empty(handlers_node)) {
+		return 0;
+	}
+
+	spdk_json_write_named_array_begin(w, "handlers");
+
+	STO_TREE_FOREACH_TYPE(dh_node, handlers_node, STO_INODE_TYPE_DIR) {
+		if (sto_tree_node_first_child_type(dh_node, STO_INODE_TYPE_LNK) == NULL) {
+			continue;
+		}
+
+		spdk_json_write_object_begin(w);
+		scst_config_handler_info_json(dh_node, w);
+		spdk_json_write_object_end(w);
+	}
+
+	spdk_json_write_array_end(w);
+
+	return 0;
+}
+
 static void
 scst_config_write_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
 {
-	spdk_json_write_string(w, "GLEB");
+	spdk_json_write_object_begin(w);
+
+	scst_config_handlers_info_json(tree_root, w);
+
+	spdk_json_write_object_end(w);
 }
 
 static struct sto_tree_req_params_constructor config_write_constructor = {
