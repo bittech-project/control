@@ -674,6 +674,10 @@ sto_tree_req_params_parse(void *priv, void *params)
 		p->only_dirs = constructor->only_dirs(params);
 	}
 
+	if (constructor->info_json) {
+		p->info_json = constructor->info_json;
+	}
+
 	return 0;
 }
 
@@ -732,8 +736,15 @@ static void
 sto_tree_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_info *info = &tree_req->info;
+	struct sto_tree_req_params *params = &tree_req->params;
 
-	sto_tree_info_json(&tree_req->info, w);
+	if (params->info_json) {
+		params->info_json(&info->tree_root, w);
+		return;
+	}
+
+	sto_tree_info_json(&info->tree_root, w);
 }
 
 static void

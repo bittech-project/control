@@ -229,6 +229,8 @@ struct sto_tree_req_params {
 	char *dirpath;
 	uint32_t depth;
 	bool only_dirs;
+
+	sto_tree_info_json_t info_json;
 };
 
 struct sto_tree_req {
@@ -244,6 +246,8 @@ struct sto_tree_req_params_constructor {
 	char *(*dirpath)(void *params);
 	uint32_t (*depth)(void *params);
 	bool (*only_dirs)(void *params);
+
+	sto_tree_info_json_t info_json;
 
 	struct {
 		struct sto_tree_req_params *params;

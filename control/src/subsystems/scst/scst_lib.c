@@ -38,8 +38,15 @@ scst_config_write_dirpath(void *arg)
 	return spdk_sprintf_alloc("%s", SCST_ROOT);
 }
 
+static void
+scst_config_write_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_string(w, "GLEB");
+}
+
 static struct sto_tree_req_params_constructor config_write_constructor = {
 	.dirpath = scst_config_write_dirpath,
+	.info_json = scst_config_write_info_json,
 };
 
 static const char *

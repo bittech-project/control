@@ -297,9 +297,8 @@ sto_tree_info_free(struct sto_tree_info *info)
 }
 
 void
-sto_tree_info_json(struct sto_tree_info *info, struct spdk_json_write_ctx *w)
+sto_tree_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_node *tree_root = &info->tree_root;
 	struct sto_tree_node *node;
 
 	spdk_json_write_array_begin(w);

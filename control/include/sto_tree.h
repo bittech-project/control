@@ -4,6 +4,9 @@
 #include <spdk/queue.h>
 
 struct sto_inode;
+struct sto_tree_node;
+
+typedef void (*sto_tree_info_json_t)(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w);
 
 struct sto_tree_node {
 	struct sto_tree_node *root;
@@ -43,7 +46,6 @@ struct sto_tree_args {
 };
 
 void sto_tree_info_free(struct sto_tree_info *info);
-void sto_tree_info_json(struct sto_tree_info *info, struct spdk_json_write_ctx *w);
 
 int sto_tree(const char *dirpath, uint32_t depth, bool only_dirs, struct sto_tree_args *args);
 
@@ -55,5 +57,6 @@ bool sto_tree_check_depth(struct sto_tree_node *node);
 struct sto_tree_params *sto_tree_params(struct sto_tree_node *node);
 
 int sto_tree_add_inode(struct sto_tree_node *parent_node, struct sto_inode *inode);
+void sto_tree_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w);
 
 #endif /* _STO_TREE_H_ */
