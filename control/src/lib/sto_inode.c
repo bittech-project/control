@@ -202,7 +202,7 @@ sto_file_inode_handle_error(struct sto_inode *inode, int rc)
 }
 
 static void
-sto_file_inode_json_info(struct sto_inode *inode, struct spdk_json_write_ctx *w)
+sto_file_inode_info_json(struct sto_inode *inode, struct spdk_json_write_ctx *w)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
 
@@ -226,7 +226,7 @@ static struct sto_inode_ops sto_file_inode_ops = {
 	.read = sto_file_inode_read,
 	.read_done = sto_file_inode_read_done,
 	.handle_error = sto_file_inode_handle_error,
-	.json_info = sto_file_inode_json_info,
+	.info_json = sto_file_inode_info_json,
 	.destroy = sto_file_inode_destroy,
 };
 
@@ -330,7 +330,7 @@ out:
 }
 
 static void
-sto_dir_inode_json_info(struct sto_inode *inode, struct spdk_json_write_ctx *w)
+sto_dir_inode_info_json(struct sto_inode *inode, struct spdk_json_write_ctx *w)
 {
 	spdk_json_write_string(w, inode->name);
 }
@@ -349,7 +349,7 @@ sto_dir_inode_destroy(struct sto_inode *inode)
 static struct sto_inode_ops sto_dir_inode_ops = {
 	.read = sto_dir_inode_read,
 	.read_done = sto_dir_inode_read_done,
-	.json_info = sto_dir_inode_json_info,
+	.info_json = sto_dir_inode_info_json,
 	.destroy = sto_dir_inode_destroy,
 };
 
@@ -388,7 +388,7 @@ static struct sto_inode_ops sto_lnk_inode_ops = {
 	.read = sto_lnk_inode_read,
 	.read_done = sto_file_inode_read_done,
 	.handle_error = sto_file_inode_handle_error,
-	.json_info = sto_file_inode_json_info,
+	.info_json = sto_file_inode_info_json,
 	.destroy = sto_file_inode_destroy,
 };
 
