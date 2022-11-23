@@ -191,25 +191,26 @@ sto_tree_node_find(struct sto_tree_node *root, const char *path)
 struct sto_tree_node *
 sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
 {
-	struct sto_tree_node *node;
-	char path[PATH_MAX + 1] = {};
-	char *tokens[STO_LNK_MAX_TOKENS] = {};
-	char *buf;
+	struct sto_tree_node *node = NULL;
+	char *buf, *tokens[STO_LNK_MAX_TOKENS] = {};
 	int ret, i;
 
-	buf = sto_file_inode_buf(lnk_node->inode);
+	buf = strdup(sto_file_inode_buf(lnk_node->inode));
+	if (spdk_unlikely(!buf)) {
+		SPDK_ERRLOG("Failed to alloc buf for link %s\n",
+			    lnk_node->inode->name);
+		return NULL;
+	}
 
-	memcpy(path, buf, spdk_min(strlen(buf), PATH_MAX));
-
-	ret = rte_strsplit(path, sizeof(path), tokens, SPDK_COUNTOF(tokens), '/');
+	ret = rte_strsplit(buf, strlen(buf), tokens, SPDK_COUNTOF(tokens), '/');
 	if (spdk_unlikely(ret <= 0)) {
 		SPDK_ERRLOG("Failed to split link\n");
-		return NULL;
+		goto out;
 	}
 
 	node = lnk_node->parent;
 
-	for (i = 0; i < STO_LNK_MAX_TOKENS && tokens[i]; i++) {
+	for (i = 0; i < STO_LNK_MAX_TOKENS && tokens[i] && node; i++) {
 		SPDK_ERRLOG("GLEB: node[%s], token[%s]\n", node->inode->name, tokens[i]);
 
 		if (!strcmp(tokens[i], "..")) {
@@ -218,8 +219,10 @@ sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
 		}
 
 		node = sto_tree_node_find(node, tokens[i]);
-		assert(node);
 	}
+
+out:
+	free(buf);
 
 	return node;
 }

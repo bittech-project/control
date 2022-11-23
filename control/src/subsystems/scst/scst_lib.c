@@ -3,6 +3,8 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
+#include <rte_string_fns.h>
+
 #include "sto_lib.h"
 
 #define SCST_ROOT "/sys/kernel/scst_tgt"
@@ -38,13 +40,54 @@ scst_config_write_dirpath(void *arg)
 	return spdk_sprintf_alloc("%s", SCST_ROOT);
 }
 
-static int
+#define SCST_ATTR_MAX_LINES 16
+
+static char *
+scst_config_attr(const char *buf, bool nokey)
+{
+	char *tmp_buf, *attr = NULL;
+	char *lines[SCST_ATTR_MAX_LINES] = {};
+	int ret;
+
+	tmp_buf = strdup(buf);
+	if (spdk_unlikely(!tmp_buf)) {
+		SPDK_ERRLOG("Failed to alloc buf for SCST attr\n");
+		return NULL;
+	}
+
+	ret = rte_strsplit(tmp_buf, strlen(tmp_buf), lines, SPDK_COUNTOF(lines), '\n');
+	if (spdk_unlikely(ret < 0)) {
+		SPDK_ERRLOG("Failed to split scst attr\n");
+		goto out;
+	}
+
+	if (!ret) {
+		goto out;
+	}
+
+	if (!nokey && (!lines[1] || strcmp(lines[1], "[key]"))) {
+		goto out;
+	}
+
+	attr = strdup(lines[0]);
+
+out:
+	free(tmp_buf);
+
+	return attr;
+}
+
+static void
 scst_config_dev_info_json(struct sto_tree_node *dev_lnk_node, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_node *dev_node, *node;
 
 	dev_node = sto_tree_node_resolv_lnk(dev_lnk_node);
-	assert(dev_node);
+	if (spdk_unlikely(!dev_node)) {
+		SPDK_ERRLOG("Failed to resolve device %s link\n",
+			    dev_lnk_node->inode->name);
+		return;
+	}
 
 	spdk_json_write_name(w, dev_lnk_node->inode->name);
 
@@ -52,17 +95,19 @@ scst_config_dev_info_json(struct sto_tree_node *dev_lnk_node, struct spdk_json_w
 
 	STO_TREE_FOREACH_TYPE(node, dev_node, STO_INODE_TYPE_FILE) {
 		struct sto_inode *inode = node->inode;
-		char *buf = sto_file_inode_buf(inode);
+		char *attr = scst_config_attr(sto_file_inode_buf(inode), false);
 
-		spdk_json_write_named_string(w, inode->name, buf);
+		if (attr) {
+			spdk_json_write_named_string(w, inode->name, attr);
+		}
+
+		free(attr);
 	}
 
 	spdk_json_write_object_end(w);
-
-	return 0;
 }
 
-static int
+static void
 scst_config_handler_info_json(struct sto_tree_node *dh_node, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_node *dev_node;
@@ -82,8 +127,6 @@ scst_config_handler_info_json(struct sto_tree_node *dh_node, struct spdk_json_wr
 	spdk_json_write_array_end(w);
 
 	spdk_json_write_object_end(w);
-
-	return 0;
 }
 
 static bool
@@ -104,7 +147,7 @@ scst_config_handlers_is_empty(struct sto_tree_node *handlers_node)
 	return true;
 }
 
-static int
+static void
 scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_node *handlers_node, *dh_node;
@@ -112,10 +155,9 @@ scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json
 	SPDK_ERRLOG("GLEB: SCST config handlers info json\n");
 
 	handlers_node = sto_tree_node_find(tree_root, "handlers");
-	assert(handlers_node);
 
-	if (scst_config_handlers_is_empty(handlers_node)) {
-		return 0;
+	if (!handlers_node || scst_config_handlers_is_empty(handlers_node)) {
+		return;
 	}
 
 	spdk_json_write_named_array_begin(w, "handlers");
@@ -131,8 +173,6 @@ scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json
 	}
 
 	spdk_json_write_array_end(w);
-
-	return 0;
 }
 
 static void
