@@ -670,7 +670,7 @@ sto_tree_req_params_parse(void *priv, void *params)
 		p->depth = constructor->depth(params);
 	}
 
-	if (constructor->depth) {
+	if (constructor->only_dirs) {
 		p->only_dirs = constructor->only_dirs(params);
 	}
 
