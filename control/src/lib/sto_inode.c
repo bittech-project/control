@@ -95,6 +95,8 @@ sto_inode_create(const char *name, const char *path, enum sto_inode_type type, .
 		goto free_name;
 	}
 
+	inode->type = type;
+
 	return inode;
 
 free_name:

@@ -32,6 +32,8 @@ struct sto_inode {
 	const char *name;
 	char *path;
 
+	enum sto_inode_type type;
+
 	struct sto_inode_ops *ops;
 	struct sto_tree_node *node;
 };
