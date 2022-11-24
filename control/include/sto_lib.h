@@ -3,6 +3,8 @@
 
 #include <spdk/util.h>
 
+#include "sto_utils.h"
+
 #include "sto_subsystem.h"
 #include "sto_rpc_readdir.h"
 #include "sto_tree.h"
@@ -266,10 +268,6 @@ struct sto_req *sto_tree_req_constructor(const struct sto_cdbops *op);
 
 int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 		      sto_params_parse params_parse, void *priv);
-
-int sto_decode_object_str(const struct spdk_json_val *values,
-			  const char *name, char **value);
-const struct spdk_json_val *sto_decode_next_cdb(const struct spdk_json_val *params);
 
 void sto_err(struct sto_err_context *err, int rc);
 

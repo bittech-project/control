@@ -43,7 +43,7 @@ sto_subsystem_decode_params(struct sto_req *req, const struct spdk_json_val *par
 	struct sto_req_ops *ops = req->ops;
 	int rc = 0;
 
-	cdb = sto_decode_next_cdb(params);
+	cdb = sto_json_decode_next_object(params);
 	if (IS_ERR(cdb)) {
 		SPDK_ERRLOG("Failed to decode CDB for req[%p]\n", req);
 		return PTR_ERR(cdb);
@@ -69,7 +69,7 @@ sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
 	const struct sto_cdbops *op;
 	int rc = 0;
 
-	rc = sto_decode_object_str(params, "op", &op_name);
+	rc = sto_json_decode_object_str(params, "op", &op_name);
 	if (rc) {
 		SPDK_ERRLOG("Failed to decode op, rc=%d\n", rc);
 		return ERR_PTR(rc);

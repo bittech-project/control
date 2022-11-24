@@ -8,6 +8,7 @@
 #include <rte_malloc.h>
 
 #include "sto_core.h"
+#include "sto_lib.h"
 #include "sto_subsystem.h"
 #include "err.h"
 
@@ -109,7 +110,7 @@ sto_core_req_get_subsystem(struct sto_core_req *req)
 	char *subsystem_name = NULL;
 	int rc = 0;
 
-	rc = sto_decode_object_str(req->params, "subsystem", &subsystem_name);
+	rc = sto_json_decode_object_str(req->params, "subsystem", &subsystem_name);
 	if (rc) {
 		SPDK_ERRLOG("Failed to decode subystem for req[%p], rc=%d\n", req, rc);
 		return NULL;
@@ -154,7 +155,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 		return rc;
 	}
 
-	cdb = sto_decode_next_cdb(core_req->params);
+	cdb = sto_json_decode_next_object(core_req->params);
 	if (IS_ERR_OR_NULL(cdb)) {
 		SPDK_ERRLOG("Failed to decode CDB for req[%p]\n", core_req);
 		rc = PTR_ERR_OR_ZERO(cdb);
