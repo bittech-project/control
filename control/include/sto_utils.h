@@ -7,4 +7,6 @@ int sto_json_decode_object_str(const struct spdk_json_val *values,
 			       const char *name, char **value);
 const struct spdk_json_val *sto_json_decode_next_object(const struct spdk_json_val *values);
 
+bool sto_find_match_str(const char *key, const char *strings[]);
+
 #endif /* _STO_UTILS_H_ */

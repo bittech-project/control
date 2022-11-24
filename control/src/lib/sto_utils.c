@@ -95,3 +95,21 @@ sto_json_decode_next_object(const struct spdk_json_val *values)
 
 	return obj;
 }
+
+bool
+sto_find_match_str(const char *key, const char *strings[])
+{
+	const char **str;
+
+	if (!strings) {
+		return false;
+	}
+
+	for (str = strings; *str; str++) {
+		if (!strcmp(key, *str)) {
+			return true;
+		}
+	}
+
+	return false;
+}

@@ -4,6 +4,7 @@
 
 #include <rte_malloc.h>
 
+#include "sto_utils.h"
 #include "sto_lib.h"
 #include "sto_client.h"
 #include "sto_rpc_readdir.h"
@@ -186,24 +187,6 @@ free_cmd:
 	return rc;
 }
 
-static bool
-find_match_str(const char **exclude_list, const char *str)
-{
-	const char **i;
-
-	if (!exclude_list) {
-		return false;
-	}
-
-	for (i = exclude_list; *i; i++) {
-		if (!strcmp(str, *i)) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
 void
 sto_dirents_info_json(struct sto_dirents *dirents,
 		      struct sto_dirents_json_cfg *cfg, struct spdk_json_write_ctx *w)
@@ -217,7 +200,7 @@ sto_dirents_info_json(struct sto_dirents *dirents,
 	for (i = 0; i < dirents->cnt; i++) {
 		struct sto_dirent *dirent = &dirents->dirents[i];
 
-		if (find_match_str(cfg->exclude_list, dirent->name)) {
+		if (sto_find_match_str(dirent->name, cfg->exclude_list)) {
 			continue;
 		}
 
