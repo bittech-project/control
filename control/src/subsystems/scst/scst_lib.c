@@ -43,7 +43,6 @@ scst_attr(const char *buf, bool nonkey)
 	int ret;
 
 	if (spdk_unlikely(!buf)) {
-		SPDK_ERRLOG("attr buf is NULL\n");
 		return NULL;
 	}
 
@@ -81,7 +80,8 @@ scst_serialize_attr(struct sto_inode *attr_inode, const char *available_attrs[],
 {
 	char *attr;
 
-	if (available_attrs && !sto_find_match_str(attr_inode->name, available_attrs)) {
+	if (sto_inode_read_only(attr_inode) &&
+			!(available_attrs && sto_find_match_str(attr_inode->name, available_attrs))) {
 		return;
 	}
 

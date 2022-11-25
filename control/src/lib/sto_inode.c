@@ -127,10 +127,6 @@ sto_inode_read_done(void *priv, int rc)
 		goto out;
 	}
 
-	if (rc && inode->ops->handle_error) {
-		rc = inode->ops->handle_error(inode, rc);
-	}
-
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to read tree, rc=%d\n", rc);
 		goto out_err;
@@ -156,6 +152,10 @@ void
 sto_inode_read(struct sto_inode *inode)
 {
 	int rc;
+
+	if (sto_inode_write_only(inode)) {
+		return;
+	}
 
 	sto_inode_get_ref(inode);
 
@@ -186,25 +186,6 @@ sto_file_inode_read_done(struct sto_inode *inode)
 	return 0;
 }
 
-static int
-sto_file_inode_handle_error(struct sto_inode *inode, int rc)
-{
-	struct sto_file_inode *file_inode = sto_file_inode(inode);
-
-	if (rc != -EACCES) {
-		return rc;
-	}
-
-	free(file_inode->buf);
-
-	file_inode->buf = strdup(spdk_strerror(-rc));
-	if (spdk_unlikely(!file_inode->buf)) {
-		return -ENOMEM;
-	}
-
-	return 0;
-}
-
 static void
 sto_file_inode_info_json(struct sto_inode *inode, struct spdk_json_write_ctx *w)
 {
@@ -229,7 +210,6 @@ sto_file_inode_destroy(struct sto_inode *inode)
 static struct sto_inode_ops sto_file_inode_ops = {
 	.read = sto_file_inode_read,
 	.read_done = sto_file_inode_read_done,
-	.handle_error = sto_file_inode_handle_error,
 	.info_json = sto_file_inode_info_json,
 	.destroy = sto_file_inode_destroy,
 };
@@ -390,7 +370,6 @@ sto_lnk_inode_read(struct sto_inode *inode)
 static struct sto_inode_ops sto_lnk_inode_ops = {
 	.read = sto_lnk_inode_read,
 	.read_done = sto_file_inode_read_done,
-	.handle_error = sto_file_inode_handle_error,
 	.info_json = sto_file_inode_info_json,
 	.destroy = sto_file_inode_destroy,
 };
