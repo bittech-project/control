@@ -60,9 +60,10 @@ sto_inode_check_tree_depth(struct sto_inode *inode)
 }
 
 struct sto_inode *
-sto_inode_create(const char *name, const char *path, enum sto_inode_type type, ...)
+sto_inode_create(const char *name, const char *path, uint32_t mode, ...)
 {
 	struct sto_inode *inode;
+	enum sto_inode_type type = sto_inode_type(mode);
 	va_list args;
 
 	switch(type) {
@@ -86,7 +87,7 @@ sto_inode_create(const char *name, const char *path, enum sto_inode_type type, .
 		goto free_inode;
 	}
 
-	va_start(args, type);
+	va_start(args, mode);
 	inode->path = spdk_vsprintf_alloc(path, args);
 	va_end(args);
 
@@ -96,6 +97,7 @@ sto_inode_create(const char *name, const char *path, enum sto_inode_type type, .
 	}
 
 	inode->type = type;
+	inode->mode = mode;
 
 	return inode;
 
@@ -254,16 +256,15 @@ static int
 sto_dir_inode_parse(struct sto_dirent *dirent, struct sto_tree_node *parent_node)
 {
 	struct sto_inode *inode;
-	enum sto_inode_type inode_type = sto_inode_type(dirent->mode);
 	struct sto_tree_params *tree_params = sto_tree_params(parent_node);
 	int rc = 0;
 
-	if (tree_params->only_dirs && inode_type != STO_INODE_TYPE_DIR) {
+	if (tree_params->only_dirs && sto_inode_type(dirent->mode) != STO_INODE_TYPE_DIR) {
 		return 0;
 	}
 
 	inode = sto_inode_create(dirent->name, "%s/%s",
-				 inode_type, parent_node->inode->path, dirent->name);
+				 dirent->mode, parent_node->inode->path, dirent->name);
 	if (spdk_unlikely(!inode)) {
 		SPDK_ERRLOG("Failed to allod inode\n");
 		return -ENOMEM;

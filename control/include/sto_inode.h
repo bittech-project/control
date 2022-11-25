@@ -33,10 +33,23 @@ struct sto_inode {
 	char *path;
 
 	enum sto_inode_type type;
+	uint32_t mode;
 
 	struct sto_inode_ops *ops;
 	struct sto_tree_node *node;
 };
+
+static inline bool
+sto_inode_read_only(struct sto_inode *inode)
+{
+	return !(inode->mode & S_IWUSR);
+}
+
+static inline bool
+sto_inode_write_only(struct sto_inode *inode)
+{
+	return !(inode->mode & S_IRUSR);
+}
 
 struct sto_file_inode {
 	struct sto_inode inode;

@@ -247,10 +247,11 @@ static int
 sto_tree_init(struct sto_tree_node *tree_root, const char *dirpath)
 {
 	struct sto_inode *inode;
+	uint32_t mode = S_IRWXU | S_IFDIR;
 
 	memset(tree_root, 0, sizeof(*tree_root));
 
-	inode = sto_inode_create("root", dirpath, STO_INODE_TYPE_DIR);
+	inode = sto_inode_create("root", dirpath, mode);
 	if (spdk_unlikely(!inode)) {
 		SPDK_ERRLOG("Cann't allocate memory for root node\n");
 		return -ENOMEM;
