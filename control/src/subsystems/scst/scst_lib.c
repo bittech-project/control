@@ -257,55 +257,43 @@ static struct sto_readdir_req_params_constructor driver_list_constructor = {
 	.dirpath = scst_driver_list_dirpath,
 };
 
-#define SCST_DEV_MAX_ATTR_CNT 32
-struct scst_attr_name_list {
-	const char *names[SCST_DEV_MAX_ATTR_CNT];
-	size_t cnt;
-};
-
 static int
-scst_attr_list_decode(const struct spdk_json_val *val, void *out)
+scst_parse_attributes(char *attributes, char **data)
 {
-	struct scst_attr_name_list *attr_list = out;
+	char *parsed_attributes, *c, *tmp;
+	int rc = 0;
 
-	return spdk_json_decode_array(val, spdk_json_decode_string, attr_list->names,
-				      SCST_DEV_MAX_ATTR_CNT, &attr_list->cnt, sizeof(char *));
-}
-
-static void
-scst_attr_list_free(struct scst_attr_name_list *attr_list)
-{
-	ssize_t i;
-
-	for (i = 0; i < attr_list->cnt; i++) {
-		free((char *) attr_list->names[i]);
+	parsed_attributes = strdup(attributes);
+	if (spdk_unlikely(!parsed_attributes)) {
+		SPDK_ERRLOG("Failed to alloc memory for parsed attributes\n");
+		return -ENOMEM;
 	}
-}
 
-static int
-scst_attr_list_fill_data(struct scst_attr_name_list *attr_list, char **data)
-{
-	char *parsed_cmd;
-	int i;
-
-	for (i = 0; i < attr_list->cnt; i++) {
-		parsed_cmd = spdk_sprintf_append_realloc(*data, " %s;",
-							 attr_list->names[i]);
-		if (spdk_unlikely(!parsed_cmd)) {
-			SPDK_ERRLOG("Failed to realloc memory for attributes data\n");
-			return -ENOMEM;
+	for (c = parsed_attributes; *c != '\0'; c++) {
+		if (*c == ',') {
+			*c = ';';
 		}
-
-		*data = parsed_cmd;
 	}
 
-	return 0;
+	tmp = spdk_sprintf_append_realloc(*data, " %s", parsed_attributes);
+	if (spdk_unlikely(!tmp)) {
+		SPDK_ERRLOG("Failed to realloc memory for attributes data\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	*data = tmp;
+
+	free(parsed_attributes);
+out:
+
+	return rc;
 }
 
 struct scst_dev_open_params {
 	char *name;
 	char *handler;
-	struct scst_attr_name_list attr_list;
+	char *attributes;
 };
 
 static void *
@@ -321,14 +309,14 @@ scst_dev_open_params_free(void *arg)
 
 	free(params->name);
 	free(params->handler);
-	scst_attr_list_free(&params->attr_list);
+	free(params->attributes);
 	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
 	{"name", offsetof(struct scst_dev_open_params, name), spdk_json_decode_string},
 	{"handler", offsetof(struct scst_dev_open_params, handler), spdk_json_decode_string},
-	{"attributes", offsetof(struct scst_dev_open_params, attr_list), scst_attr_list_decode, true},
+	{"attributes", offsetof(struct scst_dev_open_params, attributes), spdk_json_decode_string, true},
 };
 
 static const char *
@@ -352,7 +340,7 @@ scst_dev_open_data(void *arg)
 		return NULL;
 	}
 
-	rc = scst_attr_list_fill_data(&params->attr_list, &data);
+	rc = scst_parse_attributes(params->attributes, &data);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to fill scst attrs\n");
 		free(data);
@@ -1044,7 +1032,7 @@ struct scst_lun_add_params {
 	char *target;
 	char *device;
 	char *group;
-	struct scst_attr_name_list attr_list;
+	char *attributes;
 };
 
 static void *
@@ -1062,7 +1050,7 @@ scst_lun_add_params_free(void *arg)
 	free(params->target);
 	free(params->device);
 	free(params->group);
-	scst_attr_list_free(&params->attr_list);
+	free(params->attributes);
 	free(params);
 }
 
@@ -1072,7 +1060,7 @@ static const struct spdk_json_object_decoder scst_lun_add_decoders[] = {
 	{"target", offsetof(struct scst_lun_add_params, target), spdk_json_decode_string},
 	{"device", offsetof(struct scst_lun_add_params, device), spdk_json_decode_string},
 	{"group", offsetof(struct scst_lun_add_params, group), spdk_json_decode_string, true},
-	{"attributes", offsetof(struct scst_lun_add_params, attr_list), scst_attr_list_decode, true},
+	{"attributes", offsetof(struct scst_lun_add_params, attributes), spdk_json_decode_string, true},
 };
 
 static const char *
@@ -1096,7 +1084,7 @@ scst_lun_add_data(void *arg)
 		return NULL;
 	}
 
-	rc = scst_attr_list_fill_data(&params->attr_list, &data);
+	rc = scst_parse_attributes(params->attributes, &data);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to fill scst attrs\n");
 		free(data);
@@ -1180,7 +1168,7 @@ scst_lun_replace_data(void *arg)
 		return NULL;
 	}
 
-	rc = scst_attr_list_fill_data(&params->attr_list, &data);
+	rc = scst_parse_attributes(params->attributes, &data);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to fill scst attrs\n");
 		free(data);

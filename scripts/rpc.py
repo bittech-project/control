@@ -71,316 +71,36 @@ if __name__ == "__main__":
     p = subparsers.add_parser('spdk_get_version', help='Get SPDK version')
     p.set_defaults(func=spdk_get_version)
 
-    # scst
-    def scst_snapshot(args):
-        json = rpc.scst.scst_snapshot(args.client)
+    def control(args):
+        params = {
+            'subsystem': args.subsystem,
+            'op': args.operation,
+        }
+
+        if args.params is not None:
+            try:
+                subsystem_params = {k: v for k, v in (p.split(':') for p in args.params)}
+            except ValueError:
+                print("'params' format not correct")
+                print("expected format: space-separated key:value pairs")
+                exit(1)
+
+            for k, v in subsystem_params.items():
+                params[k] = v
+
+        json = args.client.call('control', params)
         print_json(json)
 
-    p = subparsers.add_parser('scst_snapshot', help='Dump the current SCST state to stdout')
-    p.set_defaults(func=scst_snapshot)
-
-    def scst_handler_list(args):
-        json = rpc.scst.scst_handler_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_handler_list', help='List all available handlers')
-    p.set_defaults(func=scst_handler_list)
-
-    def scst_driver_list(args):
-        json = rpc.scst.scst_driver_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_driver_list', help='List all available drivers')
-    p.set_defaults(func=scst_driver_list)
-
-    def scst_dev_open(args):
-        json = rpc.scst.scst_dev_open(args.client,
-                                      name=args.name,
-                                      handler=args.handler,
-                                      attributes=args.attributes)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dev_open', help='Adds a new device using handler <handler>')
-    p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
-    p.add_argument('-dh', '--handler', help='SCST handler name', required=True, type=str)
-    p.add_argument('-attrs', '--attributes', nargs='+', help='SCST dev attributes <p=v,...>', required=False, type=str)
-    p.set_defaults(func=scst_dev_open)
-
-    def scst_dev_close(args):
-        json = rpc.scst.scst_dev_close(args.client,
-                                       name=args.name,
-                                       handler=args.handler)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dev_close', help='Closes a device belonging to handler <handler>')
-    p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
-    p.add_argument('-dh', '--handler', help='SCST handler name', required=True, type=str)
-    p.set_defaults(func=scst_dev_close)
-
-    def scst_dev_resync(args):
-        json = rpc.scst.scst_dev_resync(args.client,
-                                        name=args.name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dev_resync', help='Resync the device size with the initiator(s)')
-    p.add_argument('-n', '--name', help='SCST device name', required=True, type=str)
-    p.set_defaults(func=scst_dev_resync)
-
-    def scst_dev_list(args):
-        json = rpc.scst.scst_dev_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dev_list', help='List all open devices')
-    p.set_defaults(func=scst_dev_list)
-
-    def scst_dgrp_add(args):
-        json = rpc.scst.scst_dgrp_add(args.client,
-                                      name=args.name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dgrp_add', help='Add device group <name>')
-    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
-    p.set_defaults(func=scst_dgrp_add)
-
-    def scst_dgrp_del(args):
-        json = rpc.scst.scst_dgrp_del(args.client,
-                                      name=args.name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dgrp_del', help='Remove device group <name>')
-    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
-    p.set_defaults(func=scst_dgrp_del)
-
-    def scst_dgrp_list(args):
-        json = rpc.scst.scst_dgrp_list(args.client)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dgrp_list', help='List all device groups')
-    p.set_defaults(func=scst_dgrp_list)
-
-    def scst_dgrp_add_dev(args):
-        json = rpc.scst.scst_dgrp_add_dev(args.client,
-                                          name=args.name,
-                                          dev_name=args.dev_name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dgrp_add_dev', help='Add device <dev_name> to device group <name>')
-    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
-    p.add_argument('-d', '--dev_name', help='SCST device name', required=True, type=str)
-    p.set_defaults(func=scst_dgrp_add_dev)
-
-    def scst_dgrp_del_dev(args):
-        json = rpc.scst.scst_dgrp_del_dev(args.client,
-                                          name=args.name,
-                                          dev_name=args.dev_name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_dgrp_del_dev', help='Remove device <dev_name> from device group <name>')
-    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
-    p.add_argument('-d', '--dev_name', help='SCST device name', required=True, type=str)
-    p.set_defaults(func=scst_dgrp_del_dev)
-
-    def scst_tgrp_add(args):
-        json = rpc.scst.scst_tgrp_add(args.client,
-                                      name=args.name,
-                                      dgrp_name=args.dgrp_name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_tgrp_add', help='Add target group <name> to device group <dgrp_name>')
-    p.add_argument('-n', '--name', help='SCST target group name', required=True, type=str)
-    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
-    p.set_defaults(func=scst_tgrp_add)
-
-    def scst_tgrp_del(args):
-        json = rpc.scst.scst_tgrp_del(args.client,
-                                      name=args.name,
-                                      dgrp_name=args.dgrp_name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_tgrp_del', help='Remove target group <name> from device group <dgrp_name>')
-    p.add_argument('-n', '--name', help='SCST device group name', required=True, type=str)
-    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
-    p.set_defaults(func=scst_tgrp_del)
-
-    def scst_tgrp_list(args):
-        json = rpc.scst.scst_tgrp_list(args.client,
-                                       dgrp=args.dgrp)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_tgrp_list', help='List all target groups within a device group')
-    p.add_argument('-d', '--dgrp', help='SCST device group name', required=True, type=str)
-    p.set_defaults(func=scst_tgrp_list)
-
-    def scst_tgrp_add_tgt(args):
-        json = rpc.scst.scst_tgrp_add_tgt(args.client,
-                                          tgt_name=args.tgt_name,
-                                          dgrp_name=args.dgrp_name,
-                                          tgrp_name=args.tgrp_name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_tgrp_add_tgt', help='Add target <tgt_name> to specified target group')
-    p.add_argument('-t', '--tgt_name', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
-    p.add_argument('-tg', '--tgrp_name', help='SCST target group name', required=True, type=str)
-    p.set_defaults(func=scst_tgrp_add_tgt)
-
-    def scst_tgrp_del_tgt(args):
-        json = rpc.scst.scst_tgrp_del_tgt(args.client,
-                                          tgt_name=args.tgt_name,
-                                          dgrp_name=args.dgrp_name,
-                                          tgrp_name=args.tgrp_name)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_tgrp_del_tgt', help='Add target <tgt_name> to specified target group')
-    p.add_argument('-t', '--tgt_name', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--dgrp_name', help='SCST device group name', required=True, type=str)
-    p.add_argument('-tg', '--tgrp_name', help='SCST target group name', required=True, type=str)
-    p.set_defaults(func=scst_tgrp_del_tgt)
-
-    def scst_target_add(args):
-        json = rpc.scst.scst_target_add(args.client,
-                                        target=args.target,
-                                        driver=args.driver)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_target_add', help='Add a dynamic target to a capable driver')
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
-    p.set_defaults(func=scst_target_add)
-
-    def scst_target_del(args):
-        json = rpc.scst.scst_target_del(args.client,
-                                        target=args.target,
-                                        driver=args.driver)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_target_del', help='Remove a dynamic target from a driver')
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
-    p.set_defaults(func=scst_target_del)
-
-    def scst_target_list(args):
-        json = rpc.scst.scst_target_list(args.client,
-                                         driver=args.driver)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_target_list', help='List all available targets')
-    p.add_argument('-d', '--driver', help='SCST driver name', required=False, type=str)
-    p.set_defaults(func=scst_target_list)
-
-    def scst_target_enable(args):
-        json = rpc.scst.scst_target_enable(args.client,
-                                           target=args.target,
-                                           driver=args.driver)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_target_enable', help='Enable target mode for a given driver & target')
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
-    p.set_defaults(func=scst_target_enable)
-
-    def scst_target_disable(args):
-        json = rpc.scst.scst_target_disable(args.client,
-                                           target=args.target,
-                                           driver=args.driver)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_target_disable', help='Disable target mode for a given driver & target')
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
-    p.set_defaults(func=scst_target_disable)
-
-    def scst_group_add(args):
-        json = rpc.scst.scst_group_add(args.client,
-                                       group=args.group,
-                                       driver=args.driver,
-                                       target=args.target)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_group_add', help='Add a group to a given driver & target')
-    p.add_argument('-g', '--group', help='SCST group name', required=True, type=str)
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
-    p.set_defaults(func=scst_group_add)
-
-    def scst_group_del(args):
-        json = rpc.scst.scst_group_del(args.client,
-                                       group=args.group,
-                                       driver=args.driver,
-                                       target=args.target)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_group_del', help='Remove a group from a given driver & target')
-    p.add_argument('-g', '--group', help='SCST group name', required=True, type=str)
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-d', '--driver', help='SCST target driver name', required=True, type=str)
-    p.set_defaults(func=scst_group_del)
-
-    def scst_lun_add(args):
-        json = rpc.scst.scst_lun_add(args.client,
-                                     lun=args.lun,
-                                     driver=args.driver,
-                                     target=args.target,
-                                     group=args.group,
-                                     device=args.device,
-                                     attributes=args.attributes)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_lun_add', help='Adds a given device to a group')
-    p.add_argument('-l', '--lun', help='LUN number', required=True, type=int)
-    p.add_argument('-d', '--driver', help='SCST driver name', required=True, type=str)
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
-    p.add_argument('-dev', '--device', help='SCST device name', required=True, type=str)
-    p.add_argument('-attrs', '--attributes', nargs='+', help='SCST dev attributes <p=v,...>', required=False, type=str)
-    p.set_defaults(func=scst_lun_add)
-
-    def scst_lun_del(args):
-        json = rpc.scst.scst_lun_del(args.client,
-                                     lun=args.lun,
-                                     driver=args.driver,
-                                     target=args.target,
-                                     group=args.group)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_lun_del', help='Remove a LUN from a group')
-    p.add_argument('-l', '--lun', help='LUN number', required=True, type=int)
-    p.add_argument('-d', '--driver', help='SCST driver name', required=True, type=str)
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
-    p.set_defaults(func=scst_lun_del)
-
-    def scst_lun_replace(args):
-        json = rpc.scst.scst_lun_replace(args.client,
-                                         lun=args.lun,
-                                         driver=args.driver,
-                                         target=args.target,
-                                         group=args.group,
-                                         device=args.device,
-                                         attributes=args.attributes)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_lun_replace', help='Adds a given device to a group')
-    p.add_argument('-l', '--lun', help='LUN number', required=True, type=int)
-    p.add_argument('-d', '--driver', help='SCST driver name', required=True, type=str)
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
-    p.add_argument('-dev', '--device', help='SCST device name', required=True, type=str)
-    p.add_argument('-attrs', '--attributes', nargs='+', help='SCST dev attributes <p=v,...>', required=False, type=str)
-    p.set_defaults(func=scst_lun_replace)
-
-    def scst_lun_clear(args):
-        json = rpc.scst.scst_lun_clear(args.client,
-                                       driver=args.driver,
-                                       target=args.target,
-                                       group=args.group)
-        print_json(json)
-
-    p = subparsers.add_parser('scst_lun_clear', help='Clear all LUNs within a group')
-    p.add_argument('-d', '--driver', help='SCST driver name', required=True, type=str)
-    p.add_argument('-t', '--target', help='SCST target name', required=True, type=str)
-    p.add_argument('-g', '--group', help='SCST group name', required=False, type=str)
-    p.set_defaults(func=scst_lun_clear)
+    p = subparsers.add_parser('control', help='Send RPC request to the Control')
+    subsystem_args = p.add_argument_group('Control subsystem arguments')
+    subsystem_args.add_argument('-s', '--subsystem', help='Control subsystem name',
+                                required=True, type=str)
+    subsystem_args.add_argument('-op', '--operation', help='Control subsystem operation name',
+                                required=True, type=str)
+    subsystem_args.add_argument('-p', '--params', nargs='+',
+                                help='Space-separated key:value Control subsystem parameters pairs',
+                                required=False, type=str)
+    p.set_defaults(func=control)
 
     def check_called_name(name):
         if name in deprecated_aliases:

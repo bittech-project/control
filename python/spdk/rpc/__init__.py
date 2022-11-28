@@ -8,7 +8,6 @@ from . import log
 from . import notify
 from . import subsystem
 from . import trace
-from . import scst
 from . import client as rpc_client
 
 
