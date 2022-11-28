@@ -232,8 +232,10 @@ __sto_tree_node_free(struct sto_tree_node *node)
 {
 	struct sto_inode *inode = node->inode;
 
-	inode->ops->destroy(inode);
-	node->inode = NULL;
+	if (spdk_likely(inode)) {
+		inode->ops->destroy(inode);
+		node->inode = NULL;
+	}
 }
 
 static void
