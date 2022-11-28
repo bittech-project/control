@@ -112,18 +112,18 @@ sto_core_req_get_subsystem(struct sto_core_req *req)
 
 	rc = sto_json_decode_object_str(req->params, "subsystem", &subsystem_name);
 	if (rc) {
-		SPDK_ERRLOG("Failed to decode subystem for req[%p], rc=%d\n", req, rc);
-		return NULL;
+		SPDK_ERRLOG("Failed to decode subsystem for req[%p], rc=%d\n", req, rc);
+		return ERR_PTR(rc);
 	}
 
 	subsystem = sto_subsystem_find(subsystem_name);
-	if (spdk_unlikely(!subsystem)) {
-		SPDK_ERRLOG("Failed to find %s subsystem\n", subsystem_name);
-		goto out;
-	}
 
-out:
 	free(subsystem_name);
+
+	if (spdk_unlikely(!subsystem)) {
+		SPDK_ERRLOG("Failed to find subsystem\n");
+		return ERR_PTR(-EINVAL);
+	}
 
 	return subsystem;
 }
@@ -149,10 +149,11 @@ sto_core_req_parse(struct sto_core_req *core_req)
 	int rc = 0;
 
 	subsystem = sto_core_req_get_subsystem(core_req);
-	if (spdk_unlikely(!subsystem)) {
-		SPDK_ERRLOG("Failed to get subsystem for req[%p], rc=%d\n",
-			    core_req, rc);
-		return rc;
+	if (IS_ERR_OR_NULL(subsystem)) {
+		SPDK_ERRLOG("Failed to get subsystem for req[%p]\n",
+			    core_req);
+		rc = PTR_ERR_OR_ZERO(subsystem);
+		return rc ?: -EINVAL;
 	}
 
 	cdb = sto_json_decode_next_object(core_req->params);
