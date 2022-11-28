@@ -123,6 +123,8 @@ sto_rpc_readdir_resp_handler(void *priv, struct spdk_jsonrpc_client_response *re
 		goto out;
 	}
 
+	rc = info.returncode;
+
 out:
 	cmd->done(cmd->priv, rc);
 
