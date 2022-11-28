@@ -75,18 +75,16 @@ out:
 }
 
 static void
-scst_serialize_attr(struct sto_inode *attr_inode, const char *available_attrs[],
-		    bool nonkey, struct spdk_json_write_ctx *w)
+scst_serialize_attr(struct sto_inode *attr_inode, struct spdk_json_write_ctx *w)
 {
 	char *attr;
 
-	if (sto_inode_read_only(attr_inode) &&
-			!(available_attrs && sto_find_match_str(attr_inode->name, available_attrs))) {
+	if (sto_inode_read_only(attr_inode)) {
 		return;
 	}
 
-	attr = scst_attr(sto_file_inode_buf(attr_inode), nonkey);
-	if (!attr || !strcmp(attr, "")) {
+	attr = scst_attr(sto_file_inode_buf(attr_inode), false);
+	if (!attr) {
 		goto out;
 	}
 
@@ -97,134 +95,19 @@ out:
 }
 
 static void
-scst_serialize_attrs(struct sto_tree_node *obj_node, const char *available_attrs[],
-		     bool nonkey, struct spdk_json_write_ctx *w)
+scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_node *attr_node;
 
 	STO_TREE_FOREACH_TYPE(attr_node, obj_node, STO_INODE_TYPE_FILE) {
 		struct sto_inode *inode = attr_node->inode;
 
-		scst_serialize_attr(inode, available_attrs, nonkey, w);
+		scst_serialize_attr(inode, w);
 	}
-}
-
-static char *
-scst_available_attrs_line(char **lines, size_t num_lines, const char *prefix)
-{
-	int i, prefix_len;
-
-	prefix_len = strlen(prefix);
-
-	for (i = 0; i < num_lines; i++) {
-		if (!strncmp(prefix, lines[i], prefix_len)) {
-			return lines[i] + prefix_len + 1;
-		}
-	}
-
-	return NULL;
-}
-
-static void scst_available_attrs_free(char **available_attrs);
-
-static char **
-scst_available_attrs(char **raw_available_attrs, int num_attrs)
-{
-	char **available_attrs;
-	int i;
-
-	available_attrs = calloc(num_attrs + 1, sizeof(char *));
-	if (spdk_unlikely(!available_attrs)) {
-		SPDK_ERRLOG("Failed to alloc available_attrs\n");
-		return NULL;
-	}
-
-	for (i = 0; i < num_attrs; i++) {
-		char *raw_attr = raw_available_attrs[i];
-		int raw_attr_len = strlen(raw_attr);
-
-		if (raw_attr[raw_attr_len - 1] == ',') {
-			raw_attr[raw_attr_len - 1] = '\0';
-		}
-
-		available_attrs[i] = strdup(raw_attr);
-		if (spdk_unlikely(!available_attrs[i])) {
-			SPDK_ERRLOG("Failed to strdup available_attrs\n");
-			goto out_err;
-		}
-	}
-
-	return available_attrs;
-
-out_err:
-	scst_available_attrs_free(available_attrs);
-
-	return NULL;
-}
-
-static char **
-scst_available_attrs_create(const char *buf, const char *prefix)
-{
-#define SCST_MGMT_MAX_LINES 32
-	char *lines[SCST_MGMT_MAX_LINES] = {};
-#define SCST_MAX_ATTRS 32
-	char *raw_available_attrs[SCST_MAX_ATTRS] = {};
-	char **available_attrs = NULL, *tmp_buf, *available_attrs_line;
-	int ret;
-
-	if (spdk_unlikely(!prefix || !buf)) {
-		SPDK_ERRLOG("Buf or Prefix is NULL!\n");
-		return NULL;
-	}
-
-	tmp_buf = strdup(buf);
-	if (spdk_unlikely(!tmp_buf)) {
-		SPDK_ERRLOG("Failed to alloc buf for SCST available_attrs\n");
-		return NULL;
-	}
-
-	ret = rte_strsplit(tmp_buf, strlen(tmp_buf), lines, SPDK_COUNTOF(lines), '\n');
-	if (spdk_unlikely(ret <= 0)) {
-		SPDK_ERRLOG("Failed to split scst attr filter\n");
-		goto out;
-	}
-
-	available_attrs_line = scst_available_attrs_line(lines, SPDK_COUNTOF(lines), prefix);
-
-	ret = rte_strsplit(available_attrs_line, strlen(available_attrs_line),
-			   raw_available_attrs, SPDK_COUNTOF(raw_available_attrs), ' ');
-	if (spdk_unlikely(ret <= 0)) {
-		SPDK_ERRLOG("Failed to split scst attr line\n");
-		goto out;
-	}
-
-	available_attrs = scst_available_attrs(raw_available_attrs, ret);
-
-out:
-	free(tmp_buf);
-
-	return available_attrs;
 }
 
 static void
-scst_available_attrs_free(char **available_attrs)
-{
-	char **attr;
-
-	if (!available_attrs) {
-		return;
-	}
-
-	for (attr = available_attrs; *attr; attr++) {
-		free(*attr);
-	}
-
-	free(available_attrs);
-}
-
-static void
-scst_config_dev_info_json(struct sto_tree_node *dev_lnk_node, const char **available_attrs,
-			  struct spdk_json_write_ctx *w)
+scst_snapshot_dev_info_json(struct sto_tree_node *dev_lnk_node, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_node *dev_node;
 
@@ -239,28 +122,19 @@ scst_config_dev_info_json(struct sto_tree_node *dev_lnk_node, const char **avail
 
 	spdk_json_write_object_begin(w);
 
-	scst_serialize_attrs(dev_node, available_attrs, false, w);
+	scst_serialize_attrs(dev_node, w);
 
 	spdk_json_write_object_end(w);
 }
 
 static void
-scst_config_handler_info_json(struct sto_tree_node *dh_node, struct spdk_json_write_ctx *w)
+scst_snapshot_handler_info_json(struct sto_tree_node *dh_node, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_node *dev_node, *mgmt_node;
-	char **dh_available_attrs;
 
 	mgmt_node = sto_tree_node_find(dh_node, "mgmt");
 	if (spdk_unlikely(!mgmt_node)) {
 		SPDK_ERRLOG("Failed to find 'mgmt' for handler %s\n",
-			    dh_node->inode->name);
-		return;
-	}
-
-	dh_available_attrs = scst_available_attrs_create(sto_file_inode_buf(mgmt_node->inode),
-							 "The following parameters available:");
-	if (spdk_unlikely(!dh_available_attrs)) {
-		SPDK_ERRLOG("Failed to get available_attrs for handler %s\n",
 			    dh_node->inode->name);
 		return;
 	}
@@ -273,19 +147,17 @@ scst_config_handler_info_json(struct sto_tree_node *dh_node, struct spdk_json_wr
 
 	STO_TREE_FOREACH_TYPE(dev_node, dh_node, STO_INODE_TYPE_LNK) {
 		spdk_json_write_object_begin(w);
-		scst_config_dev_info_json(dev_node, (const char **) dh_available_attrs, w);
+		scst_snapshot_dev_info_json(dev_node, w);
 		spdk_json_write_object_end(w);
 	}
 
 	spdk_json_write_array_end(w);
 
 	spdk_json_write_object_end(w);
-
-	scst_available_attrs_free(dh_available_attrs);
 }
 
 static bool
-scst_config_handlers_is_empty(struct sto_tree_node *handlers_node)
+scst_snapshot_handlers_is_empty(struct sto_tree_node *handlers_node)
 {
 	struct sto_tree_node *dh_node;
 
@@ -303,7 +175,7 @@ scst_config_handlers_is_empty(struct sto_tree_node *handlers_node)
 }
 
 static void
-scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
+scst_snapshot_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_node *handlers_node, *dh_node;
 
@@ -311,7 +183,7 @@ scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json
 
 	handlers_node = sto_tree_node_find(tree_root, "handlers");
 
-	if (!handlers_node || scst_config_handlers_is_empty(handlers_node)) {
+	if (!handlers_node || scst_snapshot_handlers_is_empty(handlers_node)) {
 		return;
 	}
 
@@ -323,7 +195,7 @@ scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json
 		}
 
 		spdk_json_write_object_begin(w);
-		scst_config_handler_info_json(dh_node, w);
+		scst_snapshot_handler_info_json(dh_node, w);
 		spdk_json_write_object_end(w);
 	}
 
@@ -331,24 +203,24 @@ scst_config_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json
 }
 
 static char *
-scst_config_write_dirpath(void *arg)
+scst_snapshot_dirpath(void *arg)
 {
 	return spdk_sprintf_alloc("%s", SCST_ROOT);
 }
 
 static void
-scst_config_write_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
+scst_snapshot_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
 {
 	spdk_json_write_object_begin(w);
 
-	scst_config_handlers_info_json(tree_root, w);
+	scst_snapshot_handlers_info_json(tree_root, w);
 
 	spdk_json_write_object_end(w);
 }
 
-static struct sto_tree_req_params_constructor config_write_constructor = {
-	.dirpath = scst_config_write_dirpath,
-	.info_json = scst_config_write_info_json,
+static struct sto_tree_req_params_constructor snapshot_constructor = {
+	.dirpath = scst_snapshot_dirpath,
+	.info_json = scst_snapshot_info_json,
 };
 
 static const char *
@@ -1377,10 +1249,10 @@ static struct sto_write_req_params_constructor lun_clear_constructor = {
 
 static const struct sto_cdbops scst_op_table[] = {
 	{
-		.name = "config_write",
+		.name = "snapshot",
 		.req_constructor = sto_tree_req_constructor,
 		.req_ops = &sto_tree_req_ops,
-		.params_constructor = &config_write_constructor,
+		.params_constructor = &snapshot_constructor,
 	},
 	{
 		.name = "handler_list",

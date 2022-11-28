@@ -1,12 +1,12 @@
 from .cmd_parser import *
 
-def scst_config_write(client):
+def scst_snapshot(client):
     """Writes the current configuration to stdout.
     Args:
     """
     params = {
         'subsystem': 'scst',
-        'op': 'config_write',
+        'op': 'snapshot',
     }
     return client.call('control', params)
 

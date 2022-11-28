@@ -72,12 +72,12 @@ if __name__ == "__main__":
     p.set_defaults(func=spdk_get_version)
 
     # scst
-    def scst_config_write(args):
-        json = rpc.scst.scst_config_write(args.client)
+    def scst_snapshot(args):
+        json = rpc.scst.scst_snapshot(args.client)
         print_json(json)
 
-    p = subparsers.add_parser('scst_config_write', help='Writes the current configuration to stdout')
-    p.set_defaults(func=scst_config_write)
+    p = subparsers.add_parser('scst_snapshot', help='Dump the current SCST state to stdout')
+    p.set_defaults(func=scst_snapshot)
 
     def scst_handler_list(args):
         json = rpc.scst.scst_handler_list(args.client)
