@@ -38,6 +38,14 @@ struct sto_err_context {
 	const char *errno_msg;
 };
 
+int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
+		      sto_params_parse params_parse, void *priv);
+
+void sto_err(struct sto_err_context *err, int rc);
+
+void sto_status_ok(struct spdk_json_write_ctx *w);
+void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err);
+
 struct sto_context {
 	void *priv;
 	sto_subsys_response_t response;
@@ -144,6 +152,12 @@ sto_dummy_req_exec(struct sto_req *req)
 	sto_req_response(req);
 
 	return 0;
+}
+
+static inline void
+sto_dummy_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+{
+	sto_status_ok(w);
 }
 
 static inline void
@@ -295,13 +309,5 @@ struct sto_tree_req_params_constructor {
 extern struct sto_req_ops sto_tree_req_ops;
 
 STO_REQ_CONSTRUCTOR_DECLARE(tree)
-
-int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
-		      sto_params_parse params_parse, void *priv);
-
-void sto_err(struct sto_err_context *err, int rc);
-
-void sto_status_ok(struct spdk_json_write_ctx *w);
-void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err);
 
 #endif /* _STO_LIB_H_ */

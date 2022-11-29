@@ -148,12 +148,6 @@ sto_write_req_exec(struct sto_req *req)
 }
 
 static void
-sto_write_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
-{
-	sto_status_ok(w);
-}
-
-static void
 sto_write_req_free(struct sto_req *req)
 {
 	struct sto_write_req *write_req = STO_REQ_TYPE(req, write);
@@ -166,7 +160,7 @@ sto_write_req_free(struct sto_req *req)
 struct sto_req_ops sto_write_req_ops = {
 	.decode_cdb = sto_write_req_decode_cdb,
 	.exec = sto_write_req_exec,
-	.end_response = sto_write_req_end_response,
+	.end_response = sto_dummy_req_end_response,
 	.free = sto_write_req_free,
 };
 

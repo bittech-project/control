@@ -79,12 +79,6 @@ out_err:
 }
 
 static void
-sto_show_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
-{
-	sto_status_ok(w);
-}
-
-static void
 sto_show_req_free(struct sto_req *req)
 {
 	struct sto_show_req *show_req = STO_REQ_TYPE(req, show);
@@ -97,7 +91,7 @@ sto_show_req_free(struct sto_req *req)
 static struct sto_req_ops sto_show_req_ops = {
 	.decode_cdb = sto_show_req_decode_cdb,
 	.exec = sto_dummy_req_exec,
-	.end_response = sto_show_req_end_response,
+	.end_response = sto_dummy_req_end_response,
 	.free = sto_show_req_free,
 };
 
