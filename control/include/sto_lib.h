@@ -42,7 +42,6 @@ struct sto_context {
 };
 
 struct sto_req;
-struct sto_cdbops;
 
 typedef int (*sto_req_decode_cdb_t)(struct sto_req *req, const struct spdk_json_val *cdb);
 typedef int (*sto_req_exec_t)(struct sto_req *req);
@@ -56,14 +55,16 @@ struct sto_req_ops {
 	sto_req_free_t free;
 };
 
-typedef struct sto_req *(*sto_req_constructor_t)(const struct sto_cdbops *op);
+struct sto_ops;
 
-struct sto_cdbops {
+typedef struct sto_req *(*sto_req_constructor_t)(const struct sto_ops *op);
+
+struct sto_ops {
 	const char *name;
 
 	sto_req_constructor_t req_constructor;
-
 	struct sto_req_ops *req_ops;
+
 	void *params_constructor;
 };
 
@@ -81,7 +82,7 @@ sto_req(struct sto_context *ctx)
 }
 
 static inline void
-sto_req_init(struct sto_req *req, const struct sto_cdbops *op)
+sto_req_init(struct sto_req *req, const struct sto_ops *op)
 {
 	req->ops = op->req_ops;
 	req->params_constructor = op->params_constructor;
@@ -125,7 +126,7 @@ sto_write_req(struct sto_req *req)
 	return SPDK_CONTAINEROF(req, struct sto_write_req, req);
 }
 
-struct sto_req *sto_write_req_constructor(const struct sto_cdbops *op);
+struct sto_req *sto_write_req_constructor(const struct sto_ops *op);
 
 struct sto_read_req_params {
 	const char *file;
@@ -158,7 +159,7 @@ sto_read_req(struct sto_req *req)
 	return SPDK_CONTAINEROF(req, struct sto_read_req, req);
 }
 
-struct sto_req *sto_read_req_constructor(const struct sto_cdbops *op);
+struct sto_req *sto_read_req_constructor(const struct sto_ops *op);
 
 struct sto_readlink_req_params {
 	const char *file;
@@ -189,7 +190,7 @@ sto_readlink_req(struct sto_req *req)
 	return SPDK_CONTAINEROF(req, struct sto_readlink_req, req);
 }
 
-struct sto_req *sto_readlink_req_constructor(const struct sto_cdbops *op);
+struct sto_req *sto_readlink_req_constructor(const struct sto_ops *op);
 
 struct sto_readdir_req_params {
 	const char *name;
@@ -225,7 +226,7 @@ sto_readdir_req(struct sto_req *req)
 	return SPDK_CONTAINEROF(req, struct sto_readdir_req, req);
 }
 
-struct sto_req *sto_readdir_req_constructor(const struct sto_cdbops *op);
+struct sto_req *sto_readdir_req_constructor(const struct sto_ops *op);
 
 struct sto_tree_req_params {
 	char *dirpath;
@@ -264,7 +265,7 @@ sto_tree_req(struct sto_req *req)
 	return SPDK_CONTAINEROF(req, struct sto_tree_req, req);
 }
 
-struct sto_req *sto_tree_req_constructor(const struct sto_cdbops *op);
+struct sto_req *sto_tree_req_constructor(const struct sto_ops *op);
 
 int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 		      sto_params_parse params_parse, void *priv);

@@ -1235,7 +1235,7 @@ static struct sto_write_req_params_constructor lun_clear_constructor = {
 	.data = scst_lun_clear_data,
 };
 
-static const struct sto_cdbops scst_op_table[] = {
+static const struct sto_ops scst_op_table[] = {
 	{
 		.name = "snapshot",
 		.req_constructor = sto_tree_req_constructor,
@@ -1408,13 +1408,13 @@ static const struct sto_cdbops scst_op_table[] = {
 
 #define SCST_OP_TBL_SIZE	(SPDK_COUNTOF(scst_op_table))
 
-static const struct sto_cdbops *
-scst_find_cdbops(const char *op_name)
+static const struct sto_ops *
+scst_find_ops(const char *op_name)
 {
 	int i;
 
 	for (i = 0; i < SCST_OP_TBL_SIZE; i++) {
-		const struct sto_cdbops *op = &scst_op_table[i];
+		const struct sto_ops *op = &scst_op_table[i];
 
 		if (!strcmp(op_name, op->name)) {
 			return op;
@@ -1426,7 +1426,7 @@ scst_find_cdbops(const char *op_name)
 
 static struct sto_subsystem g_scst_subsystem = {
 	.name = "scst",
-	.find_cdbops = scst_find_cdbops,
+	.find_ops = scst_find_ops,
 };
 
 STO_SUBSYSTEM_REGISTER(g_scst_subsystem);

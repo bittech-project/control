@@ -3,17 +3,17 @@
 
 #include <spdk/queue.h>
 
-struct sto_cdbops;
+struct sto_ops;
 struct spdk_json_val;
 
 typedef void (*sto_subsys_response_t)(void *priv);
 
-typedef const struct sto_cdbops *(*sto_subsys_find_cdbops)(const char *name);
+typedef const struct sto_ops *(*sto_subsystem_find_ops)(const char *name);
 
 struct sto_subsystem {
 	const char *name;
 
-	sto_subsys_find_cdbops find_cdbops;
+	sto_subsystem_find_ops find_ops;
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };

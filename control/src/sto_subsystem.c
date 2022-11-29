@@ -61,12 +61,12 @@ out:
 	return rc;
 }
 
-static const struct sto_cdbops *
+static const struct sto_ops *
 sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
 			 const struct spdk_json_val *params)
 {
 	char *op_name = NULL;
-	const struct sto_cdbops *op;
+	const struct sto_ops *op;
 	int rc = 0;
 
 	rc = sto_json_decode_object_str(params, "op", &op_name);
@@ -75,7 +75,7 @@ sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
 		return ERR_PTR(rc);
 	}
 
-	op = subsystem->find_cdbops(op_name);
+	op = subsystem->find_ops(op_name);
 	if (!op) {
 		SPDK_ERRLOG("Failed to find op %s\n", op_name);
 		free(op_name);
@@ -90,7 +90,7 @@ sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
 struct sto_context *
 sto_subsystem_parse(struct sto_subsystem *subsystem, const struct spdk_json_val *params)
 {
-	const struct sto_cdbops *op;
+	const struct sto_ops *op;
 	struct sto_req *req = NULL;
 	int rc;
 

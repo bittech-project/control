@@ -183,7 +183,7 @@ static struct sto_readdir_req_params_constructor readdir_constructor = {
 	.dirpath = sys_readdir_dirpath,
 };
 
-static const struct sto_cdbops sys_op_table[] = {
+static const struct sto_ops sys_op_table[] = {
 	{
 		.name = "writefile",
 		.req_constructor = sto_write_req_constructor,
@@ -212,13 +212,13 @@ static const struct sto_cdbops sys_op_table[] = {
 
 #define SYS_OP_TBL_SIZE	(SPDK_COUNTOF(sys_op_table))
 
-static const struct sto_cdbops *
-sys_find_cdbops(const char *op_name)
+static const struct sto_ops *
+sys_find_ops(const char *op_name)
 {
 	int i;
 
 	for (i = 0; i < SYS_OP_TBL_SIZE; i++) {
-		const struct sto_cdbops *op = &sys_op_table[i];
+		const struct sto_ops *op = &sys_op_table[i];
 
 		if (!strcmp(op_name, op->name)) {
 			return op;
@@ -230,7 +230,7 @@ sys_find_cdbops(const char *op_name)
 
 static struct sto_subsystem g_sys_subsystem = {
 	.name = "sys",
-	.find_cdbops = sys_find_cdbops,
+	.find_ops = sys_find_ops,
 };
 
 STO_SUBSYSTEM_REGISTER(g_sys_subsystem);

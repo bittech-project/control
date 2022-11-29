@@ -93,9 +93,11 @@ if __name__ == "__main__":
 
     p = subparsers.add_parser('control', help='Send RPC request to the Control')
     subsystem_args = p.add_argument_group('Control subsystem arguments')
-    subsystem_args.add_argument('-s', '--subsystem', help='Control subsystem name',
+    subsystem_args.add_argument('-s', '--subsystem',
+                                help='Control subsystem name',
                                 required=True, type=str)
-    subsystem_args.add_argument('-op', '--operation', help='Control subsystem operation name',
+    subsystem_args.add_argument('-op', '--operation',
+                                help='Control subsystem operation name',
                                 required=True, type=str)
     subsystem_args.add_argument('-p', '--params', nargs='+',
                                 help='Space-separated key:value Control subsystem parameters pairs',

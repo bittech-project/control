@@ -70,7 +70,7 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 }
 
 struct sto_req *
-sto_write_req_constructor(const struct sto_cdbops *op)
+sto_write_req_constructor(const struct sto_ops *op)
 {
 	struct sto_write_req *write_req;
 
@@ -185,7 +185,7 @@ struct sto_req_ops sto_write_req_ops = {
 };
 
 struct sto_req *
-sto_read_req_constructor(const struct sto_cdbops *op)
+sto_read_req_constructor(const struct sto_ops *op)
 {
 	struct sto_read_req *read_req;
 
@@ -296,7 +296,7 @@ struct sto_req_ops sto_read_req_ops = {
 };
 
 struct sto_req *
-sto_readlink_req_constructor(const struct sto_cdbops *op)
+sto_readlink_req_constructor(const struct sto_ops *op)
 {
 	struct sto_readlink_req *readlink_req;
 
@@ -403,7 +403,7 @@ struct sto_req_ops sto_readlink_req_ops = {
 };
 
 struct sto_req *
-sto_readdir_req_constructor(const struct sto_cdbops *op)
+sto_readdir_req_constructor(const struct sto_ops *op)
 {
 	struct sto_readdir_req *readdir_req;
 
@@ -543,7 +543,7 @@ struct sto_req_ops sto_readdir_req_ops = {
 };
 
 struct sto_req *
-sto_tree_req_constructor(const struct sto_cdbops *op)
+sto_tree_req_constructor(const struct sto_ops *op)
 {
 	struct sto_tree_req *tree_req;
 
