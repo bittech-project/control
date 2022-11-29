@@ -26,7 +26,7 @@ def print_array(a):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='SPDK RPC command line interface', usage='%(prog)s [options]')
+        description='Control RPC command line interface', usage='%(prog)s [options]')
     parser.add_argument('-s', dest='server_addr',
                         help='RPC domain socket path or IP address', default='/var/tmp/spdk.sock')
     parser.add_argument('-p', dest='port',
@@ -54,22 +54,6 @@ if __name__ == "__main__":
     parser.set_defaults(is_server=False)
     parser.add_argument('--plugin', dest='rpc_plugin', help='Module name of plugin with additional RPC commands')
     subparsers = parser.add_subparsers(help='RPC methods', dest='called_rpc_name', metavar='')
-
-    def rpc_get_methods(args):
-        print_dict(rpc.rpc_get_methods(args.client,
-                                       current=args.current,
-                                       include_aliases=args.include_aliases))
-
-    p = subparsers.add_parser('rpc_get_methods', help='Get list of supported RPC methods')
-    p.add_argument('-c', '--current', help='Get list of RPC methods only callable in the current state.', action='store_true')
-    p.add_argument('-i', '--include-aliases', help='include RPC aliases', action='store_true')
-    p.set_defaults(func=rpc_get_methods)
-
-    def spdk_get_version(args):
-        print_json(rpc.spdk_get_version(args.client))
-
-    p = subparsers.add_parser('spdk_get_version', help='Get SPDK version')
-    p.set_defaults(func=spdk_get_version)
 
     def control(args):
         params = {
@@ -103,6 +87,12 @@ if __name__ == "__main__":
                                 help='Space-separated key:value Control subsystem parameters pairs',
                                 required=False, type=str)
     p.set_defaults(func=control)
+
+    def spdk_get_version(args):
+        print_json(rpc.spdk_get_version(args.client))
+
+    p = subparsers.add_parser('spdk_get_version', help='Get SPDK version')
+    p.set_defaults(func=spdk_get_version)
 
     def check_called_name(name):
         if name in deprecated_aliases:
