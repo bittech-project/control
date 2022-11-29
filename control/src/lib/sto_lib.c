@@ -69,21 +69,7 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_object_end(w);
 }
 
-struct sto_req *
-sto_write_req_constructor(const struct sto_ops *op)
-{
-	struct sto_write_req *write_req;
-
-	write_req = rte_zmalloc(NULL, sizeof(*write_req), 0);
-	if (spdk_unlikely(!write_req)) {
-		SPDK_ERRLOG("Failed to alloc sto write req\n");
-		return NULL;
-	}
-
-	sto_req_init(&write_req->req, op);
-
-	return &write_req->req;
-}
+STO_REQ_CONSTRUCTOR_DEFINE(write)
 
 static void
 sto_write_req_params_free(struct sto_write_req_params *params)
@@ -121,7 +107,7 @@ free_file:
 static int
 sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_write_req *write_req = sto_write_req(req);
+	struct sto_write_req *write_req = STO_REQ_TYPE(req, write);
 	struct sto_write_req_params_constructor *constructor = req->params_constructor;
 	int rc = 0;
 
@@ -151,7 +137,7 @@ sto_write_req_done(void *priv, int rc)
 static int
 sto_write_req_exec(struct sto_req *req)
 {
-	struct sto_write_req *write_req = sto_write_req(req);
+	struct sto_write_req *write_req = STO_REQ_TYPE(req, write);
 	struct sto_write_req_params *params = &write_req->params;
 	struct sto_rpc_writefile_args args = {
 		.priv = req,
@@ -170,7 +156,7 @@ sto_write_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 static void
 sto_write_req_free(struct sto_req *req)
 {
-	struct sto_write_req *write_req = sto_write_req(req);
+	struct sto_write_req *write_req = STO_REQ_TYPE(req, write);
 
 	sto_write_req_params_free(&write_req->params);
 
@@ -184,21 +170,7 @@ struct sto_req_ops sto_write_req_ops = {
 	.free = sto_write_req_free,
 };
 
-struct sto_req *
-sto_read_req_constructor(const struct sto_ops *op)
-{
-	struct sto_read_req *read_req;
-
-	read_req = rte_zmalloc(NULL, sizeof(*read_req), 0);
-	if (spdk_unlikely(!read_req)) {
-		SPDK_ERRLOG("Failed to alloc sto read req\n");
-		return NULL;
-	}
-
-	sto_req_init(&read_req->req, op);
-
-	return &read_req->req;
-}
+STO_REQ_CONSTRUCTOR_DEFINE(read)
 
 static void
 sto_read_req_params_free(struct sto_read_req_params *params)
@@ -228,7 +200,7 @@ sto_read_req_params_parse(void *priv, void *params)
 static int
 sto_read_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_read_req *read_req = sto_read_req(req);
+	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
 	struct sto_read_req_params_constructor *constructor = req->params_constructor;
 	int rc = 0;
 
@@ -258,7 +230,7 @@ sto_read_req_done(void *priv, int rc)
 static int
 sto_read_req_exec(struct sto_req *req)
 {
-	struct sto_read_req *read_req = sto_read_req(req);
+	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
 	struct sto_read_req_params *params = &read_req->params;
 	struct sto_rpc_readfile_args args = {
 		.priv = req,
@@ -272,7 +244,7 @@ sto_read_req_exec(struct sto_req *req)
 static void
 sto_read_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_read_req *read_req = sto_read_req(req);
+	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
 
 	spdk_json_write_string(w, read_req->buf);
 }
@@ -280,7 +252,7 @@ sto_read_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 static void
 sto_read_req_free(struct sto_req *req)
 {
-	struct sto_read_req *read_req = sto_read_req(req);
+	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
 
 	sto_read_req_params_free(&read_req->params);
 	free(read_req->buf);
@@ -295,21 +267,7 @@ struct sto_req_ops sto_read_req_ops = {
 	.free = sto_read_req_free,
 };
 
-struct sto_req *
-sto_readlink_req_constructor(const struct sto_ops *op)
-{
-	struct sto_readlink_req *readlink_req;
-
-	readlink_req = rte_zmalloc(NULL, sizeof(*readlink_req), 0);
-	if (spdk_unlikely(!readlink_req)) {
-		SPDK_ERRLOG("Failed to alloc sto readlink req\n");
-		return NULL;
-	}
-
-	sto_req_init(&readlink_req->req, op);
-
-	return &readlink_req->req;
-}
+STO_REQ_CONSTRUCTOR_DEFINE(readlink)
 
 static void
 sto_readlink_req_params_free(struct sto_readlink_req_params *params)
@@ -335,7 +293,7 @@ sto_readlink_req_params_parse(void *priv, void *params)
 static int
 sto_readlink_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
 	struct sto_readlink_req_params_constructor *constructor = req->params_constructor;
 	int rc = 0;
 
@@ -365,7 +323,7 @@ sto_readlink_req_done(void *priv, int rc)
 static int
 sto_readlink_req_exec(struct sto_req *req)
 {
-	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
 	struct sto_readlink_req_params *params = &readlink_req->params;
 	struct sto_rpc_readlink_args args = {
 		.priv = req,
@@ -379,7 +337,7 @@ sto_readlink_req_exec(struct sto_req *req)
 static void
 sto_readlink_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
 
 	spdk_json_write_string(w, readlink_req->buf);
 }
@@ -387,7 +345,7 @@ sto_readlink_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w
 static void
 sto_readlink_req_free(struct sto_req *req)
 {
-	struct sto_readlink_req *readlink_req = sto_readlink_req(req);
+	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
 
 	sto_readlink_req_params_free(&readlink_req->params);
 	free(readlink_req->buf);
@@ -402,21 +360,7 @@ struct sto_req_ops sto_readlink_req_ops = {
 	.free = sto_readlink_req_free,
 };
 
-struct sto_req *
-sto_readdir_req_constructor(const struct sto_ops *op)
-{
-	struct sto_readdir_req *readdir_req;
-
-	readdir_req = rte_zmalloc(NULL, sizeof(*readdir_req), 0);
-	if (spdk_unlikely(!readdir_req)) {
-		SPDK_ERRLOG("Failed to alloc sto ls req\n");
-		return NULL;
-	}
-
-	sto_req_init(&readdir_req->req, op);
-
-	return &readdir_req->req;
-}
+STO_REQ_CONSTRUCTOR_DEFINE(readdir)
 
 static void
 sto_readdir_req_params_free(struct sto_readdir_req_params *params)
@@ -467,7 +411,7 @@ free_name:
 static int
 sto_readdir_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
+	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
 	struct sto_readdir_req_params_constructor *constructor = req->params_constructor;
 	int rc = 0;
 
@@ -499,7 +443,7 @@ out:
 static int
 sto_readdir_req_exec(struct sto_req *req)
 {
-	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
+	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
 	struct sto_readdir_req_params *params = &readdir_req->params;
 	struct sto_rpc_readdir_args args = {
 		.priv = req,
@@ -513,7 +457,7 @@ sto_readdir_req_exec(struct sto_req *req)
 static void
 sto_readdir_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
+	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
 	struct sto_readdir_req_params *params = &readdir_req->params;
 	struct sto_dirents_json_cfg cfg = {
 		.name = params->name,
@@ -526,7 +470,7 @@ sto_readdir_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 static void
 sto_readdir_req_free(struct sto_req *req)
 {
-	struct sto_readdir_req *readdir_req = sto_readdir_req(req);
+	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
 
 	sto_readdir_req_params_free(&readdir_req->params);
 
@@ -542,21 +486,7 @@ struct sto_req_ops sto_readdir_req_ops = {
 	.free = sto_readdir_req_free,
 };
 
-struct sto_req *
-sto_tree_req_constructor(const struct sto_ops *op)
-{
-	struct sto_tree_req *tree_req;
-
-	tree_req = rte_zmalloc(NULL, sizeof(*tree_req), 0);
-	if (spdk_unlikely(!tree_req)) {
-		SPDK_ERRLOG("Failed to alloc sto ls req\n");
-		return NULL;
-	}
-
-	sto_req_init(&tree_req->req, op);
-
-	return &tree_req->req;
-}
+STO_REQ_CONSTRUCTOR_DEFINE(tree)
 
 static void
 sto_tree_req_params_free(struct sto_tree_req_params *params)
@@ -594,7 +524,7 @@ sto_tree_req_params_parse(void *priv, void *params)
 static int
 sto_tree_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 {
-	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
 	struct sto_tree_req_params_constructor *constructor = req->params_constructor;
 	int rc = 0;
 
@@ -612,7 +542,7 @@ static void
 sto_tree_req_done(void *priv)
 {
 	struct sto_req *req = priv;
-	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
 	struct sto_tree_info *info = &tree_req->info;
 	int rc;
 
@@ -631,7 +561,7 @@ out:
 static int
 sto_tree_req_exec(struct sto_req *req)
 {
-	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
 	struct sto_tree_req_params *params = &tree_req->params;
 	struct sto_tree_args args = {
 		.priv = req,
@@ -645,7 +575,7 @@ sto_tree_req_exec(struct sto_req *req)
 static void
 sto_tree_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
 	struct sto_tree_info *info = &tree_req->info;
 	struct sto_tree_req_params *params = &tree_req->params;
 
@@ -660,7 +590,7 @@ sto_tree_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 static void
 sto_tree_req_free(struct sto_req *req)
 {
-	struct sto_tree_req *tree_req = sto_tree_req(req);
+	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
 
 	sto_tree_req_params_free(&tree_req->params);
 	sto_tree_info_free(&tree_req->info);

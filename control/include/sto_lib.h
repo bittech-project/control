@@ -102,6 +102,29 @@ sto_req_response(struct sto_req *req)
 	ctx->response(ctx->priv);
 }
 
+#define STO_REQ_TYPE(rq, type) \
+	SPDK_CONTAINEROF(rq, struct sto_ ## type ## _req, req)
+
+#define STO_REQ_CONSTRUCTOR_DECLARE(type)					\
+struct sto_req *sto_ ## type ## _req_constructor(const struct sto_ops *op);
+
+#define STO_REQ_CONSTRUCTOR_DEFINE(type)			\
+struct sto_req *						\
+sto_ ## type ## _req_constructor(const struct sto_ops *op)	\
+{								\
+	struct sto_ ## type ## _req *req;			\
+								\
+	req = rte_zmalloc(NULL, sizeof(*req), 0);		\
+	if (spdk_unlikely(!req)) {				\
+		SPDK_ERRLOG("Failed to alloc STO req\n");	\
+		return NULL;					\
+	}							\
+								\
+	sto_req_init(&req->req, op);				\
+								\
+	return &req->req;					\
+}
+
 struct sto_write_req_params {
 	const char *file;
 	char *data;
@@ -126,13 +149,7 @@ struct sto_write_req_params_constructor {
 
 extern struct sto_req_ops sto_write_req_ops;
 
-static inline struct sto_write_req *
-sto_write_req(struct sto_req *req)
-{
-	return SPDK_CONTAINEROF(req, struct sto_write_req, req);
-}
-
-struct sto_req *sto_write_req_constructor(const struct sto_ops *op);
+STO_REQ_CONSTRUCTOR_DECLARE(write)
 
 struct sto_read_req_params {
 	const char *file;
@@ -159,13 +176,7 @@ struct sto_read_req_params_constructor {
 
 extern struct sto_req_ops sto_read_req_ops;
 
-static inline struct sto_read_req *
-sto_read_req(struct sto_req *req)
-{
-	return SPDK_CONTAINEROF(req, struct sto_read_req, req);
-}
-
-struct sto_req *sto_read_req_constructor(const struct sto_ops *op);
+STO_REQ_CONSTRUCTOR_DECLARE(read)
 
 struct sto_readlink_req_params {
 	const char *file;
@@ -190,13 +201,7 @@ struct sto_readlink_req_params_constructor {
 
 extern struct sto_req_ops sto_readlink_req_ops;
 
-static inline struct sto_readlink_req *
-sto_readlink_req(struct sto_req *req)
-{
-	return SPDK_CONTAINEROF(req, struct sto_readlink_req, req);
-}
-
-struct sto_req *sto_readlink_req_constructor(const struct sto_ops *op);
+STO_REQ_CONSTRUCTOR_DECLARE(readlink)
 
 struct sto_readdir_req_params {
 	const char *name;
@@ -226,13 +231,7 @@ struct sto_readdir_req_params_constructor {
 
 extern struct sto_req_ops sto_readdir_req_ops;
 
-static inline struct sto_readdir_req *
-sto_readdir_req(struct sto_req *req)
-{
-	return SPDK_CONTAINEROF(req, struct sto_readdir_req, req);
-}
-
-struct sto_req *sto_readdir_req_constructor(const struct sto_ops *op);
+STO_REQ_CONSTRUCTOR_DECLARE(readdir)
 
 struct sto_tree_req_params {
 	char *dirpath;
@@ -265,13 +264,7 @@ struct sto_tree_req_params_constructor {
 
 extern struct sto_req_ops sto_tree_req_ops;
 
-static inline struct sto_tree_req *
-sto_tree_req(struct sto_req *req)
-{
-	return SPDK_CONTAINEROF(req, struct sto_tree_req, req);
-}
-
-struct sto_req *sto_tree_req_constructor(const struct sto_ops *op);
+STO_REQ_CONSTRUCTOR_DECLARE(tree)
 
 int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 		      sto_params_parse params_parse, void *priv);
