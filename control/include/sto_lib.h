@@ -68,6 +68,12 @@ struct sto_ops {
 	void *params_constructor;
 };
 
+struct sto_op_table {
+	const struct sto_ops *ops;
+	size_t size;
+};
+#define STO_OP_TABLE_INITIALIZER(ops) {ops, SPDK_COUNTOF(ops)}
+
 struct sto_req {
 	struct sto_context ctx;
 

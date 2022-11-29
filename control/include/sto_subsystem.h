@@ -4,19 +4,19 @@
 #include <spdk/queue.h>
 
 struct sto_ops;
+struct sto_op_table;
 struct spdk_json_val;
 
 typedef void (*sto_subsys_response_t)(void *priv);
 
-typedef const struct sto_ops *(*sto_subsystem_find_ops)(const char *name);
-
 struct sto_subsystem {
 	const char *name;
 
-	sto_subsystem_find_ops find_ops;
+	const struct sto_op_table *op_table;
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };
+#define STO_SUBSYSTEM_INITIALIZER(name, op_table) {name, op_table}
 
 void sto_add_subsystem(struct sto_subsystem *subsystem);
 

@@ -62,6 +62,26 @@ out:
 }
 
 static const struct sto_ops *
+sto_subsystem_find_ops(struct sto_subsystem *subsystem, const char *op_name)
+{
+	const struct sto_op_table *op_table;
+	int i;
+
+	op_table = subsystem->op_table;
+	assert(op_table);
+
+	for (i = 0; i < op_table->size; i++) {
+		const struct sto_ops *op = &op_table->ops[i];
+
+		if (!strcmp(op_name, op->name)) {
+			return op;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct sto_ops *
 sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
 			 const struct spdk_json_val *params)
 {
@@ -75,7 +95,7 @@ sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
 		return ERR_PTR(rc);
 	}
 
-	op = subsystem->find_ops(op_name);
+	op = sto_subsystem_find_ops(subsystem, op_name);
 	if (!op) {
 		SPDK_ERRLOG("Failed to find op %s\n", op_name);
 		free(op_name);

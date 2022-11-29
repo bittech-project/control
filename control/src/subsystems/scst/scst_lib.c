@@ -1235,7 +1235,7 @@ static struct sto_write_req_params_constructor lun_clear_constructor = {
 	.data = scst_lun_clear_data,
 };
 
-static const struct sto_ops scst_op_table[] = {
+static const struct sto_ops scst_ops[] = {
 	{
 		.name = "snapshot",
 		.req_constructor = sto_tree_req_constructor,
@@ -1406,27 +1406,7 @@ static const struct sto_ops scst_op_table[] = {
 	},
 };
 
-#define SCST_OP_TBL_SIZE	(SPDK_COUNTOF(scst_op_table))
+static const struct sto_op_table scst_op_table = STO_OP_TABLE_INITIALIZER(scst_ops);
 
-static const struct sto_ops *
-scst_find_ops(const char *op_name)
-{
-	int i;
-
-	for (i = 0; i < SCST_OP_TBL_SIZE; i++) {
-		const struct sto_ops *op = &scst_op_table[i];
-
-		if (!strcmp(op_name, op->name)) {
-			return op;
-		}
-	}
-
-	return NULL;
-}
-
-static struct sto_subsystem g_scst_subsystem = {
-	.name = "scst",
-	.find_ops = scst_find_ops,
-};
-
+static struct sto_subsystem g_scst_subsystem = STO_SUBSYSTEM_INITIALIZER("scst", &scst_op_table);
 STO_SUBSYSTEM_REGISTER(g_scst_subsystem);
