@@ -19,7 +19,7 @@ LDFLAGS = -pthread $(SPDK_LDFLAGS) -Wl,--whole-archive,-Bstatic \
 C_SRCS = main.c sto_spdk_subsystem.c sto_control.c sto_control_rpc.c sto_subsystem.c sto_core.c \
 	 lib/sto_lib.c lib/sto_utils.c lib/sto_inode.c lib/sto_tree.c \
 	 client/sto_client.c client/sto_subprocess_front.c client/sto_rpc_aio.c client/sto_rpc_readdir.c \
-	 subsystems/scst/scst_lib.c subsystems/sys/sys_lib.c
+	 subsystems/scst/scst_lib.c subsystems/sys/sys_lib.c subsystems/config/config_lib.c
 OBJS := ${C_SRCS:.c=.o}
 
 all: $(PROG)
