@@ -6,7 +6,12 @@ include $(CONTROL_ROOT_DIR)/mk/sto.server.mk
 
 PROG = control
 
+STO_GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
+
 CFLAGS = -Wall -g -O2 -pthread -I../include $(STO_SERVER_CFLAGS) $(SPDK_CFLAGS)
+ifneq (, $(STO_GIT_COMMIT))
+CFLAGS += -DSTO_GIT_COMMIT=$(STO_GIT_COMMIT)
+endif
 LDFLAGS = -pthread $(SPDK_LDFLAGS) -Wl,--whole-archive,-Bstatic \
 	  $(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB) \
 	  $(STO_SERVER_LDFLAGS) -Wl,--no-whole-archive,-Bdynamic $(STO_SERVER_LIB)

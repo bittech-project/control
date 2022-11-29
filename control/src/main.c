@@ -2,6 +2,7 @@
 #include <spdk/log.h>
 #include <spdk/likely.h>
 
+#include "sto_version.h"
 #include <sto_server.h>
 
 /*
@@ -27,7 +28,8 @@ control_parse_arg(int ch, char *arg)
 static void
 control_started(void *arg1)
 {
-	SPDK_NOTICELOG("Successfully started the STO Control SPDK application\n");
+	SPDK_NOTICELOG("Successfully started the %s SPDK application\n",
+		       STO_VERSION_STRING);
 }
 
 int
