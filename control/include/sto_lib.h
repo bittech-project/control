@@ -2,6 +2,9 @@
 #define _STO_LIB_H_
 
 #include <spdk/util.h>
+#include <spdk/likely.h>
+
+#include <rte_malloc.h>
 
 #include "sto_utils.h"
 
@@ -124,6 +127,33 @@ sto_ ## type ## _req_constructor(const struct sto_ops *op)	\
 								\
 	return &req->req;					\
 }
+
+struct sto_dummy_req {
+	struct sto_req req;
+};
+
+static inline int
+sto_dummy_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+{
+	return 0;
+}
+
+static inline int
+sto_dummy_req_exec(struct sto_req *req)
+{
+	sto_req_response(req);
+
+	return 0;
+}
+
+static inline void
+sto_dummy_req_free(struct sto_req *req)
+{
+	struct sto_dummy_req *dummy_req = STO_REQ_TYPE(req, dummy);
+	rte_free(dummy_req);
+}
+
+static inline STO_REQ_CONSTRUCTOR_DEFINE(dummy)
 
 struct sto_write_req_params {
 	const char *file;
