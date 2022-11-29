@@ -70,6 +70,10 @@ if __name__ == "__main__":
                 exit(1)
 
             for k, v in subsystem_params.items():
+                if k in params.keys():
+                    print("{} parameter already set".format(k))
+                    exit(1)
+
                 params[k] = v
 
         json = args.client.call('control', params)
