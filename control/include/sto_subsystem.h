@@ -19,10 +19,7 @@ struct sto_subsystem {
 #define STO_SUBSYSTEM_INITIALIZER(name, op_table) {name, op_table}
 
 void sto_add_subsystem(struct sto_subsystem *subsystem);
-
 struct sto_subsystem *sto_subsystem_find(const char *name);
-struct sto_context *sto_subsystem_parse(struct sto_subsystem *subsystem,
-					const struct spdk_json_val *params);
 
 #define STO_SUBSYSTEM_REGISTER(_name)					\
 static void __attribute__((constructor)) _name ## _register(void)	\

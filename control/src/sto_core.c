@@ -19,6 +19,9 @@ struct spdk_poller *g_sto_core_poller;
 static TAILQ_HEAD(sto_core_req_list, sto_core_req) g_sto_core_req_list
 	= TAILQ_HEAD_INITIALIZER(g_sto_core_req_list);
 
+static TAILQ_HEAD(sto_component_list, sto_core_component) g_sto_components
+	= TAILQ_HEAD_INITIALIZER(g_sto_components);
+
 
 static void sto_process_req(struct sto_core_req *req);
 
@@ -103,29 +106,30 @@ sto_core_req_submit(struct sto_core_req *req)
 	sto_core_req_process(req);
 }
 
-static struct sto_subsystem *
-sto_core_req_get_subsystem(struct sto_core_req *req)
+void
+sto_core_add_component(struct sto_core_component *component)
 {
-	struct sto_subsystem *subsystem;
-	char *subsystem_name = NULL;
-	int rc = 0;
+	TAILQ_INSERT_TAIL(&g_sto_components, component, list);
+}
 
-	rc = sto_json_decode_object_str(req->params, "subsystem", &subsystem_name);
-	if (rc) {
-		SPDK_ERRLOG("Failed to decode subsystem for req[%p], rc=%d\n", req, rc);
-		return ERR_PTR(rc);
+static struct sto_core_component *
+_core_component_find(struct sto_component_list *list, const char *name)
+{
+	struct sto_core_component *component;
+
+	TAILQ_FOREACH(component, list, list) {
+		if (!strcmp(name, component->name)) {
+			return component;
+		}
 	}
 
-	subsystem = sto_subsystem_find(subsystem_name);
+	return NULL;
+}
 
-	free(subsystem_name);
-
-	if (spdk_unlikely(!subsystem)) {
-		SPDK_ERRLOG("Failed to find subsystem\n");
-		return ERR_PTR(-EINVAL);
-	}
-
-	return subsystem;
+struct sto_core_component *
+sto_core_component_find(const char *name)
+{
+	return _core_component_find(&g_sto_components, name);
 }
 
 static void sto_exec_done(void *priv);
@@ -140,32 +144,80 @@ sto_core_req_init_ctx(struct sto_core_req *req, struct sto_context *ctx)
 	req->ctx = ctx;
 }
 
+static struct sto_core_component *
+sto_core_component_decode(const struct spdk_json_val *params)
+{
+	struct sto_core_component *component;
+	char *component_name = NULL;
+	int rc = 0;
+
+	rc = sto_json_decode_object_name(params, &component_name);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode component name, rc=%d\n", rc);
+		return ERR_PTR(rc);
+	}
+
+	component = sto_core_component_find(component_name);
+
+	free(component_name);
+
+	if (spdk_unlikely(!component)) {
+		SPDK_ERRLOG("Failed to find component\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	return component;
+}
+
+static struct sto_context *
+sto_core_parse_ops(const struct sto_ops *op, const struct spdk_json_val *params)
+{
+	struct sto_req *req = NULL;
+	struct sto_req_ops *ops;
+	int rc;
+
+	req = op->req_constructor(op);
+	if (spdk_unlikely(!req)) {
+		SPDK_ERRLOG("Failed to construct req\n");
+		return NULL;
+	}
+
+	ops = req->ops;
+
+	rc = ops->decode_cdb(req, params);
+	if (rc) {
+		SPDK_ERRLOG("Failed to decode CDB for req[%p], rc=%d\n", req, rc);
+		ops->free(req);
+		return NULL;
+	}
+
+	return &req->ctx;
+}
+
 static int
 sto_core_req_parse(struct sto_core_req *core_req)
 {
-	struct sto_subsystem *subsystem;
-	const struct spdk_json_val *cdb;
+	struct sto_core_component *component;
+	const struct sto_ops *op;
+	const struct spdk_json_val *params_cdb = NULL;
 	struct sto_context *ctx;
 	int rc = 0;
 
-	subsystem = sto_core_req_get_subsystem(core_req);
-	if (IS_ERR_OR_NULL(subsystem)) {
-		SPDK_ERRLOG("Failed to get subsystem for req[%p]\n",
-			    core_req);
-		rc = PTR_ERR_OR_ZERO(subsystem);
-		return rc ?: -EINVAL;
+	component = sto_core_component_decode(core_req->params);
+	if (IS_ERR(component)) {
+		SPDK_ERRLOG("Failed to parse component for req[%p]\n", core_req);
+		return PTR_ERR(component);
 	}
 
-	cdb = sto_json_decode_next_object(core_req->params);
-	if (IS_ERR_OR_NULL(cdb)) {
-		SPDK_ERRLOG("Failed to decode CDB for req[%p]\n", core_req);
-		rc = PTR_ERR_OR_ZERO(cdb);
-		return rc ?: -EINVAL;
+	op = component->decode_ops(core_req->params, &params_cdb);
+	if (IS_ERR(op)) {
+		SPDK_ERRLOG("%s component failed to decode ops\n", component->name);
+		return PTR_ERR(op);
 	}
 
-	ctx = sto_subsystem_parse(subsystem, cdb);
+	ctx = sto_core_parse_ops(op, params_cdb);
 	if (spdk_unlikely(!ctx)) {
-		SPDK_ERRLOG("%s subsystem failed to parse req\n", subsystem->name);
+		SPDK_ERRLOG("Failed to parse ops\n");
 		rc = -EINVAL;
 		goto out;
 	}
@@ -176,7 +228,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 	sto_core_req_process(core_req);
 
 out:
-	free((struct spdk_json_val *) cdb);
+	free((struct spdk_json_val *) params_cdb);
 
 	return rc;
 }

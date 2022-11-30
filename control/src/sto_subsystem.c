@@ -4,6 +4,7 @@
 #include <spdk/log.h>
 
 #include "sto_subsystem.h"
+#include "sto_core.h"
 #include "sto_lib.h"
 #include "err.h"
 
@@ -36,31 +37,6 @@ sto_subsystem_find(const char *name)
 	return _subsystem_find(&g_sto_subsystems, name);
 }
 
-static int
-sto_subsystem_decode_params(struct sto_req *req, const struct spdk_json_val *params)
-{
-	const struct spdk_json_val *cdb;
-	struct sto_req_ops *ops = req->ops;
-	int rc = 0;
-
-	cdb = sto_json_decode_next_object(params);
-	if (IS_ERR(cdb)) {
-		SPDK_ERRLOG("Failed to decode CDB for req[%p]\n", req);
-		return PTR_ERR(cdb);
-	}
-
-	rc = ops->decode_cdb(req, cdb);
-	if (rc) {
-		SPDK_ERRLOG("Failed to parse CDB for req[%p], rc=%d\n", req, rc);
-		goto out;
-	}
-
-out:
-	free((struct spdk_json_val *) cdb);
-
-	return rc;
-}
-
 static const struct sto_ops *
 sto_subsystem_find_ops(struct sto_subsystem *subsystem, const char *op_name)
 {
@@ -81,9 +57,33 @@ sto_subsystem_find_ops(struct sto_subsystem *subsystem, const char *op_name)
 	return NULL;
 }
 
+static struct sto_subsystem *
+sto_subsystem_parse(const struct spdk_json_val *params)
+{
+	struct sto_subsystem *subsystem;
+	char *subsystem_name = NULL;
+	int rc = 0;
+
+	rc = sto_json_decode_object_str(params, "subsystem", &subsystem_name);
+	if (rc) {
+		SPDK_ERRLOG("Failed to decode subsystem for rc=%d\n", rc);
+		return ERR_PTR(rc);
+	}
+
+	subsystem = sto_subsystem_find(subsystem_name);
+
+	free(subsystem_name);
+
+	if (spdk_unlikely(!subsystem)) {
+		SPDK_ERRLOG("Failed to find subsystem\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	return subsystem;
+}
+
 static const struct sto_ops *
-sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
-			 const struct spdk_json_val *params)
+sto_subsystem_parse_ops(struct sto_subsystem *subsystem, const struct spdk_json_val *params)
 {
 	char *op_name = NULL;
 	const struct sto_ops *op;
@@ -107,33 +107,41 @@ sto_subsystem_get_cdbops(struct sto_subsystem *subsystem,
 	return op;
 }
 
-struct sto_context *
-sto_subsystem_parse(struct sto_subsystem *subsystem, const struct spdk_json_val *params)
+static const struct sto_ops *
+sto_subsystem_decode_ops(const struct spdk_json_val *params,
+			 const struct spdk_json_val **params_cdb)
 {
+	struct sto_subsystem *subsystem;
+	const struct spdk_json_val *op_cdb;
 	const struct sto_ops *op;
-	struct sto_req *req = NULL;
-	int rc;
 
-	op = sto_subsystem_get_cdbops(subsystem, params);
-	if (IS_ERR(op)) {
-		SPDK_ERRLOG("Failed to decode params\n");
-		return NULL;
+	if (*params_cdb) {
+		SPDK_ERRLOG("Params CDB is already set\n");
+		return ERR_PTR(-EINVAL);
 	}
 
-	req = op->req_constructor(op);
-	if (spdk_unlikely(!req)) {
-		SPDK_ERRLOG("Failed to construct req\n");
-		return NULL;
+	subsystem = sto_subsystem_parse(params);
+	if (IS_ERR(subsystem)) {
+		SPDK_ERRLOG("Failed to parse subsystem\n");
+		return ERR_CAST(subsystem);
 	}
 
-	rc = sto_subsystem_decode_params(req, params);
-	if (rc) {
-		struct sto_req_ops *ops = req->ops;
-		SPDK_ERRLOG("Failed to decode params, rc=%d\n", rc);
-
-		ops->free(req);
-		return NULL;
+	op_cdb = sto_json_decode_next_object(params);
+	if (IS_ERR_OR_NULL(op_cdb)) {
+		SPDK_ERRLOG("Failed to decode next JSON object\n");
+		return op_cdb ? ERR_CAST(op_cdb) : ERR_PTR(-EINVAL);
 	}
 
-	return &req->ctx;
+	op = sto_subsystem_parse_ops(subsystem, op_cdb);
+
+	*params_cdb = sto_json_decode_next_object_and_free(op_cdb);
+	if (IS_ERR(*params_cdb)) {
+		SPDK_ERRLOG("Failed to decode next JSON object\n");
+		return ERR_CAST(*params_cdb);
+	}
+
+	return op;
 }
+
+static struct sto_core_component g_subsystem_component = STO_CORE_COMPONENT_INITIALIZER("subsystem", sto_subsystem_decode_ops);
+STO_CORE_COMPONENT_REGISTER(g_subsystem_component)

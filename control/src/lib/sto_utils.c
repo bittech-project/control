@@ -7,6 +7,24 @@
 #include "err.h"
 
 int
+sto_json_decode_object_name(const struct spdk_json_val *values, char **value)
+{
+	const struct spdk_json_val *name_json;
+
+	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
+		SPDK_ERRLOG("Invalid JSON %p\n", values);
+		return -EINVAL;
+	}
+
+	name_json = &values[1];
+	if (spdk_json_decode_string(name_json, value)) {
+		SPDK_ERRLOG("Failed to decode JSON object name\n");
+		return -EDOM;
+	}
+
+	return 0;
+}
+int
 sto_json_decode_object_str(const struct spdk_json_val *values,
 			   const char *name, char **value)
 {
@@ -49,7 +67,7 @@ sto_json_decode_value_len(const struct spdk_json_val *values)
 }
 
 const struct spdk_json_val *
-sto_json_decode_next_object(const struct spdk_json_val *values)
+sto_json_decode_object(const struct spdk_json_val *values)
 {
 	struct spdk_json_val *obj;
 	uint32_t obj_len, size;

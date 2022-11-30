@@ -31,6 +31,29 @@ struct sto_core_req {
 	TAILQ_ENTRY(sto_core_req) list;
 };
 
+typedef const struct sto_ops *(*sto_core_component_decode_ops_t)(const struct spdk_json_val *params,
+								 const struct spdk_json_val **params_cdb);
+
+struct sto_core_component {
+	const char *name;
+
+	sto_core_component_decode_ops_t decode_ops;
+
+	TAILQ_ENTRY(sto_core_component) list;
+};
+
+#define STO_CORE_COMPONENT_INITIALIZER(name, decode_ops) {name, decode_ops}
+
+void sto_core_add_component(struct sto_core_component *component);
+
+#define STO_CORE_COMPONENT_REGISTER(_name)				\
+static void __attribute__((constructor)) _name ## _register(void)	\
+{									\
+	sto_core_add_component(&_name);					\
+}
+
+struct sto_core_component *sto_core_component_find(const char *name);
+
 int sto_core_init(void);
 void sto_core_fini(void);
 
