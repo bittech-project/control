@@ -60,30 +60,21 @@ sto_subprocess_free_req(struct sto_subprocess_req *req)
 }
 
 static void
-sto_srv_subprocess_rpc_response(struct sto_srv_subprocess_req *req, struct spdk_jsonrpc_request *request)
+sto_srv_subprocess_rpc_done(void *priv, char *output, int rc)
 {
+	struct sto_subprocess_req *req = priv;
 	struct spdk_json_write_ctx *w;
 
-	w = spdk_jsonrpc_begin_result(request);
+	w = spdk_jsonrpc_begin_result(req->request);
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_int32(w, "returncode", req->returncode);
-	spdk_json_write_named_string(w, "output", req->output);
+	spdk_json_write_named_int32(w, "returncode", rc);
+	spdk_json_write_named_string(w, "output", output);
 
 	spdk_json_write_object_end(w);
 
-	spdk_jsonrpc_end_result(request, w);
-}
-
-static void
-sto_srv_subprocess_rpc_done(struct sto_srv_subprocess_req *srv_req)
-{
-	struct sto_subprocess_req *req = srv_req->priv;
-
-	sto_srv_subprocess_rpc_response(srv_req, req->request);
-
-	sto_srv_subprocess_req_free(srv_req);
+	spdk_jsonrpc_end_result(req->request, w);
 
 	sto_subprocess_free_req(req);
 }
@@ -94,6 +85,7 @@ sto_srv_subprocess_rpc(struct spdk_jsonrpc_request *request,
 {
 	struct sto_subprocess_req *req;
 	struct sto_subprocess_params *subp_params;
+	struct sto_srv_subprocess_args args;
 	int rc;
 
 	req = calloc(1, sizeof(*req));
@@ -114,8 +106,11 @@ sto_srv_subprocess_rpc(struct spdk_jsonrpc_request *request,
 
 	req->request = request;
 
-	rc = sto_srv_subprocess(subp_params->arg_list.args, subp_params->arg_list.numargs,
-				subp_params->capture_output, sto_srv_subprocess_rpc_done, req);
+	args.priv = req;
+	args.done = sto_srv_subprocess_rpc_done;
+
+	rc = sto_srv_subprocess(subp_params->arg_list.args, subp_params->arg_list.numargs, subp_params->capture_output,
+				&args);
 	if (spdk_unlikely(rc)) {
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
 		goto free_params;

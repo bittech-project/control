@@ -14,6 +14,24 @@ static struct sto_exec_ops srv_subprocess_ops = {
 	.exec_done = sto_srv_subprocess_exec_done,
 };
 
+struct sto_srv_subprocess_req {
+	struct sto_exec_ctx exec_ctx;
+
+	bool capture_output;
+
+	char output[256];
+	size_t output_sz;
+
+	int pipefd[2];
+
+	void *priv;
+	sto_srv_subprocess_done_t done;
+
+	int numargs;
+	const char *file;
+	const char *args[];
+};
+
 static int
 __redirect_to_null(void)
 {
@@ -114,7 +132,7 @@ sto_srv_subprocess_exec(void *arg)
 {
 	struct sto_srv_subprocess_req *req = arg;
 	pid_t pid;
-	int rc, result = 0;
+	int rc = 0, result = 0;
 
 	if (req->capture_output) {
 		int rc = pipe(req->pipefd);
@@ -157,12 +175,13 @@ sto_srv_subprocess_exec(void *arg)
 	if (spdk_unlikely(rc)) {
 		printf("Failed to wait for child process pid=%d, rc=%d\n",
 		       pid, rc);
+		return rc;
 	}
 
-	req->returncode = result;
-
-	return rc;
+	return result;
 }
+
+static void sto_srv_subprocess_req_free(struct sto_srv_subprocess_req *req);
 
 static void
 sto_srv_subprocess_exec_done(void *arg, int rc)
@@ -175,10 +194,12 @@ sto_srv_subprocess_exec_done(void *arg, int rc)
 		read(req->pipefd[STDIN_FILENO], req->output, sizeof(req->output) - 1);
 	}
 
-	req->done(req);
+	req->done(req->priv, req->output, rc);
+
+	sto_srv_subprocess_req_free(req);
 }
 
-struct sto_srv_subprocess_req *
+static struct sto_srv_subprocess_req *
 sto_srv_subprocess_req_alloc(const char *const argv[], int numargs, bool capture_output)
 {
 	struct sto_srv_subprocess_req *req;
@@ -216,7 +237,7 @@ sto_srv_subprocess_req_alloc(const char *const argv[], int numargs, bool capture
 	return req;
 }
 
-void
+static void
 sto_srv_subprocess_req_init_cb(struct sto_srv_subprocess_req *req,
 			       sto_srv_subprocess_done_t done, void *priv)
 {
@@ -224,13 +245,13 @@ sto_srv_subprocess_req_init_cb(struct sto_srv_subprocess_req *req,
 	req->priv = priv;
 }
 
-void
+static void
 sto_srv_subprocess_req_free(struct sto_srv_subprocess_req *req)
 {
 	free(req);
 }
 
-int
+static int
 sto_srv_subprocess_req_submit(struct sto_srv_subprocess_req *req)
 {
 	return sto_exec(&req->exec_ctx);
@@ -238,7 +259,7 @@ sto_srv_subprocess_req_submit(struct sto_srv_subprocess_req *req)
 
 int
 sto_srv_subprocess(const char *const argv[], int numargs, bool capture_output,
-		   sto_srv_subprocess_done_t done, void *priv)
+		   struct sto_srv_subprocess_args *args)
 {
 	struct sto_srv_subprocess_req *req;
 	int rc;
@@ -249,7 +270,7 @@ sto_srv_subprocess(const char *const argv[], int numargs, bool capture_output,
 		return -ENOMEM;
 	}
 
-	sto_srv_subprocess_req_init_cb(req, done, priv);
+	sto_srv_subprocess_req_init_cb(req, args->done, args->priv);
 
 	rc = sto_srv_subprocess_req_submit(req);
 	if (spdk_unlikely(rc)) {
