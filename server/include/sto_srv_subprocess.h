@@ -31,11 +31,13 @@ struct sto_srv_subprocess_req {
 	(sto_srv_subprocess_req_alloc((ARGV), SPDK_COUNTOF((ARGV)), false))
 
 struct sto_srv_subprocess_req *sto_srv_subprocess_req_alloc(const char *const argv[],
-		int numargs, bool capture_output);
-void sto_srv_subprocess_req_free(struct sto_srv_subprocess_req *req);
+							    int numargs, bool capture_output);
 void sto_srv_subprocess_req_init_cb(struct sto_srv_subprocess_req *req,
 				    sto_srv_subprocess_done_t done, void *priv);
-
+void sto_srv_subprocess_req_free(struct sto_srv_subprocess_req *req);
 int sto_srv_subprocess_req_submit(struct sto_srv_subprocess_req *req);
+
+int sto_srv_subprocess(const char *const argv[], int numargs, bool capture_output,
+		       sto_srv_subprocess_done_t done, void *priv);
 
 #endif /* _STO_SRV_SUBPROCESS_H_ */

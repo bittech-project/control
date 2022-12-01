@@ -94,7 +94,6 @@ sto_srv_subprocess_rpc(struct spdk_jsonrpc_request *request,
 {
 	struct sto_subprocess_req *req;
 	struct sto_subprocess_params *subp_params;
-	struct sto_srv_subprocess_req *srv_req;
 	int rc;
 
 	req = calloc(1, sizeof(*req));
@@ -115,25 +114,14 @@ sto_srv_subprocess_rpc(struct spdk_jsonrpc_request *request,
 
 	req->request = request;
 
-	srv_req = sto_srv_subprocess_req_alloc(subp_params->arg_list.args, subp_params->arg_list.numargs,
-					 subp_params->capture_output);
-	if (spdk_unlikely(!srv_req)) {
-		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
+	rc = sto_srv_subprocess(subp_params->arg_list.args, subp_params->arg_list.numargs,
+				subp_params->capture_output, sto_srv_subprocess_rpc_done, req);
+	if (spdk_unlikely(rc)) {
+		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
 		goto free_params;
 	}
 
-	sto_srv_subprocess_req_init_cb(srv_req, sto_srv_subprocess_rpc_done, req);
-
-	rc = sto_srv_subprocess_req_submit(srv_req);
-	if (spdk_unlikely(rc)) {
-		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
-		goto free_srv_req;
-	}
-
 	return;
-
-free_srv_req:
-	sto_srv_subprocess_req_free(srv_req);
 
 free_params:
 	sto_subprocess_free_params(&req->params);

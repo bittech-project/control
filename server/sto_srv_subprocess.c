@@ -235,3 +235,32 @@ sto_srv_subprocess_req_submit(struct sto_srv_subprocess_req *req)
 {
 	return sto_exec(&req->exec_ctx);
 }
+
+int
+sto_srv_subprocess(const char *const argv[], int numargs, bool capture_output,
+		   sto_srv_subprocess_done_t done, void *priv)
+{
+	struct sto_srv_subprocess_req *req;
+	int rc;
+
+	req = sto_srv_subprocess_req_alloc(argv, numargs, capture_output);
+	if (spdk_unlikely(!req)) {
+		printf("server: Failed to alloc memory for subprocess req\n");
+		return -ENOMEM;
+	}
+
+	sto_srv_subprocess_req_init_cb(req, done, priv);
+
+	rc = sto_srv_subprocess_req_submit(req);
+	if (spdk_unlikely(rc)) {
+		printf("server: Failed to submit subprocess, rc=%d\n", rc);
+		goto free_req;
+	}
+
+	return 0;
+
+free_req:
+	sto_srv_subprocess_req_free(req);
+
+	return rc;
+}
