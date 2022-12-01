@@ -5,13 +5,13 @@
 #include "sto_srv_subprocess.h"
 #include "sto_exec.h"
 
-static int sto_subprocess_back_exec(void *arg);
-static void sto_subprocess_back_exec_done(void *arg, int rc);
+static int sto_srv_subprocess_exec(void *arg);
+static void sto_srv_subprocess_exec_done(void *arg, int rc);
 
-static struct sto_exec_ops subprocess_back_ops = {
+static struct sto_exec_ops srv_subprocess_ops = {
 	.name = "subprocess",
-	.exec = sto_subprocess_back_exec,
-	.exec_done = sto_subprocess_back_exec_done,
+	.exec = sto_srv_subprocess_exec,
+	.exec_done = sto_srv_subprocess_exec_done,
 };
 
 static int
@@ -83,7 +83,7 @@ __setup_child_pipe(int pipefd[2])
 }
 
 static int
-sto_subprocess_back_wait(pid_t pid, int *result)
+sto_srv_subprocess_wait(pid_t pid, int *result)
 {
 	int ret, status;
 
@@ -110,14 +110,14 @@ sto_subprocess_back_wait(pid_t pid, int *result)
 }
 
 static int
-sto_subprocess_back_exec(void *arg)
+sto_srv_subprocess_exec(void *arg)
 {
-	struct sto_subprocess_back *subp = arg;
+	struct sto_srv_subprocess_req *req = arg;
 	pid_t pid;
 	int rc, result = 0;
 
-	if (subp->capture_output) {
-		int rc = pipe(subp->pipefd);
+	if (req->capture_output) {
+		int rc = pipe(req->pipefd);
 		if (spdk_unlikely(rc == -1)) {
 			printf("Failed to create subprocess pipe: %s\n",
 			       strerror(errno));
@@ -133,8 +133,8 @@ sto_subprocess_back_exec(void *arg)
 
 	/* Child */
 	if (!pid) {
-		if (subp->capture_output) {
-			rc = __setup_child_pipe(subp->pipefd);
+		if (req->capture_output) {
+			rc = __setup_child_pipe(req->pipefd);
 		} else {
 			__redirect_to_null();
 		}
@@ -144,7 +144,7 @@ sto_subprocess_back_exec(void *arg)
 		 * but POSIX guarantees that it will not modify the strings,
 		 * so the cast is safe
 		 */
-		rc = execvp(subp->file, (char *const *) subp->args);
+		rc = execvp(req->file, (char *const *) req->args);
 		if (rc == -1) {
 			printf("Failed to execvp: %s", strerror(errno));
 		}
@@ -153,35 +153,35 @@ sto_subprocess_back_exec(void *arg)
 	}
 
 	/* Parent */
-	rc = sto_subprocess_back_wait(pid, &result);
+	rc = sto_srv_subprocess_wait(pid, &result);
 	if (spdk_unlikely(rc)) {
 		printf("Failed to wait for child process pid=%d, rc=%d\n",
 		       pid, rc);
 	}
 
-	subp->returncode = result;
+	req->returncode = result;
 
 	return rc;
 }
 
 static void
-sto_subprocess_back_exec_done(void *arg, int rc)
+sto_srv_subprocess_exec_done(void *arg, int rc)
 {
-	struct sto_subprocess_back *subp = arg;
+	struct sto_srv_subprocess_req *req = arg;
 
-	if (subp->capture_output) {
-		memset(subp->output, 0, sizeof(subp->output));
+	if (req->capture_output) {
+		memset(req->output, 0, sizeof(req->output));
 
-		read(subp->pipefd[STDIN_FILENO], subp->output, sizeof(subp->output) - 1);
+		read(req->pipefd[STDIN_FILENO], req->output, sizeof(req->output) - 1);
 	}
 
-	subp->subprocess_back_done(subp);
+	req->done(req);
 }
 
-struct sto_subprocess_back *
-sto_subprocess_back_alloc(const char *const argv[], int numargs, bool capture_output)
+struct sto_srv_subprocess_req *
+sto_srv_subprocess_req_alloc(const char *const argv[], int numargs, bool capture_output)
 {
-	struct sto_subprocess_back *subp;
+	struct sto_srv_subprocess_req *req;
 	unsigned int data_len;
 	int real_numargs = numargs + 1; /* Plus one for the NULL terminator at the end */
 	int i;
@@ -194,44 +194,44 @@ sto_subprocess_back_alloc(const char *const argv[], int numargs, bool capture_ou
 	/* Count the number of bytes for the 'real_numargs' arguments to be allocated */
 	data_len = real_numargs * sizeof(char *);
 
-	subp = calloc(1, sizeof(*subp) + data_len);
-	if (spdk_unlikely(!subp)) {
+	req = calloc(1, sizeof(*req) + data_len);
+	if (spdk_unlikely(!req)) {
 		printf("Cann't allocate memory for subprocess\n");
 		return NULL;
 	}
 
-	sto_exec_init_ctx(&subp->exec_ctx, &subprocess_back_ops, subp);
+	sto_exec_init_ctx(&req->exec_ctx, &srv_subprocess_ops, req);
 
-	subp->capture_output = capture_output;
-	subp->numargs = real_numargs;
+	req->capture_output = capture_output;
+	req->numargs = real_numargs;
 
-	subp->file = argv[0];
+	req->file = argv[0];
 
-	for (i = 0; i < subp->numargs - 1; i++) {
-		subp->args[i] = argv[i];
+	for (i = 0; i < req->numargs - 1; i++) {
+		req->args[i] = argv[i];
 	}
 
-	subp->args[subp->numargs - 1] = NULL;
+	req->args[req->numargs - 1] = NULL;
 
-	return subp;
+	return req;
 }
 
 void
-sto_subprocess_back_init_cb(struct sto_subprocess_back *subp,
-			    subprocess_back_done_t subprocess_back_done, void *priv)
+sto_srv_subprocess_req_init_cb(struct sto_srv_subprocess_req *req,
+			       sto_srv_subprocess_done_t done, void *priv)
 {
-	subp->subprocess_back_done = subprocess_back_done;
-	subp->priv = priv;
+	req->done = done;
+	req->priv = priv;
 }
 
 void
-sto_subprocess_back_free(struct sto_subprocess_back *subp)
+sto_srv_subprocess_req_free(struct sto_srv_subprocess_req *req)
 {
-	free(subp);
+	free(req);
 }
 
 int
-sto_subprocess_back_run(struct sto_subprocess_back *subp)
+sto_srv_subprocess_req_submit(struct sto_srv_subprocess_req *req)
 {
-	return sto_exec(&subp->exec_ctx);
+	return sto_exec(&req->exec_ctx);
 }

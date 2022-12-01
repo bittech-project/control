@@ -60,7 +60,7 @@ sto_subprocess_free_req(struct sto_subprocess_req *req)
 }
 
 static void
-sto_subprocess_response(struct sto_subprocess_back *subp, struct spdk_jsonrpc_request *request)
+sto_srv_subprocess_rpc_response(struct sto_srv_subprocess_req *req, struct spdk_jsonrpc_request *request)
 {
 	struct spdk_json_write_ctx *w;
 
@@ -68,8 +68,8 @@ sto_subprocess_response(struct sto_subprocess_back *subp, struct spdk_jsonrpc_re
 
 	spdk_json_write_object_begin(w);
 
-	spdk_json_write_named_int32(w, "returncode", subp->returncode);
-	spdk_json_write_named_string(w, "output", subp->output);
+	spdk_json_write_named_int32(w, "returncode", req->returncode);
+	spdk_json_write_named_string(w, "output", req->output);
 
 	spdk_json_write_object_end(w);
 
@@ -77,24 +77,24 @@ sto_subprocess_response(struct sto_subprocess_back *subp, struct spdk_jsonrpc_re
 }
 
 static void
-sto_rpc_subprocess_done(struct sto_subprocess_back *subp)
+sto_srv_subprocess_rpc_done(struct sto_srv_subprocess_req *srv_req)
 {
-	struct sto_subprocess_req *req = subp->priv;
+	struct sto_subprocess_req *req = srv_req->priv;
 
-	sto_subprocess_response(subp, req->request);
+	sto_srv_subprocess_rpc_response(srv_req, req->request);
 
-	sto_subprocess_back_free(subp);
+	sto_srv_subprocess_req_free(srv_req);
 
 	sto_subprocess_free_req(req);
 }
 
 static void
-sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
-		   const struct spdk_json_val *params)
+sto_srv_subprocess_rpc(struct spdk_jsonrpc_request *request,
+		       const struct spdk_json_val *params)
 {
 	struct sto_subprocess_req *req;
 	struct sto_subprocess_params *subp_params;
-	struct sto_subprocess_back *subp;
+	struct sto_srv_subprocess_req *srv_req;
 	int rc;
 
 	req = calloc(1, sizeof(*req));
@@ -115,25 +115,25 @@ sto_rpc_subprocess(struct spdk_jsonrpc_request *request,
 
 	req->request = request;
 
-	subp = sto_subprocess_back_alloc(subp_params->arg_list.args, subp_params->arg_list.numargs,
+	srv_req = sto_srv_subprocess_req_alloc(subp_params->arg_list.args, subp_params->arg_list.numargs,
 					 subp_params->capture_output);
-	if (spdk_unlikely(!subp)) {
+	if (spdk_unlikely(!srv_req)) {
 		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
 		goto free_params;
 	}
 
-	sto_subprocess_back_init_cb(subp, sto_rpc_subprocess_done, req);
+	sto_srv_subprocess_req_init_cb(srv_req, sto_srv_subprocess_rpc_done, req);
 
-	rc = sto_subprocess_back_run(subp);
+	rc = sto_srv_subprocess_req_submit(srv_req);
 	if (spdk_unlikely(rc)) {
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
-		goto free_subp;
+		goto free_srv_req;
 	}
 
 	return;
 
-free_subp:
-	sto_subprocess_back_free(subp);
+free_srv_req:
+	sto_srv_subprocess_req_free(srv_req);
 
 free_params:
 	sto_subprocess_free_params(&req->params);
@@ -143,4 +143,4 @@ free_req:
 
 	return;
 }
-STO_RPC_REGISTER("subprocess", sto_rpc_subprocess)
+STO_RPC_REGISTER("subprocess", sto_srv_subprocess_rpc)

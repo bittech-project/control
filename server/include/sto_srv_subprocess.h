@@ -5,10 +5,10 @@
 
 #include "sto_exec.h"
 
-struct sto_subprocess_back;
-typedef void (*subprocess_back_done_t)(struct sto_subprocess_back *subp);
+struct sto_srv_subprocess_req;
+typedef void (*sto_srv_subprocess_done_t)(struct sto_srv_subprocess_req *req);
 
-struct sto_subprocess_back {
+struct sto_srv_subprocess_req {
 	struct sto_exec_ctx exec_ctx;
 
 	bool capture_output;
@@ -20,7 +20,7 @@ struct sto_subprocess_back {
 	int pipefd[2];
 
 	void *priv;
-	subprocess_back_done_t subprocess_back_done;
+	sto_srv_subprocess_done_t done;
 
 	int numargs;
 	const char *file;
@@ -28,14 +28,14 @@ struct sto_subprocess_back {
 };
 
 #define STO_SUBPROCESS_BACK(ARGV)	\
-	(sto_subprocess_back_alloc((ARGV), SPDK_COUNTOF((ARGV)), false))
+	(sto_srv_subprocess_req_alloc((ARGV), SPDK_COUNTOF((ARGV)), false))
 
-struct sto_subprocess_back *sto_subprocess_back_alloc(const char *const argv[],
+struct sto_srv_subprocess_req *sto_srv_subprocess_req_alloc(const char *const argv[],
 		int numargs, bool capture_output);
-void sto_subprocess_back_free(struct sto_subprocess_back *subp);
-void sto_subprocess_back_init_cb(struct sto_subprocess_back *subp,
-				 subprocess_back_done_t subprocess_back_done, void *priv);
+void sto_srv_subprocess_req_free(struct sto_srv_subprocess_req *req);
+void sto_srv_subprocess_req_init_cb(struct sto_srv_subprocess_req *req,
+				    sto_srv_subprocess_done_t done, void *priv);
 
-int sto_subprocess_back_run(struct sto_subprocess_back *subp);
+int sto_srv_subprocess_req_submit(struct sto_srv_subprocess_req *req);
 
 #endif /* _STO_SRV_SUBPROCESS_H_ */
