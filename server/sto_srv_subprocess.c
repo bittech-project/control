@@ -1,9 +1,11 @@
-#include <spdk/stdinc.h>
-
+#include <spdk/json.h>
 #include <spdk/likely.h>
+#include <spdk/stdinc.h>
+#include <spdk/util.h>
+#include <spdk/string.h>
 
-#include "sto_srv_subprocess.h"
 #include "sto_exec.h"
+#include "sto_srv_subprocess.h"
 
 static int sto_srv_subprocess_exec(void *arg);
 static void sto_srv_subprocess_exec_done(void *arg, int rc);
@@ -14,22 +16,60 @@ static struct sto_exec_ops srv_subprocess_ops = {
 	.exec_done = sto_srv_subprocess_exec_done,
 };
 
+#define STO_SUBPROCESS_MAX_ARGS 256
+
+struct sto_srv_subprocess_arg_list {
+	const char *args[STO_SUBPROCESS_MAX_ARGS + 1];
+	size_t numargs;
+};
+
+static int
+sto_srv_subprocess_cmd_decode(const struct spdk_json_val *val, void *out)
+{
+	struct sto_srv_subprocess_arg_list *arg_list = out;
+
+	return spdk_json_decode_array(val, spdk_json_decode_string, arg_list->args, STO_SUBPROCESS_MAX_ARGS,
+				      &arg_list->numargs, sizeof(char *));
+}
+
+static void
+sto_srv_subprocess_cmd_free(struct sto_srv_subprocess_arg_list *arg_list)
+{
+	ssize_t i;
+
+	for (i = 0; i < arg_list->numargs; i++) {
+		free((char *) arg_list->args[i]);
+	}
+}
+
+struct sto_srv_subprocess_params {
+	struct sto_srv_subprocess_arg_list arg_list;
+	bool capture_output;
+};
+
+static void
+sto_srv_subprocess_params_free(struct sto_srv_subprocess_params *params)
+{
+	sto_srv_subprocess_cmd_free(&params->arg_list);
+}
+
+static const struct spdk_json_object_decoder sto_srv_subprocess_decoders[] = {
+	{"cmd", offsetof(struct sto_srv_subprocess_params, arg_list), sto_srv_subprocess_cmd_decode},
+	{"capture_output", offsetof(struct sto_srv_subprocess_params, capture_output), spdk_json_decode_bool, true},
+};
+
 struct sto_srv_subprocess_req {
 	struct sto_exec_ctx exec_ctx;
 
-	bool capture_output;
+	int pipefd[2];
 
 	char output[256];
 	size_t output_sz;
 
-	int pipefd[2];
+	struct sto_srv_subprocess_params params;
 
 	void *priv;
 	sto_srv_subprocess_done_t done;
-
-	int numargs;
-	const char *file;
-	const char *args[];
 };
 
 static int
@@ -131,10 +171,11 @@ static int
 sto_srv_subprocess_exec(void *arg)
 {
 	struct sto_srv_subprocess_req *req = arg;
+	struct sto_srv_subprocess_params *params = &req->params;
 	pid_t pid;
 	int rc = 0, result = 0;
 
-	if (req->capture_output) {
+	if (params->capture_output) {
 		int rc = pipe(req->pipefd);
 		if (spdk_unlikely(rc == -1)) {
 			printf("Failed to create subprocess pipe: %s\n",
@@ -151,7 +192,9 @@ sto_srv_subprocess_exec(void *arg)
 
 	/* Child */
 	if (!pid) {
-		if (req->capture_output) {
+		struct sto_srv_subprocess_arg_list *arg_list = &params->arg_list;
+
+		if (params->capture_output) {
 			rc = __setup_child_pipe(req->pipefd);
 		} else {
 			__redirect_to_null();
@@ -162,7 +205,7 @@ sto_srv_subprocess_exec(void *arg)
 		 * but POSIX guarantees that it will not modify the strings,
 		 * so the cast is safe
 		 */
-		rc = execvp(req->file, (char *const *) req->args);
+		rc = execvp(arg_list->args[0], (char *const *) arg_list->args);
 		if (rc == -1) {
 			printf("Failed to execvp: %s", strerror(errno));
 		}
@@ -187,8 +230,9 @@ static void
 sto_srv_subprocess_exec_done(void *arg, int rc)
 {
 	struct sto_srv_subprocess_req *req = arg;
+	struct sto_srv_subprocess_params *params = &req->params;
 
-	if (req->capture_output) {
+	if (params->capture_output) {
 		memset(req->output, 0, sizeof(req->output));
 
 		read(req->pipefd[STDIN_FILENO], req->output, sizeof(req->output) - 1);
@@ -200,41 +244,30 @@ sto_srv_subprocess_exec_done(void *arg, int rc)
 }
 
 static struct sto_srv_subprocess_req *
-sto_srv_subprocess_req_alloc(const char *const argv[], int numargs, bool capture_output)
+sto_srv_subprocess_req_alloc(const struct spdk_json_val *params)
 {
 	struct sto_srv_subprocess_req *req;
-	unsigned int data_len;
-	int real_numargs = numargs + 1; /* Plus one for the NULL terminator at the end */
-	int i;
 
-	if (spdk_unlikely(!numargs)) {
-		printf("Too few arguments\n");
+	req = calloc(1, sizeof(*req));
+	if (spdk_unlikely(!req)) {
+		printf("Cann't allocate memory for subprocess req\n");
 		return NULL;
 	}
 
-	/* Count the number of bytes for the 'real_numargs' arguments to be allocated */
-	data_len = real_numargs * sizeof(char *);
-
-	req = calloc(1, sizeof(*req) + data_len);
-	if (spdk_unlikely(!req)) {
-		printf("Cann't allocate memory for subprocess\n");
-		return NULL;
+	if (spdk_json_decode_object(params, sto_srv_subprocess_decoders,
+				    SPDK_COUNTOF(sto_srv_subprocess_decoders), &req->params)) {
+		printf("server: Cann't decode subprocess req params\n");
+		goto free_req;
 	}
 
 	sto_exec_init_ctx(&req->exec_ctx, &srv_subprocess_ops, req);
 
-	req->capture_output = capture_output;
-	req->numargs = real_numargs;
-
-	req->file = argv[0];
-
-	for (i = 0; i < req->numargs - 1; i++) {
-		req->args[i] = argv[i];
-	}
-
-	req->args[req->numargs - 1] = NULL;
-
 	return req;
+
+free_req:
+	free(req);
+
+	return NULL;
 }
 
 static void
@@ -248,6 +281,8 @@ sto_srv_subprocess_req_init_cb(struct sto_srv_subprocess_req *req,
 static void
 sto_srv_subprocess_req_free(struct sto_srv_subprocess_req *req)
 {
+	sto_srv_subprocess_params_free(&req->params);
+
 	free(req);
 }
 
@@ -258,13 +293,13 @@ sto_srv_subprocess_req_submit(struct sto_srv_subprocess_req *req)
 }
 
 int
-sto_srv_subprocess(const char *const argv[], int numargs, bool capture_output,
+sto_srv_subprocess(const struct spdk_json_val *params,
 		   struct sto_srv_subprocess_args *args)
 {
 	struct sto_srv_subprocess_req *req;
 	int rc;
 
-	req = sto_srv_subprocess_req_alloc(argv, numargs, capture_output);
+	req = sto_srv_subprocess_req_alloc(params);
 	if (spdk_unlikely(!req)) {
 		printf("server: Failed to alloc memory for subprocess req\n");
 		return -ENOMEM;
