@@ -5,7 +5,7 @@
 
 #include <rte_malloc.h>
 
-#include "sto_subprocess_front.h"
+#include "sto_rpc_subprocess.h"
 #include "sto_module.h"
 #include "sto_lib.h"
 

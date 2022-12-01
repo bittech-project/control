@@ -3,7 +3,7 @@
 #include <spdk/util.h>
 
 #include "sto_rpc.h"
-#include "sto_subprocess_back.h"
+#include "sto_srv_subprocess.h"
 
 #define STO_SUBPROCESS_MAX_ARGS 256
 

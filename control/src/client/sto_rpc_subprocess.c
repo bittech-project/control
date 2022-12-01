@@ -5,7 +5,7 @@
 #include <rte_malloc.h>
 
 #include "sto_client.h"
-#include "sto_subprocess_front.h"
+#include "sto_rpc_subprocess.h"
 
 struct sto_subprocess *
 sto_subprocess_alloc(const char *const argv[], int numargs, bool capture_output)

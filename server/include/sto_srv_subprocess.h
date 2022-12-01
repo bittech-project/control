@@ -1,5 +1,5 @@
-#ifndef _STO_SUBPROCESS_BACK_H_
-#define _STO_SUBPROCESS_BACK_H_
+#ifndef _STO_SRV_SUBPROCESS_H_
+#define _STO_SRV_SUBPROCESS_H_
 
 #include <spdk/util.h>
 
@@ -38,4 +38,4 @@ void sto_subprocess_back_init_cb(struct sto_subprocess_back *subp,
 
 int sto_subprocess_back_run(struct sto_subprocess_back *subp);
 
-#endif /* _STO_SUBPROCESS_BACK_H_ */
+#endif /* _STO_SRV_SUBPROCESS_H_ */

@@ -1,5 +1,5 @@
-#ifndef _STO_SUBPROCESS_FRONT_H_
-#define _STO_SUBPROCESS_FRONT_H_
+#ifndef _STO_RPC_SUBPROCESS_H_
+#define _STO_RPC_SUBPROCESS_H_
 
 #include <spdk/util.h>
 
@@ -34,4 +34,4 @@ int sto_subprocess_run(struct sto_subprocess *subp);
 int sto_subprocess_exec(const char *const cmd[], int numargs,
 			subprocess_done_t cmd_done, void *priv);
 
-#endif /* _STO_SUBPROCESS_FRONT_H_ */
+#endif /* _STO_RPC_SUBPROCESS_H_ */

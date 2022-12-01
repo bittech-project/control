@@ -9,7 +9,7 @@ LIB = libsto_$(LIBNAME).so
 CFLAGS = -fPIC -Wall -g -O2 -pthread -I./include $(SPDK_CFLAGS)
 LDFLAGS = -shared -Wl,-soname,$(LIB) -pthread
 
-C_SRCS = sto_server.c sto_exec.c sto_srv_rpc.c sto_subprocess_back.c sto_subprocess_rpc.c \
+C_SRCS = sto_server.c sto_exec.c sto_srv_rpc.c sto_srv_subprocess.c sto_subprocess_rpc.c \
 	 fs/sto_srv_fs.c fs/sto_srv_aio.c fs/sto_srv_readdir.c
 OBJS := ${C_SRCS:.c=.o}
 
