@@ -8,7 +8,6 @@
 
 #include "sto_utils.h"
 
-#include "sto_subsystem.h"
 #include "sto_rpc_readdir.h"
 #include "sto_tree.h"
 
@@ -33,24 +32,26 @@ struct sto_decoder {
 #define STO_DECODER_INITIALIZER_EMPTY(decoders, params_alloc, params_free)	\
 	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free, true, true}
 
+int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
+		      sto_params_parse params_parse, void *priv);
+
 struct sto_err_context {
 	int rc;
 	const char *errno_msg;
 };
 
-int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
-		      sto_params_parse params_parse, void *priv);
+typedef void (*sto_context_done_t)(void *priv);
+
+struct sto_context {
+	void *priv;
+	sto_context_done_t done;
+	struct sto_err_context *err_ctx;
+};
 
 void sto_err(struct sto_err_context *err, int rc);
 
 void sto_status_ok(struct spdk_json_write_ctx *w);
 void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err);
-
-struct sto_context {
-	void *priv;
-	sto_subsys_response_t response;
-	struct sto_err_context *err_ctx;
-};
 
 struct sto_req;
 
@@ -110,7 +111,7 @@ sto_req_response(struct sto_req *req)
 {
 	struct sto_context *ctx = &req->ctx;
 
-	ctx->response(ctx->priv);
+	ctx->done(ctx->priv);
 }
 
 #define STO_REQ_TYPE(rq, type) \

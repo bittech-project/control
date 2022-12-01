@@ -3,11 +3,7 @@
 
 #include <spdk/queue.h>
 
-struct sto_ops;
 struct sto_op_table;
-struct spdk_json_val;
-
-typedef void (*sto_subsys_response_t)(void *priv);
 
 struct sto_subsystem {
 	const char *name;

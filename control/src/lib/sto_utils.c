@@ -67,14 +67,14 @@ sto_json_decode_value_len(const struct spdk_json_val *values)
 }
 
 const struct spdk_json_val *
-sto_json_decode_object(const struct spdk_json_val *values)
+sto_json_next_object(const struct spdk_json_val *values)
 {
 	struct spdk_json_val *obj;
 	uint32_t obj_len, size;
 	int val_len = 0;
 	int i;
 
-	if (!values|| values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
+	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
 		SPDK_ERRLOG("Invalid JSON %p\n", values);
 		return ERR_PTR(-EINVAL);
 	}
@@ -109,6 +109,35 @@ sto_json_decode_object(const struct spdk_json_val *values)
 		obj[i].start = values[i + val_len].start;
 		obj[i].len = values[i + val_len].len;
 		obj[i].type = values[i + val_len].type;
+	}
+
+	return obj;
+}
+
+const struct spdk_json_val *
+sto_json_copy_object(const struct spdk_json_val *values)
+{
+	struct spdk_json_val *obj;
+	uint32_t size;
+	int i;
+
+	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
+		SPDK_ERRLOG("Invalid JSON %p\n", values);
+		return ERR_PTR(-EINVAL);
+	}
+
+	size = values->len + 1;
+
+	obj = calloc(values->len, sizeof(struct spdk_json_val));
+	if (spdk_unlikely(!obj)) {
+		SPDK_ERRLOG("Failed to alloc next JSON object: size=%u\n", size);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	for (i = 0; i <= values->len + 1; i++) {
+		obj[i].start = values[i].start;
+		obj[i].len = values[i].len;
+		obj[i].type = values[i].type;
 	}
 
 	return obj;

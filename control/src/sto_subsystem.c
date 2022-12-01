@@ -1,4 +1,3 @@
-#include <spdk/queue.h>
 #include <spdk/string.h>
 #include <spdk/likely.h>
 #include <spdk/log.h>
@@ -126,7 +125,7 @@ sto_subsystem_decode_ops(const struct spdk_json_val *params,
 		return ERR_CAST(subsystem);
 	}
 
-	op_cdb = sto_json_decode_next_object(params);
+	op_cdb = sto_json_next_object(params);
 	if (IS_ERR_OR_NULL(op_cdb)) {
 		SPDK_ERRLOG("Failed to decode next JSON object\n");
 		return op_cdb ? ERR_CAST(op_cdb) : ERR_PTR(-EINVAL);
@@ -134,7 +133,7 @@ sto_subsystem_decode_ops(const struct spdk_json_val *params,
 
 	op = sto_subsystem_parse_ops(subsystem, op_cdb);
 
-	*params_cdb = sto_json_decode_next_object_and_free(op_cdb);
+	*params_cdb = sto_json_next_object_and_free(op_cdb);
 	if (IS_ERR(*params_cdb)) {
 		SPDK_ERRLOG("Failed to decode next JSON object\n");
 		return ERR_CAST(*params_cdb);
@@ -143,5 +142,6 @@ sto_subsystem_decode_ops(const struct spdk_json_val *params,
 	return op;
 }
 
-static struct sto_core_component g_subsystem_component = STO_CORE_COMPONENT_INITIALIZER("subsystem", sto_subsystem_decode_ops);
+static struct sto_core_component g_subsystem_component =
+	STO_CORE_COMPONENT_INITIALIZER("subsystem", NULL, NULL, sto_subsystem_decode_ops);
 STO_CORE_COMPONENT_REGISTER(g_subsystem_component)

@@ -4,6 +4,7 @@
 #include <spdk/string.h>
 
 #include "sto_lib.h"
+#include "sto_subsystem.h"
 
 struct sys_writefile_params {
 	char *filepath;
