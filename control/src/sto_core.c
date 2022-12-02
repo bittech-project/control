@@ -12,15 +12,54 @@
 #include "sto_subsystem.h"
 #include "err.h"
 
-#define STO_CORE_POLL_PERIOD	1000 /* 1ms */
+#define STO_CORE_REQ_POLL_PERIOD	1000 /* 1ms */
 
-static struct spdk_poller *g_sto_core_poller;
+static struct spdk_poller *g_sto_core_req_poller;
 
-static TAILQ_HEAD(sto_core_req_list, sto_core_req) g_sto_core_req_list
-	= TAILQ_HEAD_INITIALIZER(g_sto_core_req_list);
+static TAILQ_HEAD(sto_component_list, sto_core_component) g_sto_components =
+	TAILQ_HEAD_INITIALIZER(g_sto_components);
 
-static TAILQ_HEAD(sto_component_list, sto_core_component) g_sto_components
-	= TAILQ_HEAD_INITIALIZER(g_sto_components);
+static TAILQ_HEAD(sto_core_req_list, sto_core_req) g_sto_core_req_list =
+	TAILQ_HEAD_INITIALIZER(g_sto_core_req_list);
+
+
+static struct sto_core_component *
+_core_component_find(struct sto_component_list *list, const char *name)
+{
+	struct sto_core_component *component;
+
+	TAILQ_FOREACH(component, list, list) {
+		if (!strcmp(name, component->name)) {
+			return component;
+		}
+	}
+
+	return NULL;
+}
+
+static struct sto_core_component *
+_core_component_next(struct sto_core_component *component, struct sto_component_list *list)
+{
+	return !component ? TAILQ_FIRST(list) : TAILQ_NEXT(component, list);
+}
+
+struct sto_core_component *
+sto_core_component_find(const char *name)
+{
+	return _core_component_find(&g_sto_components, name);
+}
+
+struct sto_core_component *
+sto_core_component_next(struct sto_core_component *component)
+{
+	return _core_component_next(component, &g_sto_components);
+}
+
+void
+sto_core_add_component(struct sto_core_component *component)
+{
+	TAILQ_INSERT_TAIL(&g_sto_components, component, list);
+}
 
 
 static const char *const sto_core_req_state_names[] = {
@@ -41,10 +80,10 @@ sto_core_req_state_name(enum sto_core_req_state state)
 	return sto_core_req_state_names[index];
 }
 
-static void sto_process_req(struct sto_core_req *core_req);
+static void sto_core_process(struct sto_core_req *core_req);
 
 static int
-sto_core_poll(void *ctx)
+sto_core_req_poll(void *ctx)
 {
 	struct sto_core_req_list core_req_list = TAILQ_HEAD_INITIALIZER(core_req_list);
 	struct sto_core_req *core_req, *tmp;
@@ -58,7 +97,7 @@ sto_core_poll(void *ctx)
 	TAILQ_FOREACH_SAFE(core_req, &core_req_list, list, tmp) {
 		TAILQ_REMOVE(&core_req_list, core_req, list);
 
-		sto_process_req(core_req);
+		sto_core_process(core_req);
 	}
 
 	return SPDK_POLLER_BUSY;
@@ -106,51 +145,13 @@ sto_core_req_submit(struct sto_core_req *core_req)
 	sto_core_req_process(core_req);
 }
 
-void
-sto_core_add_component(struct sto_core_component *component)
-{
-	TAILQ_INSERT_TAIL(&g_sto_components, component, list);
-}
-
-static struct sto_core_component *
-_core_component_find(struct sto_component_list *list, const char *name)
-{
-	struct sto_core_component *component;
-
-	TAILQ_FOREACH(component, list, list) {
-		if (!strcmp(name, component->name)) {
-			return component;
-		}
-	}
-
-	return NULL;
-}
-
-static struct sto_core_component *
-_core_component_next(struct sto_core_component *component, struct sto_component_list *list)
-{
-	return !component ? TAILQ_FIRST(list) : TAILQ_NEXT(component, list);
-}
-
-struct sto_core_component *
-sto_core_component_find(const char *name)
-{
-	return _core_component_find(&g_sto_components, name);
-}
-
-struct sto_core_component *
-sto_core_component_next(struct sto_core_component *component)
-{
-	return _core_component_next(component, &g_sto_components);
-}
-
-static void sto_exec_done(void *priv);
+static void sto_core_req_exec_done(void *priv);
 
 static void
 sto_core_req_init_ctx(struct sto_core_req *core_req, struct sto_context *ctx)
 {
 	ctx->priv = core_req;
-	ctx->done = sto_exec_done;
+	ctx->done = sto_core_req_exec_done;
 	ctx->err_ctx = &core_req->err_ctx;
 
 	core_req->ctx = ctx;
@@ -246,7 +247,7 @@ out:
 }
 
 static void
-sto_exec_done(void *priv)
+sto_core_req_exec_done(void *priv)
 {
 	struct sto_core_req *core_req = priv;
 
@@ -254,13 +255,12 @@ sto_exec_done(void *priv)
 	sto_core_req_process(core_req);
 }
 
-static int
+static void
 sto_core_req_exec(struct sto_core_req *core_req)
 {
 	struct sto_req *req = sto_req(core_req->ctx);
-	struct sto_req_ops *ops = req->ops;
 
-	return ops->exec(req);
+	sto_req_exec_start(req);
 }
 
 static void
@@ -302,7 +302,7 @@ sto_core_req_end_response(struct sto_core_req *core_req, struct spdk_json_write_
 }
 
 static void
-sto_process_req(struct sto_core_req *core_req)
+sto_core_process(struct sto_core_req *core_req)
 {
 	int rc = 0;
 
@@ -311,7 +311,7 @@ sto_process_req(struct sto_core_req *core_req)
 		rc = sto_core_req_parse(core_req);
 		break;
 	case STO_CORE_REQ_STATE_EXEC:
-		rc = sto_core_req_exec(core_req);
+		sto_core_req_exec(core_req);
 		break;
 	case STO_CORE_REQ_STATE_RESPONSE:
 		sto_core_req_response(core_req);
@@ -335,28 +335,10 @@ sto_process_req(struct sto_core_req *core_req)
 int
 sto_core_init(void)
 {
-	struct sto_core_component *component;
-	int rc;
-
-	g_sto_core_poller = SPDK_POLLER_REGISTER(sto_core_poll, NULL, STO_CORE_POLL_PERIOD);
-	if (spdk_unlikely(!g_sto_core_poller)) {
-		SPDK_ERRLOG("Cann't register the STO req poller\n");
+	g_sto_core_req_poller = SPDK_POLLER_REGISTER(sto_core_req_poll, NULL, STO_CORE_REQ_POLL_PERIOD);
+	if (spdk_unlikely(!g_sto_core_req_poller)) {
+		SPDK_ERRLOG("Cann't register the STO core req poller\n");
 		return -ENOMEM;
-	}
-
-	STO_CORE_FOREACH_COMPONENT(component) {
-		if (!component->init) {
-			continue;
-		}
-
-		rc = component->init();
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Cann't init %s component, rc=%d\n",
-				    component->name, rc);
-			return rc;
-		}
-
-		component->initialized = true;
 	}
 
 	return 0;
@@ -365,13 +347,5 @@ sto_core_init(void)
 void
 sto_core_fini(void)
 {
-	struct sto_core_component *component;
-
-	spdk_poller_unregister(&g_sto_core_poller);
-
-	STO_CORE_FOREACH_COMPONENT(component) {
-		if (component->fini && component->initialized) {
-			component->fini();
-		}
-	}
+	spdk_poller_unregister(&g_sto_core_req_poller);
 }

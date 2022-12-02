@@ -1,6 +1,7 @@
 #ifndef _STO_LIB_H_
 #define _STO_LIB_H_
 
+#include <spdk/queue.h>
 #include <spdk/util.h>
 #include <spdk/likely.h>
 
@@ -86,11 +87,19 @@ struct sto_op_table {
 };
 #define STO_OP_TABLE_INITIALIZER(ops) {ops, SPDK_COUNTOF(ops)}
 
+int sto_lib_init(void);
+void sto_lib_fini(void);
+
 struct sto_req {
 	struct sto_context ctx;
 
 	struct sto_req_ops *ops;
 	void *params_constructor;
+
+	sto_req_exec_t exec;
+	int returncode;
+
+	TAILQ_ENTRY(sto_req) list;
 };
 
 static inline struct sto_req *
@@ -104,6 +113,20 @@ sto_req_init(struct sto_req *req, const struct sto_ops *op)
 {
 	req->ops = op->req_ops;
 	req->params_constructor = op->params_constructor;
+}
+
+void sto_req_exec_process(struct sto_req *req, sto_req_exec_t exec);
+
+static inline void
+sto_req_exec_start(struct sto_req *req)
+{
+	sto_req_exec_process(req, req->ops->exec);
+}
+
+static inline void
+sto_req_exec_fini(struct sto_req *req)
+{
+	sto_req_exec_process(req, NULL);
 }
 
 static inline void
@@ -150,7 +173,7 @@ sto_dummy_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 static inline int
 sto_dummy_req_exec(struct sto_req *req)
 {
-	sto_req_response(req);
+	sto_req_exec_fini(req);
 
 	return 0;
 }

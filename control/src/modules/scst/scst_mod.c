@@ -7,7 +7,7 @@
 
 #include "sto_rpc_subprocess.h"
 #include "sto_module.h"
-#include "sto_lib.h"
+#include "sto_core.h"
 
 /* modprobe iscsi-scst */
 
@@ -16,18 +16,18 @@
 void
 iscsi_modprobe_done(void *priv, int rc)
 {
-	struct sto_module_req *module_req = priv;
+	struct sto_req *req = priv;
 
-	module_req->returncode = rc;
+	req->returncode = rc;
 
-	sto_module_req_process(module_req);
+	sto_req_exec_fini(req);
 }
 
 int
-iscsi_modprobe(struct sto_module_req *module_req)
+iscsi_modprobe(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
-		.priv = module_req,
+		.priv = req,
 		.done = iscsi_modprobe_done,
 	};
 	const char *const cmd[] = {
@@ -40,26 +40,18 @@ iscsi_modprobe(struct sto_module_req *module_req)
 	return STO_RPC_SUBPROCESS(cmd, &args);
 }
 
-sto_module_transition_t iscsi_init_transitions[] = {
-	iscsi_modprobe,
-	iscsi_modprobe,
-	iscsi_modprobe,
-	iscsi_modprobe,
-	iscsi_modprobe,
-};
-
-sto_module_tt iscsi_init_tt = STO_MODULE_TT_INITIALIZER(iscsi_init_transitions);
-
-static struct sto_module_req_params_constructor iscsi_init_constructor = {
-	.tt = &iscsi_init_tt,
+struct sto_req_ops sto_iscsi_init_req_ops = {
+	.decode_cdb = sto_dummy_req_decode_cdb,
+	.exec = iscsi_modprobe,
+	.end_response = sto_dummy_req_end_response,
+	.free = sto_dummy_req_free,
 };
 
 static const struct sto_ops scst_ops[] = {
 	{
 		.name = "iscsi_init",
-		.req_constructor = sto_module_req_constructor,
-		.req_ops = &sto_module_req_ops,
-		.params_constructor = &iscsi_init_constructor,
+		.req_constructor = sto_dummy_req_constructor,
+		.req_ops = &sto_iscsi_init_req_ops,
 	}
 };
 

@@ -1,6 +1,7 @@
+#include <spdk/thread.h>
+#include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
-#include <spdk/json.h>
 #include <spdk/string.h>
 
 #include <rte_malloc.h>
@@ -8,6 +9,13 @@
 #include "sto_lib.h"
 #include "sto_rpc_aio.h"
 #include "err.h"
+
+#define STO_REQ_POLL_PERIOD	1000 /* 1ms */
+
+static struct spdk_poller *g_sto_req_poller;
+
+static TAILQ_HEAD(sto_req_list, sto_req) g_sto_req_list = TAILQ_HEAD_INITIALIZER(g_sto_req_list);
+
 
 int
 sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
@@ -69,6 +77,65 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_object_end(w);
 }
 
+static void
+sto_req_exec(struct sto_req *req)
+{
+	int rc = 0;
+
+	if (spdk_unlikely(req->returncode)) {
+		rc = req->returncode;
+		goto out_err;
+	}
+
+	if (!req->exec) {
+		goto out_response;
+	}
+
+	rc = req->exec(req);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to exec req[%p]\n", req);
+		goto out_err;
+	}
+
+	return;
+
+out_err:
+	sto_err(req->ctx.err_ctx, rc);
+
+out_response:
+	sto_req_response(req);
+
+	return;
+}
+
+static int
+sto_req_poll(void *ctx)
+{
+	struct sto_req_list req_list = TAILQ_HEAD_INITIALIZER(req_list);
+	struct sto_req *req, *tmp;
+
+	if (TAILQ_EMPTY(&g_sto_req_list)) {
+		return SPDK_POLLER_IDLE;
+	}
+
+	TAILQ_SWAP(&req_list, &g_sto_req_list, sto_req, list);
+
+	TAILQ_FOREACH_SAFE(req, &req_list, list, tmp) {
+		TAILQ_REMOVE(&req_list, req, list);
+
+		sto_req_exec(req);
+	}
+
+	return SPDK_POLLER_BUSY;
+}
+
+void
+sto_req_exec_process(struct sto_req *req, sto_req_exec_t exec)
+{
+	req->exec = exec;
+	TAILQ_INSERT_TAIL(&g_sto_req_list, req, list);
+}
+
 STO_REQ_CONSTRUCTOR_DEFINE(write)
 
 static void
@@ -126,12 +193,8 @@ sto_write_req_done(void *priv, int rc)
 {
 	struct sto_req *req = priv;
 
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("WRITE req failed, rc=%d\n", rc);
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	sto_req_response(req);
+	req->returncode = rc;
+	sto_req_exec_fini(req);
 }
 
 static int
@@ -213,12 +276,8 @@ sto_read_req_done(void *priv, int rc)
 {
 	struct sto_req *req = priv;
 
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("READ req failed, rc=%d\n", rc);
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	sto_req_response(req);
+	req->returncode = rc;
+	sto_req_exec_fini(req);
 }
 
 static int
@@ -306,12 +365,8 @@ sto_readlink_req_done(void *priv, int rc)
 {
 	struct sto_req *req = priv;
 
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("READ req failed, rc=%d\n", rc);
-		sto_err(req->ctx.err_ctx, rc);
-	}
-
-	sto_req_response(req);
+	req->returncode = rc;
+	sto_req_exec_fini(req);
 }
 
 static int
@@ -424,14 +479,8 @@ sto_readdir_req_done(void *priv, int rc)
 {
 	struct sto_req *req = priv;
 
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to list directories\n");
-		sto_err(req->ctx.err_ctx, rc);
-		goto out;
-	}
-
-out:
-	sto_req_response(req);
+	req->returncode = rc;
+	sto_req_exec_fini(req);
 }
 
 static int
@@ -542,14 +591,8 @@ sto_tree_req_done(void *priv)
 
 	rc = info->returncode;
 
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to tree\n");
-		sto_err(req->ctx.err_ctx, rc);
-		goto out;
-	}
-
-out:
-	sto_req_response(req);
+	req->returncode = rc;
+	sto_req_exec_fini(req);
 }
 
 static int
@@ -598,3 +641,21 @@ struct sto_req_ops sto_tree_req_ops = {
 	.end_response = sto_tree_req_end_response,
 	.free = sto_tree_req_free,
 };
+
+int
+sto_lib_init(void)
+{
+	g_sto_req_poller = SPDK_POLLER_REGISTER(sto_req_poll, NULL, STO_REQ_POLL_PERIOD);
+	if (spdk_unlikely(!g_sto_req_poller)) {
+		SPDK_ERRLOG("Cann't register the STO req poller\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+void
+sto_lib_fini(void)
+{
+	spdk_poller_unregister(&g_sto_req_poller);
+}

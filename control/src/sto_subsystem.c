@@ -4,7 +4,6 @@
 
 #include "sto_subsystem.h"
 #include "sto_core.h"
-#include "sto_lib.h"
 #include "err.h"
 
 static TAILQ_HEAD(sto_subsystem_list, sto_subsystem) g_sto_subsystems
@@ -142,6 +141,5 @@ sto_subsystem_decode_ops(const struct spdk_json_val *params,
 	return op;
 }
 
-static struct sto_core_component g_subsystem_component =
-	STO_CORE_COMPONENT_INITIALIZER("subsystem", NULL, NULL, sto_subsystem_decode_ops);
+static struct sto_core_component g_subsystem_component = STO_CORE_COMPONENT_INITIALIZER("subsystem", sto_subsystem_decode_ops);
 STO_CORE_COMPONENT_REGISTER(g_subsystem_component)
