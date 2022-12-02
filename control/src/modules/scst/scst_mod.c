@@ -14,12 +14,9 @@
 /* iscsi-scstd -p 3260 */
 
 void
-iscsi_modprobe_done(struct sto_rpc_subprocess_cmd *cmd)
+iscsi_modprobe_done(void *priv, int rc)
 {
-	struct sto_module_req *module_req = cmd->priv;
-	int rc = cmd->returncode;
-
-	sto_rpc_subprocess_cmd_free(cmd);
+	struct sto_module_req *module_req = priv;
 
 	module_req->returncode = rc;
 
@@ -29,6 +26,10 @@ iscsi_modprobe_done(struct sto_rpc_subprocess_cmd *cmd)
 int
 iscsi_modprobe(struct sto_module_req *module_req)
 {
+	struct sto_rpc_subprocess_args args = {
+		.priv = module_req,
+		.done = iscsi_modprobe_done,
+	};
 	const char *const cmd[] = {
 		"modprobe",
 		"iscsi-scst",
@@ -36,7 +37,7 @@ iscsi_modprobe(struct sto_module_req *module_req)
 
 	SPDK_ERRLOG("GLEB: Modprobe iscsi-scst\n");
 
-	return STO_RPC_SUBPROCESS(cmd, iscsi_modprobe_done, module_req);
+	return STO_RPC_SUBPROCESS(cmd, &args);
 }
 
 sto_module_transition_t iscsi_init_transitions[] = {

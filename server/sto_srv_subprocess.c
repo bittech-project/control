@@ -231,14 +231,17 @@ sto_srv_subprocess_exec_done(void *arg, int rc)
 {
 	struct sto_srv_subprocess_req *req = arg;
 	struct sto_srv_subprocess_params *params = &req->params;
+	char *output = NULL;
 
 	if (params->capture_output) {
 		memset(req->output, 0, sizeof(req->output));
 
 		read(req->pipefd[STDIN_FILENO], req->output, sizeof(req->output) - 1);
+
+		output = req->output;
 	}
 
-	req->done(req->priv, req->output, rc);
+	req->done(req->priv, output, rc);
 
 	sto_srv_subprocess_req_free(req);
 }

@@ -174,7 +174,10 @@ sto_srv_subprocess_rpc_done(void *priv, char *output, int rc)
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_int32(w, "returncode", rc);
-	spdk_json_write_named_string(w, "output", output);
+
+	if (output) {
+		spdk_json_write_named_string(w, "output", output);
+	}
 
 	spdk_json_write_object_end(w);
 

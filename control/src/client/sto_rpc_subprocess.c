@@ -9,52 +9,50 @@
 
 struct sto_rpc_subprocess_info {
 	int returncode;
-	char *output;
+	char **output;
 };
 
-static void
-sto_rpc_subprocess_info_free(struct sto_rpc_subprocess_info *info)
+static int
+sto_rpc_subprocess_output_decode(const struct spdk_json_val *val, void *out)
 {
-	free(info->output);
+	char **output = *(char ***) out;
+
+	return spdk_json_decode_string(val, output);
 }
 
 static const struct spdk_json_object_decoder sto_rpc_subprocess_info_decoders[] = {
 	{"returncode", offsetof(struct sto_rpc_subprocess_info, returncode), spdk_json_decode_int32},
-	{"output", offsetof(struct sto_rpc_subprocess_info, output), spdk_json_decode_string},
+	{"output", offsetof(struct sto_rpc_subprocess_info, output), sto_rpc_subprocess_output_decode, true},
 };
 
-struct sto_rpc_subprocess_cmd *
-sto_rpc_subprocess_cmd_alloc(const char *const argv[], int numargs, bool capture_output)
+struct sto_rpc_subprocess_params {
+	int numargs;
+	const char *const *argv;
+	bool capture_output;
+};
+
+struct sto_rpc_subprocess_cmd {
+	void *priv;
+	sto_rpc_subprocess_done_t done;
+
+	char **output;
+};
+
+static struct sto_rpc_subprocess_cmd *
+sto_rpc_subprocess_cmd_alloc(void)
 {
 	struct sto_rpc_subprocess_cmd *cmd;
-	unsigned int data_len;
-	int i;
 
-	if (spdk_unlikely(!numargs)) {
-		SPDK_ERRLOG("Too few arguments\n");
-		return NULL;
-	}
-
-	/* Count the number of bytes for the 'numargs' arguments to be allocated */
-	data_len = numargs * sizeof(char *);
-
-	cmd = rte_zmalloc(NULL, sizeof(*cmd) + data_len, 0);
+	cmd = rte_zmalloc(NULL, sizeof(*cmd), 0);
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Cann't allocate memory for subprocess\n");
 		return NULL;
 	}
 
-	cmd->numargs = numargs;
-	cmd->capture_output = capture_output;
-
-	for (i = 0; i < cmd->numargs; i++) {
-		cmd->args[i] = argv[i];
-	}
-
 	return cmd;
 }
 
-void
+static void
 sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd,
 			       sto_rpc_subprocess_done_t done, void *priv)
 {
@@ -62,10 +60,9 @@ sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd,
 	cmd->priv = priv;
 }
 
-void
+static void
 sto_rpc_subprocess_cmd_free(struct sto_rpc_subprocess_cmd *cmd)
 {
-	free(cmd->output);
 	rte_free(cmd);
 }
 
@@ -73,84 +70,83 @@ static void
 sto_rpc_subprocess_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp, int rc)
 {
 	struct sto_rpc_subprocess_cmd *cmd = priv;
-	struct sto_rpc_subprocess_info info = {};
+	struct sto_rpc_subprocess_info info = {
+		.output = cmd->output,
+	};
 
 	if (spdk_unlikely(rc)) {
-		cmd->returncode = rc;
 		goto out;
 	}
 
 	if (spdk_json_decode_object(resp->result, sto_rpc_subprocess_info_decoders,
 				    SPDK_COUNTOF(sto_rpc_subprocess_info_decoders), &info)) {
 		SPDK_ERRLOG("Failed to decode response for subprocess\n");
-		cmd->returncode = -ENOMEM;
+		rc = -ENOMEM;
 		goto out;
 	}
 
-	cmd->returncode = info.returncode;
-
-	if (cmd->capture_output) {
-		cmd->output = strdup(info.output);
-		if (spdk_unlikely(!cmd->output)) {
-			SPDK_ERRLOG("Failed copy output for subprocess\n");
-			cmd->returncode = -ENOMEM;
-			goto free_params;
-		}
-	}
-
-free_params:
-	sto_rpc_subprocess_info_free(&info);
+	rc = info.returncode;
 
 out:
-	cmd->done(cmd);
+	cmd->done(cmd->priv, rc);
+	sto_rpc_subprocess_cmd_free(cmd);
 }
 
 static void
 sto_rpc_subprocess_info_json(void *priv, struct spdk_json_write_ctx *w)
 {
-	struct sto_rpc_subprocess_cmd *cmd = priv;
+	struct sto_rpc_subprocess_params *params = priv;
 	int i;
 
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_array_begin(w, "cmd");
-	for (i = 0; i < cmd->numargs; i++) {
-		spdk_json_write_string(w, cmd->args[i]);
+	for (i = 0; i < params->numargs; i++) {
+		spdk_json_write_string(w, params->argv[i]);
 	}
 	spdk_json_write_array_end(w);
 
-	spdk_json_write_named_bool(w, "capture_output", cmd->capture_output);
+	spdk_json_write_named_bool(w, "capture_output", params->capture_output);
 
 	spdk_json_write_object_end(w);
 }
 
-int
-sto_rpc_subprocess_cmd_run(struct sto_rpc_subprocess_cmd *cmd)
+static int
+sto_rpc_subprocess_cmd_run(struct sto_rpc_subprocess_cmd *cmd, struct sto_rpc_subprocess_params *params)
 {
 	struct sto_client_args args = {
 		.priv = cmd,
 		.response_handler = sto_rpc_subprocess_resp_handler,
 	};
 
-	return sto_client_send("subprocess", cmd, sto_rpc_subprocess_info_json, &args);
+	return sto_client_send("subprocess", params, sto_rpc_subprocess_info_json, &args);
 }
 
 int
 sto_rpc_subprocess(const char *const argv[], int numargs,
-		   sto_rpc_subprocess_done_t done, void *priv)
+		   struct sto_rpc_subprocess_args *args)
 {
 	struct sto_rpc_subprocess_cmd *cmd;
+	struct sto_rpc_subprocess_params params = {
+		.numargs = numargs,
+		.argv = argv,
+		.capture_output = args->output != NULL,
+	};
 	int rc = 0;
 
-	cmd = sto_rpc_subprocess_cmd_alloc(argv, numargs, false);
+	assert(numargs);
+
+	cmd = sto_rpc_subprocess_cmd_alloc();
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to create subprocess\n");
 		return -ENOMEM;
 	}
 
-	sto_rpc_subprocess_cmd_init_cb(cmd, done, priv);
+	cmd->output = args->output;
 
-	rc = sto_rpc_subprocess_cmd_run(cmd);
+	sto_rpc_subprocess_cmd_init_cb(cmd, args->done, args->priv);
+
+	rc = sto_rpc_subprocess_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to run subprocess, rc=%d\n", rc);
 		goto free_cmd;
