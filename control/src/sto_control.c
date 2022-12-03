@@ -47,13 +47,6 @@ spdk_control_init(spdk_control_init_cb cb_fn, void *cb_arg)
 		return;
 	}
 
-	rc = sto_lib_init();
-	if (rc < 0) {
-		SPDK_ERRLOG("sto_core_init() failed, rc=%d\n", rc);
-		sto_init_complete(-1);
-		return;
-	}
-
 	sto_init_complete(0);
 }
 
@@ -69,7 +62,6 @@ spdk_control_fini(spdk_control_fini_cb cb_fn, void *cb_arg)
 	g_fini_cb_fn = cb_fn;
 	g_fini_cb_arg = cb_arg;
 
-	sto_lib_fini();
 	sto_core_fini();
 	sto_client_close();
 

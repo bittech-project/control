@@ -335,10 +335,18 @@ sto_core_process(struct sto_core_req *core_req)
 int
 sto_core_init(void)
 {
+	int rc;
+
 	g_sto_core_req_poller = SPDK_POLLER_REGISTER(sto_core_req_poll, NULL, STO_CORE_REQ_POLL_PERIOD);
 	if (spdk_unlikely(!g_sto_core_req_poller)) {
 		SPDK_ERRLOG("Cann't register the STO core req poller\n");
 		return -ENOMEM;
+	}
+
+	rc = sto_lib_init();
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("sto_lib_init() failed, rc=%d\n", rc);
+		return rc;
 	}
 
 	return 0;
@@ -347,5 +355,6 @@ sto_core_init(void)
 void
 sto_core_fini(void)
 {
+	sto_lib_fini();
 	spdk_poller_unregister(&g_sto_core_req_poller);
 }
