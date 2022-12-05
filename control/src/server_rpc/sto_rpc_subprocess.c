@@ -3,6 +3,7 @@
 #include <spdk/string.h>
 
 #include <rte_malloc.h>
+#include <rte_string_fns.h>
 
 #include "sto_client.h"
 #include "sto_rpc_subprocess.h"
@@ -123,7 +124,7 @@ sto_rpc_subprocess_cmd_run(struct sto_rpc_subprocess_cmd *cmd, struct sto_rpc_su
 }
 
 int
-sto_rpc_subprocess(const char *const argv[], int numargs,
+sto_rpc_subprocess(const char *const *argv, int numargs,
 		   struct sto_rpc_subprocess_args *args)
 {
 	struct sto_rpc_subprocess_cmd *cmd;
@@ -156,6 +157,40 @@ sto_rpc_subprocess(const char *const argv[], int numargs,
 
 free_cmd:
 	sto_rpc_subprocess_cmd_free(cmd);
+
+	return rc;
+}
+
+int
+sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ...)
+{
+	va_list fmt_args;
+#define STO_SUBPROCESS_MAX_ARGS 128
+	char *argv_s, *argv[STO_SUBPROCESS_MAX_ARGS] = {};
+	int ret, rc = 0;
+
+	assert(fmt && fmt[0] != '\0');
+
+	va_start(fmt_args, args);
+	argv_s = spdk_vsprintf_alloc(fmt, fmt_args);
+	va_end(fmt_args);
+
+	if (spdk_unlikely(!argv_s)) {
+		SPDK_ERRLOG("Failed to alloc format string for subprocess arguments\n");
+		return -ENOMEM;
+	}
+
+	ret = rte_strsplit(argv_s, strlen(argv_s), argv, SPDK_COUNTOF(argv), ' ');
+	if (spdk_unlikely(ret <= 0)) {
+		SPDK_ERRLOG("Failed to split subprocess arguments string, ret=%d\n", ret);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	rc = sto_rpc_subprocess((const char * const *) argv, ret, args);
+
+out:
+	free(argv_s);
 
 	return rc;
 }

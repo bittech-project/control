@@ -16,7 +16,7 @@ static struct sto_exec_ops srv_subprocess_ops = {
 	.exec_done = sto_srv_subprocess_exec_done,
 };
 
-#define STO_SUBPROCESS_MAX_ARGS 256
+#define STO_SUBPROCESS_MAX_ARGS 128
 
 struct sto_srv_subprocess_arg_list {
 	const char *args[STO_SUBPROCESS_MAX_ARGS + 1];

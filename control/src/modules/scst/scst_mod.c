@@ -30,14 +30,10 @@ iscsi_modprobe(struct sto_req *req)
 		.priv = req,
 		.done = iscsi_modprobe_done,
 	};
-	const char *const cmd[] = {
-		"modprobe",
-		"iscsi-scst",
-	};
 
 	SPDK_ERRLOG("GLEB: Modprobe iscsi-scst\n");
 
-	return STO_RPC_SUBPROCESS(cmd, &args);
+	return sto_rpc_subprocess_fmt("modprobe %s", &args, "iscsi-scst");
 }
 
 struct sto_req_ops sto_iscsi_init_req_ops = {

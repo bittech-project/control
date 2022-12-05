@@ -186,12 +186,11 @@ sto_tree_node_find(struct sto_tree_node *root, const char *path)
 	return NULL;
 }
 
-#define STO_LNK_MAX_TOKENS 16
-
 struct sto_tree_node *
 sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
 {
 	struct sto_tree_node *node = NULL;
+#define STO_LNK_MAX_TOKENS 16
 	char *buf, *tokens[STO_LNK_MAX_TOKENS] = {};
 	int ret, i;
 

@@ -12,9 +12,11 @@ struct sto_rpc_subprocess_args {
 	char **output;
 };
 
-int sto_rpc_subprocess(const char *const cmd[], int numargs,
+int sto_rpc_subprocess(const char *const *argv, int numargs,
 		       struct sto_rpc_subprocess_args *args);
-#define STO_RPC_SUBPROCESS(cmd, args) \
-	sto_rpc_subprocess(cmd, SPDK_COUNTOF(cmd), args)
+#define STO_RPC_SUBPROCESS(argv, args) \
+	sto_rpc_subprocess(argv, SPDK_COUNTOF(argv), args)
+
+int sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ...);
 
 #endif /* _STO_RPC_SUBPROCESS_H_ */
