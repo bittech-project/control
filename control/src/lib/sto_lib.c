@@ -227,7 +227,7 @@ sto_req_rollback(struct sto_req *req)
 	return;
 
 out_response:
-	sto_req_response(req);
+	sto_req_done(req);
 
 	return;
 }
@@ -265,7 +265,7 @@ sto_req_exec_error(struct sto_req *req, int rc)
 		return;
 	}
 
-	sto_req_response(req);
+	sto_req_done(req);
 
 	return;
 }
@@ -304,7 +304,7 @@ sto_req_exec(struct sto_req *req)
 
 	} while (!TAILQ_EMPTY(&req->exe_queue));
 
-	sto_req_response(req);
+	sto_req_done(req);
 
 	return;
 
@@ -430,7 +430,7 @@ sto_write_req_free(struct sto_req *req)
 struct sto_req_ops sto_write_req_ops = {
 	.decode_cdb = sto_write_req_decode_cdb,
 	.exec_constructor = sto_write_req_exec_constructor,
-	.end_response = sto_dummy_req_end_response,
+	.response = sto_dummy_req_response,
 	.free = sto_write_req_free,
 };
 
@@ -504,7 +504,7 @@ sto_read_req_exec_constructor(struct sto_req *req, int state)
 }
 
 static void
-sto_read_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_read_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
 
@@ -526,7 +526,7 @@ sto_read_req_free(struct sto_req *req)
 struct sto_req_ops sto_read_req_ops = {
 	.decode_cdb = sto_read_req_decode_cdb,
 	.exec_constructor = sto_read_req_exec_constructor,
-	.end_response = sto_read_req_end_response,
+	.response = sto_read_req_response,
 	.free = sto_read_req_free,
 };
 
@@ -596,7 +596,7 @@ sto_readlink_req_exec_constructor(struct sto_req *req, int state)
 }
 
 static void
-sto_readlink_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_readlink_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
 
@@ -618,7 +618,7 @@ sto_readlink_req_free(struct sto_req *req)
 struct sto_req_ops sto_readlink_req_ops = {
 	.decode_cdb = sto_readlink_req_decode_cdb,
 	.exec_constructor = sto_readlink_req_exec_constructor,
-	.end_response = sto_readlink_req_end_response,
+	.response = sto_readlink_req_response,
 	.free = sto_readlink_req_free,
 };
 
@@ -713,7 +713,7 @@ sto_readdir_req_exec_constructor(struct sto_req *req, int state)
 }
 
 static void
-sto_readdir_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_readdir_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
 	struct sto_readdir_req_params *params = &readdir_req->params;
@@ -741,7 +741,7 @@ sto_readdir_req_free(struct sto_req *req)
 struct sto_req_ops sto_readdir_req_ops = {
 	.decode_cdb = sto_readdir_req_decode_cdb,
 	.exec_constructor = sto_readdir_req_exec_constructor,
-	.end_response = sto_readdir_req_end_response,
+	.response = sto_readdir_req_response,
 	.free = sto_readdir_req_free,
 };
 
@@ -823,7 +823,7 @@ sto_tree_req_exec_constructor(struct sto_req *req, int state)
 }
 
 static void
-sto_tree_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_tree_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
 	struct sto_tree_info *info = &tree_req->info;
@@ -852,7 +852,7 @@ sto_tree_req_free(struct sto_req *req)
 struct sto_req_ops sto_tree_req_ops = {
 	.decode_cdb = sto_tree_req_decode_cdb,
 	.exec_constructor = sto_tree_req_exec_constructor,
-	.end_response = sto_tree_req_end_response,
+	.response = sto_tree_req_response,
 	.free = sto_tree_req_free,
 };
 

@@ -65,7 +65,7 @@ sto_core_add_component(struct sto_core_component *component)
 static const char *const sto_core_req_state_names[] = {
 	[STO_CORE_REQ_STATE_PARSE]	= "STATE_PARSE",
 	[STO_CORE_REQ_STATE_EXEC]	= "STATE_EXEC",
-	[STO_CORE_REQ_STATE_RESPONSE]	= "STATE_RESPONSE",
+	[STO_CORE_REQ_STATE_DONE]	= "STATE_DONE",
 };
 
 const char *
@@ -103,7 +103,7 @@ sto_core_req_poll(void *ctx)
 	return SPDK_POLLER_BUSY;
 }
 
-struct sto_core_req *
+static struct sto_core_req *
 sto_core_req_alloc(const struct spdk_json_val *params)
 {
 	struct sto_core_req *core_req;
@@ -120,10 +120,10 @@ sto_core_req_alloc(const struct spdk_json_val *params)
 	return core_req;
 }
 
-void
-sto_core_req_init_cb(struct sto_core_req *core_req, sto_core_req_response_t response, void *priv)
+static void
+sto_core_req_init_cb(struct sto_core_req *core_req, sto_core_req_done_t done, void *priv)
 {
-	core_req->response = response;
+	core_req->done = done;
 	core_req->priv = priv;
 }
 
@@ -139,10 +139,28 @@ sto_core_req_process(struct sto_core_req *core_req)
 	TAILQ_INSERT_TAIL(&g_sto_core_req_list, core_req, list);
 }
 
-void
+static void
 sto_core_req_submit(struct sto_core_req *core_req)
 {
 	sto_core_req_process(core_req);
+}
+
+int
+sto_core_process_start(const struct spdk_json_val *params, struct sto_core_args *args)
+{
+	struct sto_core_req *req;
+
+	req = sto_core_req_alloc(params);
+	if (spdk_unlikely(!req)) {
+		SPDK_ERRLOG("Failed to create STO req\n");
+		return -ENOMEM;
+	}
+
+	sto_core_req_init_cb(req, args->done, args->priv);
+
+	sto_core_req_submit(req);
+
+	return 0;
 }
 
 static void sto_core_req_exec_done(void *priv);
@@ -251,7 +269,7 @@ sto_core_req_exec_done(void *priv)
 {
 	struct sto_core_req *core_req = priv;
 
-	sto_core_req_set_state(core_req, STO_CORE_REQ_STATE_RESPONSE);
+	sto_core_req_set_state(core_req, STO_CORE_REQ_STATE_DONE);
 	sto_core_req_process(core_req);
 }
 
@@ -264,13 +282,13 @@ sto_core_req_exec(struct sto_core_req *core_req)
 }
 
 static void
-sto_core_req_response(struct sto_core_req *core_req)
+sto_core_req_done(struct sto_core_req *core_req)
 {
-	core_req->response(core_req);
+	core_req->done(core_req);
 }
 
 void
-sto_core_req_end_response(struct sto_core_req *core_req, struct spdk_json_write_ctx *w)
+sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx *w)
 {
 	struct sto_req *req;
 	struct sto_req_ops *ops;
@@ -295,7 +313,7 @@ sto_core_req_end_response(struct sto_core_req *core_req, struct spdk_json_write_
 	req = STO_REQ(core_req->ctx);
 	ops = req->ops;
 
-	ops->end_response(req, w);
+	ops->response(req, w);
 	ops->free(req);
 
 	return;
@@ -313,8 +331,8 @@ sto_core_process(struct sto_core_req *core_req)
 	case STO_CORE_REQ_STATE_EXEC:
 		sto_core_req_exec(core_req);
 		break;
-	case STO_CORE_REQ_STATE_RESPONSE:
-		sto_core_req_response(core_req);
+	case STO_CORE_REQ_STATE_DONE:
+		sto_core_req_done(core_req);
 		break;
 	default:
 		SPDK_ERRLOG("core req (%p) in state %s, but shouldn't be\n",
@@ -326,7 +344,7 @@ sto_core_process(struct sto_core_req *core_req)
 		SPDK_ERRLOG("core req (%p) in state %s failed, rc=%d\n",
 			    core_req, sto_core_req_state_name(core_req->state), rc);
 		sto_err(&core_req->err_ctx, rc);
-		sto_core_req_response(core_req);
+		sto_core_req_done(core_req);
 	}
 
 	return;

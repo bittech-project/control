@@ -58,13 +58,13 @@ struct sto_req;
 
 typedef int (*sto_req_decode_cdb_t)(struct sto_req *req, const struct spdk_json_val *cdb);
 typedef int (*sto_req_exec_constructor_t)(struct sto_req *req, int state);
-typedef void (*sto_req_end_response_t)(struct sto_req *req, struct spdk_json_write_ctx *w);
+typedef void (*sto_req_response_t)(struct sto_req *req, struct spdk_json_write_ctx *w);
 typedef void (*sto_req_free_t)(struct sto_req *req);
 
 struct sto_req_ops {
 	sto_req_decode_cdb_t decode_cdb;
 	sto_req_exec_constructor_t exec_constructor;
-	sto_req_end_response_t end_response;
+	sto_req_response_t response;
 	sto_req_free_t free;
 };
 
@@ -155,7 +155,7 @@ sto_req_exec_done(void *priv, int rc)
 }
 
 static inline void
-sto_req_response(struct sto_req *req)
+sto_req_done(struct sto_req *req)
 {
 	struct sto_context *ctx = &req->ctx;
 
@@ -204,7 +204,7 @@ sto_dummy_req_exec_constructor(struct sto_req *req, int state)
 }
 
 static inline void
-sto_dummy_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_dummy_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	sto_status_ok(w);
 }

@@ -7,14 +7,14 @@
 #include "sto_core.h"
 
 static void
-sto_core_req_done(struct sto_core_req *req)
+sto_control_rpc_done(struct sto_core_req *req)
 {
 	struct spdk_jsonrpc_request *request = req->priv;
 	struct spdk_json_write_ctx *w;
 
 	w = spdk_jsonrpc_begin_result(request);
 
-	sto_core_req_end_response(req, w);
+	sto_core_req_response(req, w);
 
 	spdk_jsonrpc_end_result(request, w);
 
@@ -22,21 +22,22 @@ sto_core_req_done(struct sto_core_req *req)
 }
 
 static void
-control(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
+sto_control_rpc(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
-	struct sto_core_req *req;
+	struct sto_core_args args = {
+		.priv = request,
+		.done = sto_control_rpc_done,
+	};
+	int rc;
 
-	req = sto_core_req_alloc(params);
-	if (spdk_unlikely(!req)) {
-		SPDK_ERRLOG("Failed to create STO req\n");
-		spdk_jsonrpc_send_error_response(request, -ENOMEM, strerror(ENOMEM));
-		return;
+	rc = sto_core_process_start(params, &args);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to start core process\n");
+		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
+		goto out;
 	}
 
-	sto_core_req_init_cb(req, sto_core_req_done, request);
-
-	sto_core_req_submit(req);
-
+out:
 	return;
 }
-SPDK_RPC_REGISTER("control", control, SPDK_RPC_RUNTIME)
+SPDK_RPC_REGISTER("control", sto_control_rpc, SPDK_RPC_RUNTIME)

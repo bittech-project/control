@@ -10,7 +10,7 @@
 #include "sto_lib.h"
 
 static void
-sto_version_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+sto_version_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	spdk_json_write_string(w, STO_VERSION_STRING);
 }
@@ -18,7 +18,7 @@ sto_version_req_end_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 struct sto_req_ops sto_version_req_ops = {
 	.decode_cdb = sto_dummy_req_decode_cdb,
 	.exec_constructor = sto_dummy_req_exec_constructor,
-	.end_response = sto_version_req_end_response,
+	.response = sto_version_req_response,
 	.free = sto_dummy_req_free,
 };
 

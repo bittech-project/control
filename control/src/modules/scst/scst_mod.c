@@ -79,7 +79,7 @@ iscsi_init_constructor(struct sto_req *req, int state)
 struct sto_req_ops sto_iscsi_init_req_ops = {
 	.decode_cdb = sto_dummy_req_decode_cdb,
 	.exec_constructor = iscsi_init_constructor,
-	.end_response = sto_dummy_req_end_response,
+	.response = sto_dummy_req_response,
 	.free = sto_dummy_req_free,
 };
 
@@ -102,7 +102,7 @@ iscsi_deinit_constructor(struct sto_req *req, int state)
 struct sto_req_ops sto_iscsi_deinit_req_ops = {
 	.decode_cdb = sto_dummy_req_decode_cdb,
 	.exec_constructor = iscsi_deinit_constructor,
-	.end_response = sto_dummy_req_end_response,
+	.response = sto_dummy_req_response,
 	.free = sto_dummy_req_free,
 };
 
