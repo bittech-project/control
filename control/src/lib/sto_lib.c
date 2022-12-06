@@ -146,6 +146,22 @@ sto_req_add_exec(struct sto_req *req, sto_req_exec_t exec_fn, sto_req_exec_t rol
 	return 0;
 }
 
+int
+sto_req_add_exec_entries(struct sto_req *req, const struct sto_exec_entry *entries, size_t size)
+{
+	int i, rc;
+
+	for (i = 0; i < size; i++) {
+		rc = sto_req_add_exec(req, entries[i].exec_fn, entries[i].rollback_fn);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Failed to add %d exec\n", i);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
 static sto_req_exec_t
 sto_exec_list_get_first(struct sto_exec_list *list)
 {

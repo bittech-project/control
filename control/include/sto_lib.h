@@ -92,6 +92,11 @@ void sto_lib_fini(void);
 
 typedef int (*sto_req_exec_t)(struct sto_req *req);
 
+struct sto_exec_entry {
+	sto_req_exec_t exec_fn;
+	sto_req_exec_t rollback_fn;
+};
+
 struct sto_exec_ctx {
 	sto_req_exec_t exec_fn;
 
@@ -137,6 +142,9 @@ sto_req_process_start(struct sto_req *req)
 }
 
 int sto_req_add_exec(struct sto_req *req, sto_req_exec_t exec_fn, sto_req_exec_t rollback_fn);
+int sto_req_add_exec_entries(struct sto_req *req, const struct sto_exec_entry *entries, size_t size);
+#define STO_REQ_ADD_EXEC_ENTRIES(req, entries) \
+	sto_req_add_exec_entries((req), (entries), SPDK_COUNTOF((entries)))
 
 static inline void
 sto_req_exec_done(void *priv, int rc)
