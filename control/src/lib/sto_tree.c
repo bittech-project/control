@@ -14,6 +14,8 @@ struct sto_tree_cmd {
 	struct sto_tree_params params;
 	struct sto_tree_info *info;
 
+	int returncode;
+
 	uint32_t refcnt;
 
 	void *priv;
@@ -79,7 +81,7 @@ sto_tree_put_ref(struct sto_tree_node *node)
 
 	assert(cmd->refcnt > 0);
 	if (--cmd->refcnt == 0) {
-		cmd->done(cmd->priv);
+		cmd->done(cmd->priv, cmd->returncode);
 		sto_tree_cmd_free(cmd);
 	}
 }
@@ -88,10 +90,9 @@ void
 sto_tree_set_error(struct sto_tree_node *node, int rc)
 {
 	struct sto_tree_cmd *cmd = sto_tree_cmd(node);
-	struct sto_tree_info *info = cmd->info;
 
-	if (!info->returncode) {
-		info->returncode = rc;
+	if (!cmd->returncode) {
+		cmd->returncode = rc;
 	}
 }
 
@@ -99,7 +100,7 @@ bool
 sto_tree_check_error(struct sto_tree_node *node)
 {
 	struct sto_tree_cmd *cmd = sto_tree_cmd(node);
-	return cmd->info->returncode;
+	return cmd->returncode;
 }
 
 bool

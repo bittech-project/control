@@ -23,8 +23,6 @@ struct sto_tree_node {
 };
 
 struct sto_tree_info {
-	int returncode;
-
 	struct sto_tree_node tree_root;
 
 	struct {
@@ -32,7 +30,7 @@ struct sto_tree_info {
 	} inner;
 };
 
-typedef void (*sto_tree_done_t)(void *priv);
+typedef void (*sto_tree_done_t)(void *priv, int rc);
 
 struct sto_tree_params {
 	uint32_t depth;

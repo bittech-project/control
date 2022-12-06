@@ -582,14 +582,9 @@ sto_tree_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 }
 
 static void
-sto_tree_req_done(void *priv)
+sto_tree_req_done(void *priv, int rc)
 {
 	struct sto_req *req = priv;
-	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
-	struct sto_tree_info *info = &tree_req->info;
-	int rc;
-
-	rc = info->returncode;
 
 	req->returncode = rc;
 	sto_req_exec_fini(req);
