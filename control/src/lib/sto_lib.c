@@ -10,11 +10,16 @@
 #include "sto_rpc_aio.h"
 #include "err.h"
 
-#define STO_REQ_POLL_PERIOD	1000 /* 1ms */
+#define STO_EXEC_POLL_PERIOD		1000 /* 1ms */
+#define STO_ROLLBACK_POLL_PERIOD	1000 /* 1ms */
 
-static struct spdk_poller *g_sto_req_poller;
+static struct spdk_poller *g_sto_exec_poller;
+static struct spdk_poller *g_sto_rollback_poller;
 
-static TAILQ_HEAD(sto_req_list, sto_req) g_sto_req_list = TAILQ_HEAD_INITIALIZER(g_sto_req_list);
+TAILQ_HEAD(sto_req_list, sto_req);
+
+static struct sto_req_list g_sto_req_exec_list = TAILQ_HEAD_INITIALIZER(g_sto_req_exec_list);
+static struct sto_req_list g_sto_req_rollback_list = TAILQ_HEAD_INITIALIZER(g_sto_req_rollback_list);
 
 
 int
@@ -77,30 +82,133 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_object_end(w);
 }
 
-static void
-sto_req_exec(struct sto_req *req)
+static struct sto_exec_ctx *
+sto_exec_ctx_alloc(sto_req_exec_t exec_fn)
 {
+	struct sto_exec_ctx *ctx;
+
+	ctx = rte_zmalloc(NULL, sizeof(*ctx), 0);
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to alloc exec context\n");
+		return NULL;
+	}
+
+	ctx->exec_fn = exec_fn;
+
+	return ctx;
+}
+
+static void
+sto_exec_ctx_free(struct sto_exec_ctx *ctx)
+{
+	rte_free(ctx);
+}
+
+static int
+sto_req_add_rollback(struct sto_req *req, sto_req_exec_t rollback_fn)
+{
+	struct sto_exec_ctx *ctx;
+
+	ctx = sto_exec_ctx_alloc(rollback_fn);
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to allocate rollback context\n");
+		return -ENOMEM;
+	}
+
+	TAILQ_INSERT_HEAD(&req->rollback_stack, ctx, list);
+
+	return 0;
+}
+
+int
+sto_req_add_exec(struct sto_req *req, sto_req_exec_t exec_fn, sto_req_exec_t rollback_fn)
+{
+	struct sto_exec_ctx *ctx;
+	int rc = 0;
+
+	ctx = sto_exec_ctx_alloc(exec_fn);
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to allocate exec context\n");
+		return -ENOMEM;
+	}
+
+	TAILQ_INSERT_TAIL(&req->exe_queue, ctx, list);
+
+	if (rollback_fn) {
+		rc = sto_req_add_rollback(req, rollback_fn);
+		if (spdk_unlikely(rc)) {
+			TAILQ_REMOVE(&req->exe_queue, ctx, list);
+			sto_exec_ctx_free(ctx);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+static sto_req_exec_t
+sto_exec_list_get_first(struct sto_exec_list *list)
+{
+	struct sto_exec_ctx *ctx;
+	sto_req_exec_t exec_fn;
+
+	ctx = TAILQ_FIRST(list);
+	if (!ctx) {
+		return NULL;
+	}
+
+	TAILQ_REMOVE(list, ctx, list);
+
+	exec_fn = ctx->exec_fn;
+
+	sto_exec_ctx_free(ctx);
+
+	return exec_fn;
+}
+
+static void
+sto_exec_list_free(struct sto_exec_list *list)
+{
+	struct sto_exec_ctx *ctx, *tmp;
+
+	TAILQ_FOREACH_SAFE(ctx, list, list, tmp) {
+		TAILQ_REMOVE(list, ctx, list);
+
+		sto_exec_ctx_free(ctx);
+	}
+}
+
+void
+sto_req_free(struct sto_req *req)
+{
+	sto_exec_list_free(&req->exe_queue);
+	sto_exec_list_free(&req->rollback_stack);
+}
+
+static void
+sto_req_rollback(struct sto_req *req)
+{
+	sto_req_exec_t rollback_fn;
 	int rc = 0;
 
 	if (spdk_unlikely(req->returncode)) {
-		rc = req->returncode;
-		goto out_err;
-	}
-
-	if (!req->exec) {
+		SPDK_ERRLOG("Rollback has been failed, rc=%d\n",
+			    req->returncode);
 		goto out_response;
 	}
 
-	rc = req->exec(req);
+	rollback_fn = sto_exec_list_get_first(&req->rollback_stack);
+	if (!rollback_fn) {
+		goto out_response;
+	}
+
+	rc = rollback_fn(req);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to exec req[%p]\n", req);
-		goto out_err;
+		SPDK_ERRLOG("Failed to rollback, rc=%d\n", rc);
+		goto out_response;
 	}
 
 	return;
-
-out_err:
-	sto_err(req->ctx.err_ctx, rc);
 
 out_response:
 	sto_req_response(req);
@@ -109,16 +217,96 @@ out_response:
 }
 
 static int
-sto_req_poll(void *ctx)
+sto_rollback_poll(void *ctx)
 {
 	struct sto_req_list req_list = TAILQ_HEAD_INITIALIZER(req_list);
 	struct sto_req *req, *tmp;
 
-	if (TAILQ_EMPTY(&g_sto_req_list)) {
+	if (likely(TAILQ_EMPTY(&g_sto_req_rollback_list))) {
 		return SPDK_POLLER_IDLE;
 	}
 
-	TAILQ_SWAP(&req_list, &g_sto_req_list, sto_req, list);
+	TAILQ_SWAP(&req_list, &g_sto_req_rollback_list, sto_req, list);
+
+	TAILQ_FOREACH_SAFE(req, &req_list, list, tmp) {
+		TAILQ_REMOVE(&req_list, req, list);
+
+		sto_req_rollback(req);
+	}
+
+	return SPDK_POLLER_BUSY;
+}
+
+static void
+sto_req_exec_error(struct sto_req *req, int rc)
+{
+	sto_err(req->ctx.err_ctx, rc);
+
+	if (!TAILQ_EMPTY(&req->rollback_stack)) {
+		req->returncode = 0;
+		TAILQ_INSERT_TAIL(&g_sto_req_rollback_list, req, list);
+
+		return;
+	}
+
+	sto_req_response(req);
+
+	return;
+}
+
+static void
+sto_req_exec(struct sto_req *req)
+{
+	struct sto_req_ops *ops = req->ops;
+	sto_req_exec_t exec_fn;
+	int rc = 0;
+
+	if (spdk_unlikely(req->returncode)) {
+		rc = req->returncode;
+		goto out_err;
+	}
+
+	do {
+		exec_fn = sto_exec_list_get_first(&req->exe_queue);
+		if (exec_fn) {
+			rc = exec_fn(req);
+			if (spdk_unlikely(rc)) {
+				SPDK_ERRLOG("Failed to exec queue for req[%p]\n", req);
+				goto out_err;
+			}
+
+			return;
+		}
+
+		rc = ops->exec_constructor(req, req->state);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Failed to construct exec for req[%p]\n", req);
+			goto out_err;
+		}
+
+		req->state++;
+
+	} while (!TAILQ_EMPTY(&req->exe_queue));
+
+	sto_req_response(req);
+
+	return;
+
+out_err:
+	sto_req_exec_error(req, rc);
+}
+
+static int
+sto_exec_poll(void *ctx)
+{
+	struct sto_req_list req_list = TAILQ_HEAD_INITIALIZER(req_list);
+	struct sto_req *req, *tmp;
+
+	if (TAILQ_EMPTY(&g_sto_req_exec_list)) {
+		return SPDK_POLLER_IDLE;
+	}
+
+	TAILQ_SWAP(&req_list, &g_sto_req_exec_list, sto_req, list);
 
 	TAILQ_FOREACH_SAFE(req, &req_list, list, tmp) {
 		TAILQ_REMOVE(&req_list, req, list);
@@ -130,10 +318,10 @@ sto_req_poll(void *ctx)
 }
 
 void
-sto_req_exec_process(struct sto_req *req, sto_req_exec_t exec)
+sto_req_process(struct sto_req *req, int rc)
 {
-	req->exec = exec;
-	TAILQ_INSERT_TAIL(&g_sto_req_list, req, list);
+	req->returncode = rc;
+	TAILQ_INSERT_TAIL(&g_sto_req_exec_list, req, list);
 }
 
 STO_REQ_CONSTRUCTOR_DEFINE(write)
@@ -188,15 +376,6 @@ sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	return rc;
 }
 
-static void
-sto_write_req_done(void *priv, int rc)
-{
-	struct sto_req *req = priv;
-
-	req->returncode = rc;
-	sto_req_exec_fini(req);
-}
-
 static int
 sto_write_req_exec(struct sto_req *req)
 {
@@ -204,10 +383,21 @@ sto_write_req_exec(struct sto_req *req)
 	struct sto_write_req_params *params = &write_req->params;
 	struct sto_rpc_writefile_args args = {
 		.priv = req,
-		.done = sto_write_req_done,
+		.done = sto_req_exec_done,
 	};
 
 	return sto_rpc_writefile(params->file, params->data, &args);
+}
+
+static int
+sto_write_req_exec_constructor(struct sto_req *req, int state)
+{
+	switch (state) {
+	case 0:
+		return sto_req_add_exec(req, sto_write_req_exec, NULL);
+	default:
+		return 0;
+	}
 }
 
 static void
@@ -217,12 +407,13 @@ sto_write_req_free(struct sto_req *req)
 
 	sto_write_req_params_free(&write_req->params);
 
+	sto_req_free(req);
 	rte_free(write_req);
 }
 
 struct sto_req_ops sto_write_req_ops = {
 	.decode_cdb = sto_write_req_decode_cdb,
-	.exec = sto_write_req_exec,
+	.exec_constructor = sto_write_req_exec_constructor,
 	.end_response = sto_dummy_req_end_response,
 	.free = sto_write_req_free,
 };
@@ -271,15 +462,6 @@ sto_read_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	return rc;
 }
 
-static void
-sto_read_req_done(void *priv, int rc)
-{
-	struct sto_req *req = priv;
-
-	req->returncode = rc;
-	sto_req_exec_fini(req);
-}
-
 static int
 sto_read_req_exec(struct sto_req *req)
 {
@@ -287,11 +469,22 @@ sto_read_req_exec(struct sto_req *req)
 	struct sto_read_req_params *params = &read_req->params;
 	struct sto_rpc_readfile_args args = {
 		.priv = req,
-		.done = sto_read_req_done,
+		.done = sto_req_exec_done,
 		.buf = &read_req->buf,
 	};
 
 	return sto_rpc_readfile(params->file, params->size, &args);
+}
+
+static int
+sto_read_req_exec_constructor(struct sto_req *req, int state)
+{
+	switch (state) {
+	case 0:
+		return sto_req_add_exec(req, sto_read_req_exec, NULL);
+	default:
+		return 0;
+	}
 }
 
 static void
@@ -310,12 +503,13 @@ sto_read_req_free(struct sto_req *req)
 	sto_read_req_params_free(&read_req->params);
 	free(read_req->buf);
 
+	sto_req_free(req);
 	rte_free(read_req);
 }
 
 struct sto_req_ops sto_read_req_ops = {
 	.decode_cdb = sto_read_req_decode_cdb,
-	.exec = sto_read_req_exec,
+	.exec_constructor = sto_read_req_exec_constructor,
 	.end_response = sto_read_req_end_response,
 	.free = sto_read_req_free,
 };
@@ -360,15 +554,6 @@ sto_readlink_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb
 	return rc;
 }
 
-static void
-sto_readlink_req_done(void *priv, int rc)
-{
-	struct sto_req *req = priv;
-
-	req->returncode = rc;
-	sto_req_exec_fini(req);
-}
-
 static int
 sto_readlink_req_exec(struct sto_req *req)
 {
@@ -376,11 +561,22 @@ sto_readlink_req_exec(struct sto_req *req)
 	struct sto_readlink_req_params *params = &readlink_req->params;
 	struct sto_rpc_readlink_args args = {
 		.priv = req,
-		.done = sto_readlink_req_done,
+		.done = sto_req_exec_done,
 		.buf = &readlink_req->buf,
 	};
 
 	return sto_rpc_readlink(params->file, &args);
+}
+
+static int
+sto_readlink_req_exec_constructor(struct sto_req *req, int state)
+{
+	switch (state) {
+	case 0:
+		return sto_req_add_exec(req, sto_readlink_req_exec, NULL);
+	default:
+		return 0;
+	}
 }
 
 static void
@@ -399,12 +595,13 @@ sto_readlink_req_free(struct sto_req *req)
 	sto_readlink_req_params_free(&readlink_req->params);
 	free(readlink_req->buf);
 
+	sto_req_free(req);
 	rte_free(readlink_req);
 }
 
 struct sto_req_ops sto_readlink_req_ops = {
 	.decode_cdb = sto_readlink_req_decode_cdb,
-	.exec = sto_readlink_req_exec,
+	.exec_constructor = sto_readlink_req_exec_constructor,
 	.end_response = sto_readlink_req_end_response,
 	.free = sto_readlink_req_free,
 };
@@ -474,15 +671,6 @@ sto_readdir_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	return rc;
 }
 
-static void
-sto_readdir_req_done(void *priv, int rc)
-{
-	struct sto_req *req = priv;
-
-	req->returncode = rc;
-	sto_req_exec_fini(req);
-}
-
 static int
 sto_readdir_req_exec(struct sto_req *req)
 {
@@ -490,11 +678,22 @@ sto_readdir_req_exec(struct sto_req *req)
 	struct sto_readdir_req_params *params = &readdir_req->params;
 	struct sto_rpc_readdir_args args = {
 		.priv = req,
-		.done = sto_readdir_req_done,
+		.done = sto_req_exec_done,
 		.dirents = &readdir_req->dirents,
 	};
 
 	return sto_rpc_readdir(params->dirpath, &args);
+}
+
+static int
+sto_readdir_req_exec_constructor(struct sto_req *req, int state)
+{
+	switch (state) {
+	case 0:
+		return sto_req_add_exec(req, sto_readdir_req_exec, NULL);
+	default:
+		return 0;
+	}
 }
 
 static void
@@ -519,12 +718,13 @@ sto_readdir_req_free(struct sto_req *req)
 
 	sto_dirents_free(&readdir_req->dirents);
 
+	sto_req_free(req);
 	rte_free(readdir_req);
 }
 
 struct sto_req_ops sto_readdir_req_ops = {
 	.decode_cdb = sto_readdir_req_decode_cdb,
-	.exec = sto_readdir_req_exec,
+	.exec_constructor = sto_readdir_req_exec_constructor,
 	.end_response = sto_readdir_req_end_response,
 	.free = sto_readdir_req_free,
 };
@@ -581,15 +781,6 @@ sto_tree_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 	return rc;
 }
 
-static void
-sto_tree_req_done(void *priv, int rc)
-{
-	struct sto_req *req = priv;
-
-	req->returncode = rc;
-	sto_req_exec_fini(req);
-}
-
 static int
 sto_tree_req_exec(struct sto_req *req)
 {
@@ -597,11 +788,22 @@ sto_tree_req_exec(struct sto_req *req)
 	struct sto_tree_req_params *params = &tree_req->params;
 	struct sto_tree_args args = {
 		.priv = req,
-		.done = sto_tree_req_done,
+		.done = sto_req_exec_done,
 		.info = &tree_req->info,
 	};
 
 	return sto_tree(params->dirpath, params->depth, params->only_dirs, &args);
+}
+
+static int
+sto_tree_req_exec_constructor(struct sto_req *req, int state)
+{
+	switch (state) {
+	case 0:
+		return sto_req_add_exec(req, sto_tree_req_exec, NULL);
+	default:
+		return 0;
+	}
 }
 
 static void
@@ -627,12 +829,13 @@ sto_tree_req_free(struct sto_req *req)
 	sto_tree_req_params_free(&tree_req->params);
 	sto_tree_info_free(&tree_req->info);
 
+	sto_req_free(req);
 	rte_free(tree_req);
 }
 
 struct sto_req_ops sto_tree_req_ops = {
 	.decode_cdb = sto_tree_req_decode_cdb,
-	.exec = sto_tree_req_exec,
+	.exec_constructor = sto_tree_req_exec_constructor,
 	.end_response = sto_tree_req_end_response,
 	.free = sto_tree_req_free,
 };
@@ -640,11 +843,18 @@ struct sto_req_ops sto_tree_req_ops = {
 int
 sto_lib_init(void)
 {
-	g_sto_req_poller = SPDK_POLLER_REGISTER(sto_req_poll, NULL, STO_REQ_POLL_PERIOD);
-	if (spdk_unlikely(!g_sto_req_poller)) {
+	g_sto_exec_poller = SPDK_POLLER_REGISTER(sto_exec_poll, NULL, STO_EXEC_POLL_PERIOD);
+	if (spdk_unlikely(!g_sto_exec_poller)) {
 		SPDK_ERRLOG("Cann't register the STO req poller\n");
 		return -ENOMEM;
 	}
+
+	g_sto_rollback_poller = SPDK_POLLER_REGISTER(sto_rollback_poll, NULL, STO_ROLLBACK_POLL_PERIOD);
+	if (spdk_unlikely(!g_sto_rollback_poller)) {
+		SPDK_ERRLOG("Cann't register the STO req poller\n");
+		return -ENOMEM;
+	}
+
 
 	return 0;
 }
@@ -652,5 +862,6 @@ sto_lib_init(void)
 void
 sto_lib_fini(void)
 {
-	spdk_poller_unregister(&g_sto_req_poller);
+	spdk_poller_unregister(&g_sto_exec_poller);
+	spdk_poller_unregister(&g_sto_rollback_poller);
 }

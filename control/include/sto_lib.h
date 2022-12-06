@@ -57,13 +57,13 @@ void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *er
 struct sto_req;
 
 typedef int (*sto_req_decode_cdb_t)(struct sto_req *req, const struct spdk_json_val *cdb);
-typedef int (*sto_req_exec_t)(struct sto_req *req);
+typedef int (*sto_req_exec_constructor_t)(struct sto_req *req, int state);
 typedef void (*sto_req_end_response_t)(struct sto_req *req, struct spdk_json_write_ctx *w);
 typedef void (*sto_req_free_t)(struct sto_req *req);
 
 struct sto_req_ops {
 	sto_req_decode_cdb_t decode_cdb;
-	sto_req_exec_t exec;
+	sto_req_exec_constructor_t exec_constructor;
 	sto_req_end_response_t end_response;
 	sto_req_free_t free;
 };
@@ -90,16 +90,29 @@ struct sto_op_table {
 int sto_lib_init(void);
 void sto_lib_fini(void);
 
+typedef int (*sto_req_exec_t)(struct sto_req *req);
+
+struct sto_exec_ctx {
+	sto_req_exec_t exec_fn;
+
+	TAILQ_ENTRY(sto_exec_ctx) list;
+};
+
+TAILQ_HEAD(sto_exec_list, sto_exec_ctx);
+
 struct sto_req {
 	struct sto_context ctx;
 
 	struct sto_req_ops *ops;
 	void *params_constructor;
 
-	sto_req_exec_t exec;
 	int returncode;
+	int state;
 
 	TAILQ_ENTRY(sto_req) list;
+
+	struct sto_exec_list exe_queue;
+	struct sto_exec_list rollback_stack;
 };
 
 #define STO_REQ(x) \
@@ -110,20 +123,27 @@ sto_req_init(struct sto_req *req, const struct sto_ops *op)
 {
 	req->ops = op->req_ops;
 	req->params_constructor = op->params_constructor;
+
+	TAILQ_INIT(&req->exe_queue);
+	TAILQ_INIT(&req->rollback_stack);
 }
 
-void sto_req_exec_process(struct sto_req *req, sto_req_exec_t exec);
+void sto_req_process(struct sto_req *req, int rc);
 
 static inline void
-sto_req_exec_start(struct sto_req *req)
+sto_req_process_start(struct sto_req *req)
 {
-	sto_req_exec_process(req, req->ops->exec);
+	sto_req_process(req, 0);
 }
 
+int sto_req_add_exec(struct sto_req *req, sto_req_exec_t exec_fn, sto_req_exec_t rollback_fn);
+
 static inline void
-sto_req_exec_fini(struct sto_req *req)
+sto_req_exec_done(void *priv, int rc)
 {
-	sto_req_exec_process(req, NULL);
+	struct sto_req *req = priv;
+
+	sto_req_process(req, rc);
 }
 
 static inline void
@@ -133,6 +153,8 @@ sto_req_response(struct sto_req *req)
 
 	ctx->done(ctx->priv);
 }
+
+void sto_req_free(struct sto_req *req);
 
 #define STO_REQ_TYPE(x, type) \
 	SPDK_CONTAINEROF((x), struct sto_ ## type ## _req, req)
@@ -168,10 +190,8 @@ sto_dummy_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 }
 
 static inline int
-sto_dummy_req_exec(struct sto_req *req)
+sto_dummy_req_exec_constructor(struct sto_req *req, int state)
 {
-	sto_req_exec_fini(req);
-
 	return 0;
 }
 
@@ -185,6 +205,8 @@ static inline void
 sto_dummy_req_free(struct sto_req *req)
 {
 	struct sto_dummy_req *dummy_req = STO_REQ_TYPE(req, dummy);
+
+	sto_req_free(req);
 	rte_free(dummy_req);
 }
 
