@@ -102,11 +102,8 @@ struct sto_req {
 	TAILQ_ENTRY(sto_req) list;
 };
 
-static inline struct sto_req *
-sto_req(struct sto_context *ctx)
-{
-	return SPDK_CONTAINEROF(ctx, struct sto_req, ctx);
-}
+#define STO_REQ(x) \
+	SPDK_CONTAINEROF((x), struct sto_req, ctx)
 
 static inline void
 sto_req_init(struct sto_req *req, const struct sto_ops *op)
@@ -137,8 +134,8 @@ sto_req_response(struct sto_req *req)
 	ctx->done(ctx->priv);
 }
 
-#define STO_REQ_TYPE(rq, type) \
-	SPDK_CONTAINEROF(rq, struct sto_ ## type ## _req, req)
+#define STO_REQ_TYPE(x, type) \
+	SPDK_CONTAINEROF((x), struct sto_ ## type ## _req, req)
 
 #define STO_REQ_CONSTRUCTOR_DECLARE(type)					\
 struct sto_req *sto_ ## type ## _req_constructor(const struct sto_ops *op);
