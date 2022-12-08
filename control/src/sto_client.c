@@ -191,7 +191,7 @@ sto_client_group_poll(void *ctx)
 
 static struct spdk_jsonrpc_client_request *
 sto_client_alloc_request(const char *method_name, int id,
-			 void *params, sto_client_dump_json_params_t dump_json_params)
+			 void *params, sto_client_dump_params_t dump_params)
 {
 	struct spdk_jsonrpc_client_request *request;
 	struct spdk_json_write_ctx *w;
@@ -208,9 +208,9 @@ sto_client_alloc_request(const char *method_name, int id,
 		return NULL;
 	}
 
-	if (dump_json_params) {
+	if (dump_params) {
 		spdk_json_write_name(w, "params");
-		dump_json_params(params, w);
+		dump_params(params, w);
 	}
 
 	spdk_jsonrpc_end_request(request, w);
@@ -287,7 +287,7 @@ sto_rpc_cmd_run(struct sto_rpc_cmd *cmd)
 
 int
 sto_client_send(const char *method_name, void *params,
-		sto_client_dump_json_params_t dump_json_params,
+		sto_client_dump_params_t dump_params,
 		struct sto_client_args *args)
 {
 	struct sto_client_group *group;
@@ -312,7 +312,7 @@ sto_client_send(const char *method_name, void *params,
 		return -ENOMEM;
 	}
 
-	cmd->request = sto_client_alloc_request(method_name, cmd->id, params, dump_json_params);
+	cmd->request = sto_client_alloc_request(method_name, cmd->id, params, dump_params);
 	if (spdk_unlikely(!cmd->request)) {
 		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
 		rc = -ENOMEM;
