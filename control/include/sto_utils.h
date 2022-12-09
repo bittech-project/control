@@ -3,6 +3,17 @@
 
 struct spdk_json_val;
 
+struct sto_json_ctx {
+	void *json;
+	size_t json_size;
+	const struct spdk_json_val *values;
+	size_t values_cnt;
+};
+
+struct sto_json_ctx *sto_json_ctx_alloc(void);
+int sto_json_ctx_write_cb(void *cb_ctx, const void *data, size_t size);
+void sto_json_ctx_free(struct sto_json_ctx *ctx);
+
 int sto_json_decode_object_name(const struct spdk_json_val *values, char **value);
 int sto_json_decode_object_str(const struct spdk_json_val *values,
 			       const char *name, char **value);

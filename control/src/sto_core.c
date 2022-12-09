@@ -127,12 +127,6 @@ sto_core_req_init_cb(struct sto_core_req *core_req, sto_core_req_done_t done, vo
 	core_req->priv = priv;
 }
 
-void
-sto_core_req_free(struct sto_core_req *core_req)
-{
-	rte_free(core_req);
-}
-
 static void
 sto_core_req_process(struct sto_core_req *core_req)
 {
@@ -298,15 +292,6 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 
 	if (err->rc) {
 		sto_status_failed(w, err);
-
-		if (core_req->ctx) {
-			req = STO_REQ(core_req->ctx);
-			ops = req->ops;
-
-			ops->free(req);
-			core_req->ctx = NULL;
-		}
-
 		return;
 	}
 
@@ -314,9 +299,22 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 	ops = req->ops;
 
 	ops->response(req, w);
-	ops->free(req);
 
 	return;
+}
+
+void
+sto_core_req_free(struct sto_core_req *core_req)
+{
+	if (core_req->ctx) {
+		struct sto_req *req = STO_REQ(core_req->ctx);
+		struct sto_req_ops *ops = req->ops;
+
+		ops->free(req);
+		core_req->ctx = NULL;
+	}
+
+	rte_free(core_req);
 }
 
 static void

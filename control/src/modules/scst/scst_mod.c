@@ -6,6 +6,7 @@
 #include <rte_malloc.h>
 
 #include "sto_rpc_subprocess.h"
+#include "sto_subsystem.h"
 #include "sto_module.h"
 #include "sto_core.h"
 
@@ -106,11 +107,63 @@ struct sto_req_ops sto_iscsi_deinit_req_ops = {
 	.free = sto_dummy_req_free,
 };
 
+static void
+iscsi_add_target_done(void *priv, struct sto_core_req *core_req)
+{
+	struct sto_req *req = priv;
+	int rc = core_req->err_ctx.rc;
+
+	sto_core_req_free(core_req);
+
+	sto_req_process(req, rc);
+}
+
+static void
+iscsi_add_target_params(void *priv, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_named_string(w, "driver", "iscsi");
+	spdk_json_write_named_string(w, "target", "gleb_iscsi");
+}
+
+static int
+iscsi_add_target(struct sto_req *req)
+{
+	struct sto_subsystem_args args = {
+		.priv = req,
+		.done = iscsi_add_target_done,
+	};
+
+	return sto_subsystem_send("scst", "target_add", NULL, iscsi_add_target_params, &args);
+}
+
+static int
+iscsi_add_target_constructor(struct sto_req *req, int state)
+{
+	switch (state) {
+	case 0:
+		return sto_req_add_exec(req, iscsi_add_target, NULL);
+	default:
+		return 0;
+	}
+}
+
+struct sto_req_ops sto_iscsi_add_target_req_ops = {
+	.decode_cdb = sto_dummy_req_decode_cdb,
+	.exec_constructor = iscsi_add_target_constructor,
+	.response = sto_dummy_req_response,
+	.free = sto_dummy_req_free,
+};
+
 static const struct sto_ops scst_ops[] = {
 	{
 		.name = "iscsi_init",
 		.req_constructor = sto_dummy_req_constructor,
 		.req_ops = &sto_iscsi_init_req_ops,
+	},
+	{
+		.name = "iscsi_add_target",
+		.req_constructor = sto_dummy_req_constructor,
+		.req_ops = &sto_iscsi_add_target_req_ops,
 	},
 	{
 		.name = "iscsi_deinit",

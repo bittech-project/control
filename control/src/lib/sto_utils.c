@@ -3,8 +3,75 @@
 #include <spdk/json.h>
 #include <spdk/string.h>
 
+#include <rte_malloc.h>
+
 #include "sto_utils.h"
 #include "err.h"
+
+struct sto_json_ctx *
+sto_json_ctx_alloc(void)
+{
+	return rte_zmalloc(NULL, sizeof(struct sto_json_ctx), 0);
+}
+
+int
+sto_json_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
+{
+	struct sto_json_ctx *ctx = cb_ctx;
+	void *end;
+	ssize_t rc;
+
+	ctx->json_size = size;
+
+	ctx->json = calloc(1, ctx->json_size);
+	if (spdk_unlikely(!ctx->json)) {
+		SPDK_ERRLOG("Failed to alloc json: size=%zu\n", ctx->json_size);
+		return -ENOMEM;
+	}
+
+	memcpy(ctx->json, data, ctx->json_size);
+
+	rc = spdk_json_parse(ctx->json, ctx->json_size, NULL, 0, &end, 0);
+	if (spdk_unlikely(rc < 0)) {
+		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
+		goto free_json;
+	}
+
+	ctx->values_cnt = rc;
+
+	ctx->values = calloc(ctx->values_cnt, sizeof(struct spdk_json_val));
+	if (spdk_unlikely(!ctx->values)) {
+		SPDK_ERRLOG("Failed to alloc json values: cnt=%zu\n",
+			    ctx->values_cnt);
+		rc = -ENOMEM;
+		goto free_json;
+	}
+
+	rc = spdk_json_parse(ctx->json, ctx->json_size, (struct spdk_json_val *) ctx->values,
+			     ctx->values_cnt, &end, 0);
+	if (rc != ctx->values_cnt) {
+		SPDK_ERRLOG("Parsing JSON failed (%zd)\n", rc);
+		goto free_values;
+	}
+
+	return 0;
+
+free_values:
+	free((struct spdk_json_val *) ctx->values);
+
+free_json:
+	free(ctx->json);
+
+	return rc;
+}
+
+void
+sto_json_ctx_free(struct sto_json_ctx *ctx)
+{
+	free((struct spdk_json_val *) ctx->values);
+	free(ctx->json);
+	rte_free(ctx);
+}
 
 int
 sto_json_decode_object_name(const struct spdk_json_val *values, char **value)

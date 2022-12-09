@@ -7,18 +7,18 @@
 #include "sto_core.h"
 
 static void
-sto_control_rpc_done(struct sto_core_req *req)
+sto_control_rpc_done(struct sto_core_req *core_req)
 {
-	struct spdk_jsonrpc_request *request = req->priv;
+	struct spdk_jsonrpc_request *request = core_req->priv;
 	struct spdk_json_write_ctx *w;
 
 	w = spdk_jsonrpc_begin_result(request);
 
-	sto_core_req_response(req, w);
+	sto_core_req_response(core_req, w);
 
 	spdk_jsonrpc_end_result(request, w);
 
-	sto_core_req_free(req);
+	sto_core_req_free(core_req);
 }
 
 static void
