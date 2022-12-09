@@ -340,7 +340,7 @@ struct sto_tree_req {
 	struct sto_req req;
 
 	struct sto_tree_req_params params;
-	struct sto_tree_info info;
+	struct sto_tree_node tree_root;
 };
 
 struct sto_tree_req_params_constructor {

@@ -805,7 +805,7 @@ sto_tree_req_exec(struct sto_req *req)
 	struct sto_tree_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
-		.info = &tree_req->info,
+		.tree_root = &tree_req->tree_root,
 	};
 
 	return sto_tree(params->dirpath, params->depth, params->only_dirs, &args);
@@ -826,15 +826,15 @@ static void
 sto_tree_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
 	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
-	struct sto_tree_info *info = &tree_req->info;
 	struct sto_tree_req_params *params = &tree_req->params;
+	struct sto_tree_node *tree_root = &tree_req->tree_root;
 
 	if (params->info_json) {
-		params->info_json(&info->tree_root, w);
+		params->info_json(tree_root, w);
 		return;
 	}
 
-	sto_tree_info_json(&info->tree_root, w);
+	sto_tree_info_json(tree_root, w);
 }
 
 static void
@@ -843,7 +843,7 @@ sto_tree_req_free(struct sto_req *req)
 	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
 
 	sto_tree_req_params_free(&tree_req->params);
-	sto_tree_info_free(&tree_req->info);
+	sto_tree_free(&tree_req->tree_root);
 
 	sto_req_free(req);
 	rte_free(tree_req);

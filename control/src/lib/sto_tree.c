@@ -12,7 +12,7 @@
 
 struct sto_tree_cmd {
 	struct sto_tree_params params;
-	struct sto_tree_info *info;
+	struct sto_tree_node *tree_root;
 
 	int returncode;
 
@@ -23,7 +23,7 @@ struct sto_tree_cmd {
 };
 
 static struct sto_tree_cmd *
-sto_tree_cmd_alloc(void)
+sto_tree_cmd_alloc(struct sto_tree_node *tree_root)
 {
 	struct sto_tree_cmd *cmd;
 
@@ -32,6 +32,9 @@ sto_tree_cmd_alloc(void)
 		SPDK_ERRLOG("Cann't allocate memory for STO tree cmd\n");
 		return NULL;
 	}
+
+	cmd->tree_root = tree_root;
+	tree_root->priv = cmd;
 
 	return cmd;
 }
@@ -46,25 +49,21 @@ sto_tree_cmd_init_cb(struct sto_tree_cmd *cmd, sto_tree_done_t done, void *priv)
 static void
 sto_tree_cmd_free(struct sto_tree_cmd *cmd)
 {
+	cmd->tree_root->priv = NULL;
 	rte_free(cmd);
 }
 
 static void
 sto_tree_cmd_run(struct sto_tree_cmd *cmd)
 {
-	struct sto_tree_node *tree_root = &cmd->info->tree_root;
+	struct sto_tree_node *tree_root = cmd->tree_root;
 	sto_inode_read(tree_root->inode);
 }
 
 static struct sto_tree_cmd *
 sto_tree_cmd(struct sto_tree_node *node)
 {
-	struct sto_tree_node *root = node->root;
-	struct sto_tree_info *info;
-
-	info = SPDK_CONTAINEROF(root, struct sto_tree_info, tree_root);
-
-	return info->inner.cmd;
+	return node->priv;
 }
 
 void
@@ -127,7 +126,6 @@ static void
 sto_tree_node_link_parent(struct sto_tree_node *node, struct sto_tree_node *parent)
 {
 	node->parent = parent;
-	node->root = parent->root;
 	node->level = parent->level + 1;
 
 	TAILQ_INSERT_TAIL(&parent->childs, node, list);
@@ -169,6 +167,8 @@ sto_tree_add_inode(struct sto_tree_node *parent_node, struct sto_inode *inode)
 
 	sto_tree_node_add_inode(node, inode);
 	sto_tree_node_link_parent(node, parent_node);
+
+	node->priv = parent_node->priv;
 
 	return 0;
 }
@@ -261,7 +261,6 @@ sto_tree_init(struct sto_tree_node *tree_root, const char *dirpath)
 
 	sto_tree_node_add_inode(tree_root, inode);
 
-	tree_root->root = tree_root;
 	tree_root->level = 0;
 
 	TAILQ_INIT(&tree_root->childs);
@@ -269,7 +268,7 @@ sto_tree_init(struct sto_tree_node *tree_root, const char *dirpath)
 	return 0;
 }
 
-static void
+void
 sto_tree_free(struct sto_tree_node *tree_root)
 {
 	struct sto_tree_node *parent = tree_root;
@@ -326,29 +325,6 @@ sto_subtree_info_json(struct sto_tree_node *parent, struct spdk_json_write_ctx *
 	}
 }
 
-static int
-sto_tree_info_init(struct sto_tree_info *info, const char *dirpath, struct sto_tree_cmd *cmd)
-{
-	int rc;
-
-	rc = sto_tree_init(&info->tree_root, dirpath);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to init root node\n");
-		return rc;
-	}
-
-	info->inner.cmd = cmd;
-	cmd->info = info;
-
-	return 0;
-}
-
-void
-sto_tree_info_free(struct sto_tree_info *info)
-{
-	sto_tree_free(&info->tree_root);
-}
-
 void
 sto_tree_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
 {
@@ -366,20 +342,21 @@ sto_tree_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *
 int
 sto_tree(const char *dirpath, uint32_t depth, bool only_dirs, struct sto_tree_args *args)
 {
+	struct sto_tree_node *tree_root = args->tree_root;
 	struct sto_tree_cmd *cmd;
 	int rc;
 
-	cmd = sto_tree_cmd_alloc();
-	if (spdk_unlikely(!cmd)) {
-		SPDK_ERRLOG("Failed to alloc memory for tree cmd\n");
-		return -ENOMEM;
+	rc = sto_tree_init(tree_root, dirpath);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to init root node\n");
+		return rc;
 	}
 
-	rc = sto_tree_info_init(args->info, dirpath, cmd);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to init tree info\n");
-		sto_tree_cmd_free(cmd);
-		return rc;
+	cmd = sto_tree_cmd_alloc(tree_root);
+	if (spdk_unlikely(!cmd)) {
+		SPDK_ERRLOG("Failed to alloc memory for tree cmd\n");
+		__sto_tree_node_free(tree_root);
+		return -ENOMEM;
 	}
 
 	cmd->params.depth = depth;

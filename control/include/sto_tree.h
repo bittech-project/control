@@ -10,7 +10,8 @@ struct sto_tree_node;
 typedef void (*sto_tree_info_json_t)(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w);
 
 struct sto_tree_node {
-	struct sto_tree_node *root;
+	void *priv;
+
 	struct sto_tree_node *parent;
 	struct sto_tree_node *cur_child;
 
@@ -20,14 +21,6 @@ struct sto_tree_node {
 
 	TAILQ_ENTRY(sto_tree_node) list;
 	TAILQ_HEAD(, sto_tree_node) childs;
-};
-
-struct sto_tree_info {
-	struct sto_tree_node tree_root;
-
-	struct {
-		void *cmd;
-	} inner;
 };
 
 typedef void (*sto_tree_done_t)(void *priv, int rc);
@@ -41,12 +34,11 @@ struct sto_tree_args {
 	void *priv;
 	sto_tree_done_t done;
 
-	struct sto_tree_info *info;
+	struct sto_tree_node *tree_root;
 };
 
-void sto_tree_info_free(struct sto_tree_info *info);
-
 int sto_tree(const char *dirpath, uint32_t depth, bool only_dirs, struct sto_tree_args *args);
+void sto_tree_free(struct sto_tree_node *tree_root);
 
 void sto_tree_get_ref(struct sto_tree_node *node);
 void sto_tree_put_ref(struct sto_tree_node *node);
