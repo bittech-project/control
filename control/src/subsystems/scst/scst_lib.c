@@ -297,21 +297,14 @@ struct scst_dev_open_params {
 	char *attributes;
 };
 
-static void *
-scst_dev_open_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_dev_open_params));
-}
-
 static void
-scst_dev_open_params_free(void *arg)
+scst_dev_open_params_deinit(void *arg)
 {
 	struct scst_dev_open_params *params = arg;
 
 	free(params->name);
 	free(params->handler);
 	free(params->attributes);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
@@ -353,7 +346,8 @@ scst_dev_open_data(void *arg)
 
 static struct sto_write_req_params_constructor dev_open_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_open_decoders,
-					   scst_dev_open_params_alloc, scst_dev_open_params_free),
+					   sizeof(struct scst_dev_open_params),
+					   scst_dev_open_params_deinit),
 	.file_path = scst_dev_open_mgmt_file_path,
 	.data = scst_dev_open_data,
 };
@@ -363,20 +357,13 @@ struct scst_dev_close_params {
 	char *handler;
 };
 
-static void *
-scst_dev_close_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_dev_close_params));
-}
-
 static void
-scst_dev_close_params_free(void *arg)
+scst_dev_close_params_deinit(void *arg)
 {
 	struct scst_dev_close_params *params = arg;
 
 	free(params->name);
 	free(params->handler);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dev_close_decoders[] = {
@@ -401,7 +388,8 @@ scst_dev_close_data(void *arg)
 
 static struct sto_write_req_params_constructor dev_close_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_close_decoders,
-					   scst_dev_close_params_alloc, scst_dev_close_params_free),
+					   sizeof(struct scst_dev_close_params),
+					   scst_dev_close_params_deinit),
 	.file_path = scst_dev_close_mgmt_file_path,
 	.data = scst_dev_close_data,
 };
@@ -410,18 +398,11 @@ struct scst_dev_resync_params {
 	char *name;
 };
 
-static void *
-scst_dev_resync_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_dev_resync_params));
-}
-
 static void
-scst_dev_resync_params_free(void *arg)
+scst_dev_resync_params_deinit(void *arg)
 {
 	struct scst_dev_resync_params *params = arg;
 	free(params->name);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dev_resync_decoders[] = {
@@ -444,7 +425,8 @@ scst_dev_resync_data(void *arg)
 
 static struct sto_write_req_params_constructor dev_resync_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dev_resync_decoders,
-					   scst_dev_resync_params_alloc, scst_dev_resync_params_free),
+					   sizeof(struct scst_dev_resync_params),
+					   scst_dev_resync_params_deinit),
 	.file_path = scst_dev_resync_mgmt_file_path,
 	.data = scst_dev_resync_data,
 };
@@ -471,18 +453,11 @@ struct scst_dgrp_params {
 	char *name;
 };
 
-static void *
-scst_dgrp_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_dgrp_params));
-}
-
 static void
-scst_dgrp_params_free(void *arg)
+scst_dgrp_params_deinit(void *arg)
 {
 	struct scst_dgrp_params *params = arg;
 	free(params->name);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dgrp_decoders[] = {
@@ -511,14 +486,16 @@ scst_dgrp_del_data(void *arg)
 
 static struct sto_write_req_params_constructor dgrp_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
-					   scst_dgrp_params_alloc, scst_dgrp_params_free),
+					   sizeof(struct scst_dgrp_params),
+					   scst_dgrp_params_deinit),
 	.file_path = scst_dgrp_mgmt_file_path,
 	.data = scst_dgrp_add_data,
 };
 
 static struct sto_write_req_params_constructor dgrp_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_decoders,
-					   scst_dgrp_params_alloc, scst_dgrp_params_free),
+					   sizeof(struct scst_dgrp_params),
+					   scst_dgrp_params_deinit),
 	.file_path = scst_dgrp_mgmt_file_path,
 	.data = scst_dgrp_del_data,
 };
@@ -554,20 +531,13 @@ struct scst_dgrp_dev_params {
 	char *dev_name;
 };
 
-static void *
-scst_dgrp_dev_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_dgrp_dev_params));
-}
-
 static void
-scst_dgrp_dev_params_free(void *arg)
+scst_dgrp_dev_params_deinit(void *arg)
 {
 	struct scst_dgrp_dev_params *params = arg;
 
 	free(params->name);
 	free(params->dev_name);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
@@ -599,14 +569,16 @@ scst_dgrp_del_dev_data(void *arg)
 
 static struct sto_write_req_params_constructor dgrp_add_dev_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
-					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
+					   sizeof(struct scst_dgrp_dev_params),
+					   scst_dgrp_dev_params_deinit),
 	.file_path = scst_dgrp_dev_mgmt_file_path,
 	.data = scst_dgrp_add_dev_data,
 };
 
 static struct sto_write_req_params_constructor dgrp_del_dev_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
-					   scst_dgrp_dev_params_alloc, scst_dgrp_dev_params_free),
+					   sizeof(struct scst_dgrp_dev_params),
+					   scst_dgrp_dev_params_deinit),
 	.file_path = scst_dgrp_dev_mgmt_file_path,
 	.data = scst_dgrp_del_dev_data,
 };
@@ -616,20 +588,13 @@ struct scst_tgrp_params {
 	char *dgrp_name;
 };
 
-static void *
-scst_tgrp_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_tgrp_params));
-}
-
 static void
-scst_tgrp_params_free(void *arg)
+scst_tgrp_params_deinit(void *arg)
 {
 	struct scst_tgrp_params *params = arg;
 
 	free(params->name);
 	free(params->dgrp_name);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_tgrp_decoders[] = {
@@ -661,14 +626,16 @@ scst_tgrp_del_data(void *arg)
 
 static struct sto_write_req_params_constructor tgrp_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_decoders,
-					   scst_tgrp_params_alloc, scst_tgrp_params_free),
+					   sizeof(struct scst_tgrp_params),
+					   scst_tgrp_params_deinit),
 	.file_path = scst_tgrp_mgmt_file_path,
 	.data = scst_tgrp_add_data,
 };
 
 static struct sto_write_req_params_constructor tgrp_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_decoders,
-					   scst_tgrp_params_alloc, scst_tgrp_params_free),
+					   sizeof(struct scst_tgrp_params),
+					   scst_tgrp_params_deinit),
 	.file_path = scst_tgrp_mgmt_file_path,
 	.data = scst_tgrp_del_data,
 };
@@ -677,19 +644,12 @@ struct scst_tgrp_list_params {
 	char *dgrp;
 };
 
-static void *
-scst_tgrp_list_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_tgrp_list_params));
-}
-
 static void
-scst_tgrp_list_params_free(void *arg)
+scst_tgrp_list_params_deinit(void *arg)
 {
 	struct scst_tgrp_list_params *params = arg;
 
 	free(params->dgrp);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_tgrp_list_decoders[] = {
@@ -721,7 +681,8 @@ scst_tgrp_list_exclude(const char **exclude_list)
 
 static struct sto_readdir_req_params_constructor tgrp_list_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_list_decoders,
-					   scst_tgrp_list_params_alloc, scst_tgrp_list_params_free),
+					   sizeof(struct scst_tgrp_list_params),
+					   scst_tgrp_list_params_deinit),
 	.name = scst_tgrp_list_name,
 	.dirpath = scst_tgrp_list_dirpath,
 	.exclude = scst_tgrp_list_exclude,
@@ -733,21 +694,14 @@ struct scst_tgrp_tgt_params {
 	char *tgrp_name;
 };
 
-static void *
-scst_tgrp_tgt_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_tgrp_tgt_params));
-}
-
 static void
-scst_tgrp_tgt_params_free(void *arg)
+scst_tgrp_tgt_params_deinit(void *arg)
 {
 	struct scst_tgrp_tgt_params *params = arg;
 
 	free(params->tgt_name);
 	free(params->dgrp_name);
 	free(params->tgrp_name);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_tgrp_tgt_decoders[] = {
@@ -781,14 +735,16 @@ scst_tgrp_del_tgt_data(void *arg)
 
 static struct sto_write_req_params_constructor tgrp_add_tgt_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_tgt_decoders,
-					   scst_tgrp_tgt_params_alloc, scst_tgrp_tgt_params_free),
+					   sizeof(struct scst_tgrp_tgt_params),
+					   scst_tgrp_tgt_params_deinit),
 	.file_path = scst_tgrp_tgt_mgmt_file_path,
 	.data = scst_tgrp_add_tgt_data,
 };
 
 static struct sto_write_req_params_constructor tgrp_del_tgt_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_tgrp_tgt_decoders,
-					   scst_tgrp_tgt_params_alloc, scst_tgrp_tgt_params_free),
+					   sizeof(struct scst_tgrp_tgt_params),
+					   scst_tgrp_tgt_params_deinit),
 	.file_path = scst_tgrp_tgt_mgmt_file_path,
 	.data = scst_tgrp_del_tgt_data,
 };
@@ -799,20 +755,13 @@ struct scst_target_params {
 	char *driver;
 };
 
-static void *
-scst_target_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_target_params));
-}
-
 static void
-scst_target_params_free(void *arg)
+scst_target_params_deinit(void *arg)
 {
 	struct scst_target_params *params = arg;
 
 	free(params->target);
 	free(params->driver);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_target_decoders[] = {
@@ -844,14 +793,16 @@ scst_target_del_data(void *arg)
 
 static struct sto_write_req_params_constructor target_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
-					   scst_target_params_alloc, scst_target_params_free),
+					   sizeof(struct scst_target_params),
+					   scst_target_params_deinit),
 	.file_path = scst_target_mgmt_file_path,
 	.data = scst_target_add_data,
 };
 
 static struct sto_write_req_params_constructor target_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
-					   scst_target_params_alloc, scst_target_params_free),
+					   sizeof(struct scst_target_params),
+					   scst_target_params_deinit),
 	.file_path = scst_target_mgmt_file_path,
 	.data = scst_target_del_data,
 };
@@ -860,19 +811,12 @@ struct scst_target_list_params {
 	char *driver;
 };
 
-static void *
-scst_target_list_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_target_list_params));
-}
-
 static void
-scst_target_list_params_free(void *arg)
+scst_target_list_params_deinit(void *arg)
 {
 	struct scst_target_list_params *params = arg;
 
 	free(params->driver);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_target_list_decoders[] = {
@@ -907,7 +851,8 @@ scst_target_list_only_dirs(void *arg)
 
 static struct sto_tree_req_params_constructor target_list_constructor = {
 	.decoder = STO_DECODER_INITIALIZER_EMPTY(scst_target_list_decoders,
-						 scst_target_list_params_alloc, scst_target_list_params_free),
+						 sizeof(struct scst_target_list_params),
+						 scst_target_list_params_deinit),
 	.dirpath = scst_target_list_dirpath,
 	.depth = scst_target_list_depth,
 	.only_dirs = scst_target_list_only_dirs,
@@ -935,14 +880,16 @@ scst_target_disable_data(void *arg)
 
 static struct sto_write_req_params_constructor target_enable_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
-					   scst_target_params_alloc, scst_target_params_free),
+					   sizeof(struct scst_target_params),
+					   scst_target_params_deinit),
 	.file_path = scst_target_enable_file_path,
 	.data = scst_target_enable_data,
 };
 
 static struct sto_write_req_params_constructor target_disable_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_target_decoders,
-					   scst_target_params_alloc, scst_target_params_free),
+					   sizeof(struct scst_target_params),
+					   scst_target_params_deinit),
 	.file_path = scst_target_enable_file_path,
 	.data = scst_target_disable_data,
 };
@@ -953,21 +900,14 @@ struct scst_group_params {
 	char *target;
 };
 
-static void *
-scst_group_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_group_params));
-}
-
 static void
-scst_group_params_free(void *arg)
+scst_group_params_deinit(void *arg)
 {
 	struct scst_group_params *params = arg;
 
 	free(params->group);
 	free(params->driver);
 	free(params->target);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_group_decoders[] = {
@@ -1000,14 +940,16 @@ scst_group_del_data(void *arg)
 
 static struct sto_write_req_params_constructor group_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
-					   scst_group_params_alloc, scst_group_params_free),
+					   sizeof(struct scst_group_params),
+					   scst_group_params_deinit),
 	.file_path = scst_group_mgmt_file_path,
 	.data = scst_group_add_data,
 };
 
 static struct sto_write_req_params_constructor group_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_group_decoders,
-					   scst_group_params_alloc, scst_group_params_free),
+					   sizeof(struct scst_group_params),
+					   scst_group_params_deinit),
 	.file_path = scst_group_mgmt_file_path,
 	.data = scst_group_del_data,
 };
@@ -1036,14 +978,8 @@ struct scst_lun_add_params {
 	char *attributes;
 };
 
-static void *
-scst_lun_add_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_lun_add_params));
-}
-
 static void
-scst_lun_add_params_free(void *arg)
+scst_lun_add_params_deinit(void *arg)
 {
 	struct scst_lun_add_params *params = arg;
 
@@ -1052,7 +988,6 @@ scst_lun_add_params_free(void *arg)
 	free(params->device);
 	free(params->group);
 	free(params->attributes);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_lun_add_decoders[] = {
@@ -1097,7 +1032,8 @@ scst_lun_add_data(void *arg)
 
 static struct sto_write_req_params_constructor lun_add_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_lun_add_decoders,
-					   scst_lun_add_params_alloc, scst_lun_add_params_free),
+					   sizeof(struct scst_lun_add_params),
+					   scst_lun_add_params_deinit),
 	.file_path = scst_lun_add_mgmt_file_path,
 	.data = scst_lun_add_data,
 };
@@ -1109,21 +1045,14 @@ struct scst_lun_del_params {
 	char *group;
 };
 
-static void *
-scst_lun_del_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_lun_del_params));
-}
-
 static void
-scst_lun_del_params_free(void *arg)
+scst_lun_del_params_deinit(void *arg)
 {
 	struct scst_lun_del_params *params = arg;
 
 	free(params->driver);
 	free(params->target);
 	free(params->group);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_lun_del_decoders[] = {
@@ -1151,7 +1080,8 @@ scst_lun_del_data(void *arg)
 
 static struct sto_write_req_params_constructor lun_del_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_lun_del_decoders,
-					   scst_lun_del_params_alloc, scst_lun_del_params_free),
+					   sizeof(struct scst_lun_del_params),
+					   scst_lun_del_params_deinit),
 	.file_path = scst_lun_del_mgmt_file_path,
 	.data = scst_lun_del_data,
 };
@@ -1181,7 +1111,8 @@ scst_lun_replace_data(void *arg)
 
 static struct sto_write_req_params_constructor lun_replace_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_lun_add_decoders,
-					   scst_lun_add_params_alloc, scst_lun_add_params_free),
+					   sizeof(struct scst_lun_add_params),
+					   scst_lun_add_params_deinit),
 	.file_path = scst_lun_add_mgmt_file_path,
 	.data = scst_lun_replace_data,
 };
@@ -1192,21 +1123,14 @@ struct scst_lun_clear_params {
 	char *group;
 };
 
-static void *
-scst_lun_clear_params_alloc(void)
-{
-	return calloc(1, sizeof(struct scst_lun_clear_params));
-}
-
 static void
-scst_lun_clear_params_free(void *arg)
+scst_lun_clear_params_deinit(void *arg)
 {
 	struct scst_lun_clear_params *params = arg;
 
 	free(params->driver);
 	free(params->target);
 	free(params->group);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder scst_lun_clear_decoders[] = {
@@ -1231,7 +1155,8 @@ scst_lun_clear_data(void *arg)
 
 static struct sto_write_req_params_constructor lun_clear_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(scst_lun_clear_decoders,
-					   scst_lun_clear_params_alloc, scst_lun_clear_params_free),
+					   sizeof(struct scst_lun_clear_params),
+					   scst_lun_clear_params_deinit),
 	.file_path = scst_lun_clear_mgmt_file_path,
 	.data = scst_lun_clear_data,
 };

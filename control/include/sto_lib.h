@@ -12,8 +12,7 @@
 #include "sto_rpc_readdir.h"
 #include "sto_tree.h"
 
-typedef void *(*sto_params_alloc)(void);
-typedef void (*sto_params_free)(void *params);
+typedef void (*sto_params_deinit)(void *params);
 
 typedef int (*sto_params_parse)(void *priv, void *params);
 
@@ -21,17 +20,17 @@ struct sto_decoder {
 	const struct spdk_json_object_decoder *decoders;
 	size_t num_decoders;
 
-	sto_params_alloc params_alloc;
-	sto_params_free params_free;
+	uint32_t params_size;
+	sto_params_deinit params_deinit;
 
 	bool allow_empty;
 	bool initialized;
 };
-#define STO_DECODER_INITIALIZER(decoders, params_alloc, params_free)	\
-	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free, false, true}
+#define STO_DECODER_INITIALIZER(decoders, params_size, params_deinit)	\
+	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, false, true}
 
-#define STO_DECODER_INITIALIZER_EMPTY(decoders, params_alloc, params_free)	\
-	{decoders, SPDK_COUNTOF(decoders), params_alloc, params_free, true, true}
+#define STO_DECODER_INITIALIZER_EMPTY(decoders, params_size, params_deinit)	\
+	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, true, true}
 
 int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 		      sto_params_parse params_parse, void *priv);

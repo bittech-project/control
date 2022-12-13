@@ -26,6 +26,7 @@ int
 sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 		  sto_params_parse params_parse, void *priv)
 {
+	uint32_t params_size;
 	void *params;
 	int rc = 0;
 
@@ -33,7 +34,9 @@ sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 		return params_parse(priv, NULL);
 	}
 
-	params = decoder->params_alloc();
+	params_size = decoder->params_size;
+
+	params = rte_zmalloc(NULL, params_size, 0);
 	if (spdk_unlikely(!params)) {
 		SPDK_ERRLOG("Failed to alloc params\n");
 		return -ENOMEM;
@@ -48,7 +51,8 @@ sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
 	rc = params_parse(priv, params);
 
 out:
-	decoder->params_free(params);
+	decoder->params_deinit(params);
+	rte_free(params);
 
 	return rc;
 }

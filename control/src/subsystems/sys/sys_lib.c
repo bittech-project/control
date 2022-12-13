@@ -11,20 +11,13 @@ struct sys_writefile_params {
 	char *data;
 };
 
-static void *
-sys_writefile_params_alloc(void)
-{
-	return calloc(1, sizeof(struct sys_writefile_params));
-}
-
 static void
-sys_writefile_params_free(void *arg)
+sys_writefile_params_deinit(void *arg)
 {
 	struct sys_writefile_params *params = arg;
 
 	free(params->filepath);
 	free(params->data);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder sys_writefile_decoders[] = {
@@ -50,7 +43,8 @@ sys_writefile_data(void *arg)
 
 static struct sto_write_req_params_constructor writefile_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(sys_writefile_decoders,
-					   sys_writefile_params_alloc, sys_writefile_params_free),
+					   sizeof(struct sys_writefile_params),
+					   sys_writefile_params_deinit),
 	.file_path = sys_writefile_path,
 	.data = sys_writefile_data,
 };
@@ -60,19 +54,12 @@ struct sys_readfile_params {
 	uint32_t size;
 };
 
-static void *
-sys_readfile_params_alloc(void)
-{
-	return calloc(1, sizeof(struct sys_readfile_params));
-}
-
 static void
-sys_readfile_params_free(void *arg)
+sys_readfile_params_deinit(void *arg)
 {
 	struct sys_readfile_params *params = arg;
 
 	free(params->filepath);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder sys_readfile_decoders[] = {
@@ -98,7 +85,8 @@ sys_readfile_size(void *arg)
 
 static struct sto_read_req_params_constructor readfile_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(sys_readfile_decoders,
-					   sys_readfile_params_alloc, sys_readfile_params_free),
+					   sizeof(struct sys_readfile_params),
+					   sys_readfile_params_deinit),
 	.file_path = sys_readfile_path,
 	.size = sys_readfile_size,
 };
@@ -107,19 +95,12 @@ struct sys_readlink_params {
 	char *filepath;
 };
 
-static void *
-sys_readlink_params_alloc(void)
-{
-	return calloc(1, sizeof(struct sys_readlink_params));
-}
-
 static void
-sys_readlink_params_free(void *arg)
+sys_readlink_params_deinit(void *arg)
 {
 	struct sys_readlink_params *params = arg;
 
 	free(params->filepath);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder sys_readlink_decoders[] = {
@@ -136,7 +117,8 @@ sys_readlink_path(void *arg)
 
 static struct sto_readlink_req_params_constructor readlink_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(sys_readlink_decoders,
-					   sys_readlink_params_alloc, sys_readlink_params_free),
+					   sizeof(struct sys_readlink_params),
+					   sys_readlink_params_deinit),
 	.file_path = sys_readlink_path,
 };
 
@@ -144,19 +126,12 @@ struct sys_readdir_params {
 	char *dirpath;
 };
 
-static void *
-sys_readdir_params_alloc(void)
-{
-	return calloc(1, sizeof(struct sys_readdir_params));
-}
-
 static void
-sys_readdir_params_free(void *arg)
+sys_readdir_params_deinit(void *arg)
 {
 	struct sys_readdir_params *params = arg;
 
 	free(params->dirpath);
-	free(params);
 }
 
 static const struct spdk_json_object_decoder sys_readdir_decoders[] = {
@@ -179,7 +154,8 @@ sys_readdir_dirpath(void *arg)
 
 static struct sto_readdir_req_params_constructor readdir_constructor = {
 	.decoder = STO_DECODER_INITIALIZER(sys_readdir_decoders,
-					   sys_readdir_params_alloc, sys_readdir_params_free),
+					   sizeof(struct sys_readdir_params),
+					   sys_readdir_params_deinit),
 	.name = sys_readdir_name,
 	.dirpath = sys_readdir_dirpath,
 };
