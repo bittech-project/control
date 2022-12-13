@@ -77,11 +77,12 @@ iscsi_init_constructor(struct sto_req *req, int state)
 	}
 }
 
-struct sto_req_ops sto_iscsi_init_req_ops = {
-	.decode_cdb = sto_dummy_req_decode_cdb,
-	.exec_constructor = iscsi_init_constructor,
-	.response = sto_dummy_req_response,
-	.free = sto_dummy_req_free,
+const struct sto_req_properties sto_iscsi_init_req_properties = {
+	.ops = {
+		.decode_cdb = sto_dummy_req_decode_cdb,
+		.exec_constructor = iscsi_init_constructor,
+		.response = sto_dummy_req_response,
+	}
 };
 
 static int
@@ -100,11 +101,12 @@ iscsi_deinit_constructor(struct sto_req *req, int state)
 	}
 }
 
-struct sto_req_ops sto_iscsi_deinit_req_ops = {
-	.decode_cdb = sto_dummy_req_decode_cdb,
-	.exec_constructor = iscsi_deinit_constructor,
-	.response = sto_dummy_req_response,
-	.free = sto_dummy_req_free,
+const struct sto_req_properties sto_iscsi_deinit_req_properties = {
+	.ops = {
+		.decode_cdb = sto_dummy_req_decode_cdb,
+		.exec_constructor = iscsi_deinit_constructor,
+		.response = sto_dummy_req_response,
+	}
 };
 
 static void
@@ -147,28 +149,26 @@ iscsi_add_target_constructor(struct sto_req *req, int state)
 	}
 }
 
-struct sto_req_ops sto_iscsi_add_target_req_ops = {
-	.decode_cdb = sto_dummy_req_decode_cdb,
-	.exec_constructor = iscsi_add_target_constructor,
-	.response = sto_dummy_req_response,
-	.free = sto_dummy_req_free,
+const struct sto_req_properties sto_iscsi_add_target_req_properties = {
+	.ops = {
+		.decode_cdb = sto_dummy_req_decode_cdb,
+		.exec_constructor = iscsi_add_target_constructor,
+		.response = sto_dummy_req_response,
+	}
 };
 
 static const struct sto_ops scst_ops[] = {
 	{
 		.name = "iscsi_init",
-		.req_constructor = sto_dummy_req_constructor,
-		.req_ops = &sto_iscsi_init_req_ops,
+		.req_properties = &sto_iscsi_init_req_properties,
 	},
 	{
 		.name = "iscsi_add_target",
-		.req_constructor = sto_dummy_req_constructor,
-		.req_ops = &sto_iscsi_add_target_req_ops,
+		.req_properties = &sto_iscsi_add_target_req_properties,
 	},
 	{
 		.name = "iscsi_deinit",
-		.req_constructor = sto_dummy_req_constructor,
-		.req_ops = &sto_iscsi_deinit_req_ops,
+		.req_properties = &sto_iscsi_deinit_req_properties,
 	}
 };
 

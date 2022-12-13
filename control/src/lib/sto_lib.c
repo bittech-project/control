@@ -194,11 +194,54 @@ sto_exec_list_free(struct sto_exec_list *list)
 	}
 }
 
+struct sto_req *
+sto_req_alloc(const struct sto_req_properties *properties)
+{
+	struct sto_req *req;
+	uint32_t priv_size;
+
+	req = rte_zmalloc(NULL, sizeof(*req), 0);
+	if (spdk_unlikely(!req)) {
+		SPDK_ERRLOG("Failed to alloc STO req\n");
+		return NULL;
+	}
+
+	priv_size = properties->priv_size;
+
+	if (priv_size) {
+		req->priv = rte_zmalloc(NULL, priv_size, 0);
+		if (spdk_unlikely(!req->priv)) {
+			SPDK_ERRLOG("Failed to alloc STO req priv\n");
+			rte_free(req);
+			return NULL;
+		}
+
+		req->priv_deinit = properties->priv_deinit;
+	}
+
+	req->ops = &properties->ops;
+
+	TAILQ_INIT(&req->exe_queue);
+	TAILQ_INIT(&req->rollback_stack);
+
+	return req;
+}
+
 void
 sto_req_free(struct sto_req *req)
 {
+	if (req->priv) {
+		if (req->priv_deinit) {
+			req->priv_deinit(req->priv);
+		}
+
+		rte_free(req->priv);
+	}
+
 	sto_exec_list_free(&req->exe_queue);
 	sto_exec_list_free(&req->rollback_stack);
+
+	rte_free(req);
 }
 
 static void
@@ -273,7 +316,6 @@ sto_req_exec_error(struct sto_req *req, int rc)
 static void
 sto_req_exec(struct sto_req *req)
 {
-	struct sto_req_ops *ops = req->ops;
 	sto_req_exec_t exec_fn;
 	int rc = 0;
 
@@ -294,7 +336,7 @@ sto_req_exec(struct sto_req *req)
 			return;
 		}
 
-		rc = ops->exec_constructor(req, req->state);
+		rc = req->ops->exec_constructor(req, req->state);
 		if (spdk_unlikely(rc)) {
 			SPDK_ERRLOG("Failed to construct exec for req[%p]\n", req);
 			goto out_err;
@@ -340,8 +382,6 @@ sto_req_process(struct sto_req *req, int rc)
 	TAILQ_INSERT_TAIL(&g_sto_req_exec_list, req, list);
 }
 
-STO_REQ_CONSTRUCTOR_DEFINE(write)
-
 static void
 sto_write_req_params_free(struct sto_write_req_params *params)
 {
@@ -375,14 +415,21 @@ free_file:
 	return -ENOMEM;
 }
 
-static int
-sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+static void
+sto_write_req_priv_deinit(void *priv)
 {
-	struct sto_write_req *write_req = STO_REQ_TYPE(req, write);
-	struct sto_write_req_params_constructor *constructor = req->params_constructor;
+	struct sto_write_req_info *info = priv;
+	sto_write_req_params_free(&info->params);
+}
+
+static int
+sto_write_req_decode_cdb(struct sto_req *req, void *params_constructor, const struct spdk_json_val *cdb)
+{
+	struct sto_write_req_info *info = req->priv;
+	struct sto_write_req_params_constructor *constructor = params_constructor;
 	int rc = 0;
 
-	constructor->inner.params = &write_req->params;
+	constructor->inner.params = &info->params;
 
 	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_write_req_params_parse, constructor);
 	if (spdk_unlikely(rc)) {
@@ -395,8 +442,8 @@ sto_write_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 static int
 sto_write_req_exec(struct sto_req *req)
 {
-	struct sto_write_req *write_req = STO_REQ_TYPE(req, write);
-	struct sto_write_req_params *params = &write_req->params;
+	struct sto_write_req_info *info = req->priv;
+	struct sto_write_req_params *params = &info->params;
 	struct sto_rpc_writefile_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
@@ -416,25 +463,15 @@ sto_write_req_exec_constructor(struct sto_req *req, int state)
 	}
 }
 
-static void
-sto_write_req_free(struct sto_req *req)
-{
-	struct sto_write_req *write_req = STO_REQ_TYPE(req, write);
-
-	sto_write_req_params_free(&write_req->params);
-
-	sto_req_free(req);
-	rte_free(write_req);
-}
-
-struct sto_req_ops sto_write_req_ops = {
-	.decode_cdb = sto_write_req_decode_cdb,
-	.exec_constructor = sto_write_req_exec_constructor,
-	.response = sto_dummy_req_response,
-	.free = sto_write_req_free,
+const struct sto_req_properties sto_write_req_properties = {
+	.priv_size = sizeof(struct sto_write_req_info),
+	.priv_deinit = sto_write_req_priv_deinit,
+	.ops = {
+		.decode_cdb = sto_write_req_decode_cdb,
+		.exec_constructor = sto_write_req_exec_constructor,
+		.response = sto_dummy_req_response,
+	}
 };
-
-STO_REQ_CONSTRUCTOR_DEFINE(read)
 
 static void
 sto_read_req_params_free(struct sto_read_req_params *params)
@@ -461,14 +498,23 @@ sto_read_req_params_parse(void *priv, void *params)
 	return 0;
 }
 
-static int
-sto_read_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+static void
+sto_read_req_priv_deinit(void *priv)
 {
-	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
-	struct sto_read_req_params_constructor *constructor = req->params_constructor;
+	struct sto_read_req_info *info = priv;
+
+	sto_read_req_params_free(&info->params);
+	free(info->buf);
+}
+
+static int
+sto_read_req_decode_cdb(struct sto_req *req, void *params_constructor, const struct spdk_json_val *cdb)
+{
+	struct sto_read_req_info *info = req->priv;
+	struct sto_read_req_params_constructor *constructor = params_constructor;
 	int rc = 0;
 
-	constructor->inner.params = &read_req->params;
+	constructor->inner.params = &info->params;
 
 	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_read_req_params_parse, constructor);
 	if (spdk_unlikely(rc)) {
@@ -481,12 +527,12 @@ sto_read_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 static int
 sto_read_req_exec(struct sto_req *req)
 {
-	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
-	struct sto_read_req_params *params = &read_req->params;
+	struct sto_read_req_info *info = req->priv;
+	struct sto_read_req_params *params = &info->params;
 	struct sto_rpc_readfile_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
-		.buf = &read_req->buf,
+		.buf = &info->buf,
 	};
 
 	return sto_rpc_readfile(params->file, params->size, &args);
@@ -506,31 +552,20 @@ sto_read_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_read_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
+	struct sto_read_req_info *info = req->priv;
 
-	spdk_json_write_string(w, read_req->buf);
+	spdk_json_write_string(w, info->buf);
 }
 
-static void
-sto_read_req_free(struct sto_req *req)
-{
-	struct sto_read_req *read_req = STO_REQ_TYPE(req, read);
-
-	sto_read_req_params_free(&read_req->params);
-	free(read_req->buf);
-
-	sto_req_free(req);
-	rte_free(read_req);
-}
-
-struct sto_req_ops sto_read_req_ops = {
-	.decode_cdb = sto_read_req_decode_cdb,
-	.exec_constructor = sto_read_req_exec_constructor,
-	.response = sto_read_req_response,
-	.free = sto_read_req_free,
+const struct sto_req_properties sto_read_req_properties = {
+	.priv_size = sizeof(struct sto_read_req_info),
+	.priv_deinit = sto_read_req_priv_deinit,
+	.ops = {
+		.decode_cdb = sto_read_req_decode_cdb,
+		.exec_constructor = sto_read_req_exec_constructor,
+		.response = sto_read_req_response,
+	}
 };
-
-STO_REQ_CONSTRUCTOR_DEFINE(readlink)
 
 static void
 sto_readlink_req_params_free(struct sto_readlink_req_params *params)
@@ -553,14 +588,23 @@ sto_readlink_req_params_parse(void *priv, void *params)
 	return 0;
 }
 
-static int
-sto_readlink_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+static void
+sto_readlink_req_priv_deinit(void *priv)
 {
-	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
-	struct sto_readlink_req_params_constructor *constructor = req->params_constructor;
+	struct sto_readlink_req_info *info = priv;
+
+	sto_readlink_req_params_free(&info->params);
+	free(info->buf);
+}
+
+static int
+sto_readlink_req_decode_cdb(struct sto_req *req, void *params_constructor, const struct spdk_json_val *cdb)
+{
+	struct sto_readlink_req_info *info = req->priv;
+	struct sto_readlink_req_params_constructor *constructor = params_constructor;
 	int rc = 0;
 
-	constructor->inner.params = &readlink_req->params;
+	constructor->inner.params = &info->params;
 
 	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_readlink_req_params_parse, constructor);
 	if (spdk_unlikely(rc)) {
@@ -573,12 +617,12 @@ sto_readlink_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb
 static int
 sto_readlink_req_exec(struct sto_req *req)
 {
-	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
-	struct sto_readlink_req_params *params = &readlink_req->params;
+	struct sto_readlink_req_info *info = req->priv;
+	struct sto_readlink_req_params *params = &info->params;
 	struct sto_rpc_readlink_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
-		.buf = &readlink_req->buf,
+		.buf = &info->buf,
 	};
 
 	return sto_rpc_readlink(params->file, &args);
@@ -598,31 +642,20 @@ sto_readlink_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_readlink_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
+	struct sto_readlink_req_info *info = req->priv;
 
-	spdk_json_write_string(w, readlink_req->buf);
+	spdk_json_write_string(w, info->buf);
 }
 
-static void
-sto_readlink_req_free(struct sto_req *req)
-{
-	struct sto_readlink_req *readlink_req = STO_REQ_TYPE(req, readlink);
-
-	sto_readlink_req_params_free(&readlink_req->params);
-	free(readlink_req->buf);
-
-	sto_req_free(req);
-	rte_free(readlink_req);
-}
-
-struct sto_req_ops sto_readlink_req_ops = {
-	.decode_cdb = sto_readlink_req_decode_cdb,
-	.exec_constructor = sto_readlink_req_exec_constructor,
-	.response = sto_readlink_req_response,
-	.free = sto_readlink_req_free,
+const struct sto_req_properties sto_readlink_req_properties = {
+	.priv_size = sizeof(struct sto_readlink_req_info),
+	.priv_deinit = sto_readlink_req_priv_deinit,
+	.ops = {
+		.decode_cdb = sto_readlink_req_decode_cdb,
+		.exec_constructor = sto_readlink_req_exec_constructor,
+		.response = sto_readlink_req_response,
+	}
 };
-
-STO_REQ_CONSTRUCTOR_DEFINE(readdir)
 
 static void
 sto_readdir_req_params_free(struct sto_readdir_req_params *params)
@@ -670,14 +703,23 @@ free_name:
 	return -ENOMEM;
 }
 
-static int
-sto_readdir_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+static void
+sto_readdir_req_priv_deinit(void *priv)
 {
-	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
-	struct sto_readdir_req_params_constructor *constructor = req->params_constructor;
+	struct sto_readdir_req_info *info = priv;
+
+	sto_readdir_req_params_free(&info->params);
+	sto_dirents_free(&info->dirents);
+}
+
+static int
+sto_readdir_req_decode_cdb(struct sto_req *req, void *params_constructor, const struct spdk_json_val *cdb)
+{
+	struct sto_readdir_req_info *info = req->priv;
+	struct sto_readdir_req_params_constructor *constructor = params_constructor;
 	int rc = 0;
 
-	constructor->inner.params = &readdir_req->params;
+	constructor->inner.params = &info->params;
 
 	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_readdir_req_params_parse, constructor);
 	if (spdk_unlikely(rc)) {
@@ -690,12 +732,12 @@ sto_readdir_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 static int
 sto_readdir_req_exec(struct sto_req *req)
 {
-	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
-	struct sto_readdir_req_params *params = &readdir_req->params;
+	struct sto_readdir_req_info *info = req->priv;
+	struct sto_readdir_req_params *params = &info->params;
 	struct sto_rpc_readdir_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
-		.dirents = &readdir_req->dirents,
+		.dirents = &info->dirents,
 	};
 
 	return sto_rpc_readdir(params->dirpath, &args);
@@ -715,37 +757,25 @@ sto_readdir_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_readdir_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
-	struct sto_readdir_req_params *params = &readdir_req->params;
+	struct sto_readdir_req_info *info = req->priv;
+	struct sto_readdir_req_params *params = &info->params;
 	struct sto_dirents_json_cfg cfg = {
 		.name = params->name,
 		.exclude_list = params->exclude_list,
 	};
 
-	sto_dirents_info_json(&readdir_req->dirents, &cfg, w);
+	sto_dirents_info_json(&info->dirents, &cfg, w);
 }
 
-static void
-sto_readdir_req_free(struct sto_req *req)
-{
-	struct sto_readdir_req *readdir_req = STO_REQ_TYPE(req, readdir);
-
-	sto_readdir_req_params_free(&readdir_req->params);
-
-	sto_dirents_free(&readdir_req->dirents);
-
-	sto_req_free(req);
-	rte_free(readdir_req);
-}
-
-struct sto_req_ops sto_readdir_req_ops = {
-	.decode_cdb = sto_readdir_req_decode_cdb,
-	.exec_constructor = sto_readdir_req_exec_constructor,
-	.response = sto_readdir_req_response,
-	.free = sto_readdir_req_free,
+const struct sto_req_properties sto_readdir_req_properties = {
+	.priv_size = sizeof(struct sto_readdir_req_info),
+	.priv_deinit = sto_readdir_req_priv_deinit,
+	.ops = {
+		.decode_cdb = sto_readdir_req_decode_cdb,
+		.exec_constructor = sto_readdir_req_exec_constructor,
+		.response = sto_readdir_req_response,
+	}
 };
-
-STO_REQ_CONSTRUCTOR_DEFINE(tree)
 
 static void
 sto_tree_req_params_free(struct sto_tree_req_params *params)
@@ -780,14 +810,23 @@ sto_tree_req_params_parse(void *priv, void *params)
 	return 0;
 }
 
-static int
-sto_tree_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
+static void
+sto_tree_req_priv_deinit(void *priv)
 {
-	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
-	struct sto_tree_req_params_constructor *constructor = req->params_constructor;
+	struct sto_tree_req_info *info = priv;
+
+	sto_tree_req_params_free(&info->params);
+	sto_tree_free(&info->tree_root);
+}
+
+static int
+sto_tree_req_decode_cdb(struct sto_req *req, void *params_constructor, const struct spdk_json_val *cdb)
+{
+	struct sto_tree_req_info *info = req->priv;
+	struct sto_tree_req_params_constructor *constructor = params_constructor;
 	int rc = 0;
 
-	constructor->inner.params = &tree_req->params;
+	constructor->inner.params = &info->params;
 
 	rc = sto_decoder_parse(&constructor->decoder, cdb, sto_tree_req_params_parse, constructor);
 	if (spdk_unlikely(rc)) {
@@ -800,12 +839,12 @@ sto_tree_req_decode_cdb(struct sto_req *req, const struct spdk_json_val *cdb)
 static int
 sto_tree_req_exec(struct sto_req *req)
 {
-	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
-	struct sto_tree_req_params *params = &tree_req->params;
+	struct sto_tree_req_info *info = req->priv;
+	struct sto_tree_req_params *params = &info->params;
 	struct sto_tree_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
-		.tree_root = &tree_req->tree_root,
+		.tree_root = &info->tree_root,
 	};
 
 	return sto_tree(params->dirpath, params->depth, params->only_dirs, &args);
@@ -825,9 +864,9 @@ sto_tree_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_tree_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
-	struct sto_tree_req_params *params = &tree_req->params;
-	struct sto_tree_node *tree_root = &tree_req->tree_root;
+	struct sto_tree_req_info *info = req->priv;
+	struct sto_tree_req_params *params = &info->params;
+	struct sto_tree_node *tree_root = &info->tree_root;
 
 	if (params->info_json) {
 		params->info_json(tree_root, w);
@@ -837,23 +876,14 @@ sto_tree_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 	sto_tree_info_json(tree_root, w);
 }
 
-static void
-sto_tree_req_free(struct sto_req *req)
-{
-	struct sto_tree_req *tree_req = STO_REQ_TYPE(req, tree);
-
-	sto_tree_req_params_free(&tree_req->params);
-	sto_tree_free(&tree_req->tree_root);
-
-	sto_req_free(req);
-	rte_free(tree_req);
-}
-
-struct sto_req_ops sto_tree_req_ops = {
-	.decode_cdb = sto_tree_req_decode_cdb,
-	.exec_constructor = sto_tree_req_exec_constructor,
-	.response = sto_tree_req_response,
-	.free = sto_tree_req_free,
+const struct sto_req_properties sto_tree_req_properties = {
+	.priv_size = sizeof(struct sto_tree_req_info),
+	.priv_deinit = sto_tree_req_priv_deinit,
+	.ops = {
+		.decode_cdb = sto_tree_req_decode_cdb,
+		.exec_constructor = sto_tree_req_exec_constructor,
+		.response = sto_tree_req_response,
+	}
 };
 
 int

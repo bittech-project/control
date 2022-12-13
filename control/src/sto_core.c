@@ -198,21 +198,18 @@ static struct sto_context *
 sto_core_parse_ops(const struct sto_ops *op, const struct spdk_json_val *params)
 {
 	struct sto_req *req = NULL;
-	struct sto_req_ops *ops;
 	int rc;
 
-	req = op->req_constructor(op);
+	req = sto_req_alloc(op->req_properties);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("Failed to construct req\n");
 		return NULL;
 	}
 
-	ops = req->ops;
-
-	rc = ops->decode_cdb(req, params);
+	rc = req->ops->decode_cdb(req, op->params_constructor, params);
 	if (rc) {
 		SPDK_ERRLOG("Failed to decode CDB for req[%p], rc=%d\n", req, rc);
-		ops->free(req);
+		sto_req_free(req);
 		return NULL;
 	}
 
@@ -285,7 +282,6 @@ void
 sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx *w)
 {
 	struct sto_req *req;
-	struct sto_req_ops *ops;
 	struct sto_err_context *err = &core_req->err_ctx;
 
 	SPDK_ERRLOG("req[%p] end response: rc=%d\n", core_req, err->rc);
@@ -296,9 +292,7 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 	}
 
 	req = STO_REQ(core_req->ctx);
-	ops = req->ops;
-
-	ops->response(req, w);
+	req->ops->response(req, w);
 
 	return;
 }
@@ -308,9 +302,8 @@ sto_core_req_free(struct sto_core_req *core_req)
 {
 	if (core_req->ctx) {
 		struct sto_req *req = STO_REQ(core_req->ctx);
-		struct sto_req_ops *ops = req->ops;
 
-		ops->free(req);
+		sto_req_free(req);
 		core_req->ctx = NULL;
 	}
 

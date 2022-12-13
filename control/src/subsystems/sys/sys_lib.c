@@ -187,27 +187,23 @@ static struct sto_readdir_req_params_constructor readdir_constructor = {
 static const struct sto_ops sys_ops[] = {
 	{
 		.name = "writefile",
-		.req_constructor = sto_write_req_constructor,
-		.req_ops = &sto_write_req_ops,
 		.params_constructor = &writefile_constructor,
+		.req_properties = &sto_write_req_properties,
 	},
 	{
 		.name = "readfile",
-		.req_constructor = sto_read_req_constructor,
-		.req_ops = &sto_read_req_ops,
 		.params_constructor = &readfile_constructor,
+		.req_properties = &sto_read_req_properties,
 	},
 	{
 		.name = "readlink",
-		.req_constructor = sto_readlink_req_constructor,
-		.req_ops = &sto_readlink_req_ops,
 		.params_constructor = &readlink_constructor,
+		.req_properties = &sto_readlink_req_properties,
 	},
 	{
 		.name = "readdir",
-		.req_constructor = sto_readdir_req_constructor,
-		.req_ops = &sto_readdir_req_ops,
 		.params_constructor = &readdir_constructor,
+		.req_properties = &sto_readdir_req_properties,
 	},
 };
 
