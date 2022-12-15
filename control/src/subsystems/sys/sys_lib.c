@@ -25,7 +25,7 @@ static const struct spdk_json_object_decoder sys_writefile_decoders[] = {
 	{"data", offsetof(struct sys_writefile_params, data), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder sys_writefile_decoder =
+static const struct sto_ops_decoder sys_writefile_decoder =
 	STO_OPS_DECODER_INITIALIZER(sys_writefile_decoders,
 				    sizeof(struct sys_writefile_params),
 				    sys_writefile_params_deinit);
@@ -66,7 +66,7 @@ static const struct spdk_json_object_decoder sys_readfile_decoders[] = {
 	{"size", offsetof(struct sys_readfile_params, size), spdk_json_decode_uint32, true},
 };
 
-const struct sto_ops_decoder sys_readfile_decoder =
+static const struct sto_ops_decoder sys_readfile_decoder =
 	STO_OPS_DECODER_INITIALIZER(sys_readfile_decoders,
 				    sizeof(struct sys_readfile_params),
 				    sys_readfile_params_deinit);
@@ -103,7 +103,7 @@ static const struct spdk_json_object_decoder sys_readlink_decoders[] = {
 	{"filepath", offsetof(struct sys_readlink_params, filepath), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder sys_readlink_decoder =
+static const struct sto_ops_decoder sys_readlink_decoder =
 	STO_OPS_DECODER_INITIALIZER(sys_readlink_decoders,
 				    sizeof(struct sys_readlink_params),
 				    sys_readlink_params_deinit);
@@ -137,7 +137,7 @@ static const struct spdk_json_object_decoder sys_readdir_decoders[] = {
 	{"dirpath", offsetof(struct sys_readdir_params, dirpath), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder sys_readdir_decoder =
+static const struct sto_ops_decoder sys_readdir_decoder =
 	STO_OPS_DECODER_INITIALIZER(sys_readdir_decoders,
 				    sizeof(struct sys_readdir_params),
 				    sys_readdir_params_deinit);

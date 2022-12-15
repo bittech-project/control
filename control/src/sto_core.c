@@ -10,7 +10,6 @@
 #include "sto_core.h"
 #include "sto_utils.h"
 #include "sto_req.h"
-#include "sto_subsystem.h"
 #include "sto_err.h"
 
 #define STO_CORE_REQ_POLL_PERIOD	1000 /* 1ms */

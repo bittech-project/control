@@ -318,7 +318,7 @@ static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
 	{"attributes", offsetof(struct scst_dev_open_params, attributes), spdk_json_decode_string, true},
 };
 
-const struct sto_ops_decoder scst_dev_open_decoder =
+static const struct sto_ops_decoder scst_dev_open_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_dev_open_decoders,
 				    sizeof(struct scst_dev_open_params),
 				    scst_dev_open_params_deinit);
@@ -372,7 +372,7 @@ static const struct spdk_json_object_decoder scst_dev_close_decoders[] = {
 	{"handler", offsetof(struct scst_dev_close_params, handler), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_dev_close_decoder =
+static const struct sto_ops_decoder scst_dev_close_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_dev_close_decoders,
 				    sizeof(struct scst_dev_close_params),
 				    scst_dev_close_params_deinit);
@@ -412,7 +412,7 @@ static const struct spdk_json_object_decoder scst_dev_resync_decoders[] = {
 	{"name", offsetof(struct scst_dev_resync_params, name), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_dev_resync_decoder =
+static const struct sto_ops_decoder scst_dev_resync_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_dev_resync_decoders,
 				    sizeof(struct scst_dev_resync_params),
 				    scst_dev_resync_params_deinit);
@@ -470,7 +470,7 @@ static const struct spdk_json_object_decoder scst_dgrp_decoders[] = {
 	{"name", offsetof(struct scst_dgrp_params, name), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_dgrp_decoder =
+static const struct sto_ops_decoder scst_dgrp_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_dgrp_decoders,
 				    sizeof(struct scst_dgrp_params),
 				    scst_dgrp_params_deinit);
@@ -552,7 +552,7 @@ static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
 	{"dev_name", offsetof(struct scst_dgrp_dev_params, dev_name), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_dgrp_dev_decoder =
+static const struct sto_ops_decoder scst_dgrp_dev_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
 				    sizeof(struct scst_dgrp_dev_params),
 				    scst_dgrp_dev_params_deinit);
@@ -616,7 +616,7 @@ static const struct spdk_json_object_decoder scst_tgrp_decoders[] = {
 	{"dgrp_name", offsetof(struct scst_tgrp_params, dgrp_name), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_tgrp_decoder =
+static const struct sto_ops_decoder scst_tgrp_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_tgrp_decoders,
 				    sizeof(struct scst_tgrp_params),
 				    scst_tgrp_params_deinit);
@@ -677,7 +677,7 @@ static const struct spdk_json_object_decoder scst_tgrp_list_decoders[] = {
 	{"dgrp", offsetof(struct scst_tgrp_list_params, dgrp), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_tgrp_list_decoder =
+static const struct sto_ops_decoder scst_tgrp_list_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_tgrp_list_decoders,
 				    sizeof(struct scst_tgrp_list_params),
 				    scst_tgrp_list_params_deinit);
@@ -726,7 +726,7 @@ static const struct spdk_json_object_decoder scst_tgrp_tgt_decoders[] = {
 	{"tgrp_name", offsetof(struct scst_tgrp_tgt_params, tgrp_name), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_tgrp_tgt_decoder =
+static const struct sto_ops_decoder scst_tgrp_tgt_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_tgrp_tgt_decoders,
 				    sizeof(struct scst_tgrp_tgt_params),
 				    scst_tgrp_tgt_params_deinit);
@@ -792,7 +792,7 @@ static const struct spdk_json_object_decoder scst_target_decoders[] = {
 	{"driver", offsetof(struct scst_target_params, driver), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_target_decoder =
+static const struct sto_ops_decoder scst_target_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_target_decoders,
 				    sizeof(struct scst_target_params),
 				    scst_target_params_deinit);
@@ -853,7 +853,7 @@ static const struct spdk_json_object_decoder scst_target_list_decoders[] = {
 	{"driver", offsetof(struct scst_target_list_params, driver), spdk_json_decode_string, true},
 };
 
-const struct sto_ops_decoder scst_target_list_decoder =
+static const struct sto_ops_decoder scst_target_list_decoder =
 	STO_OPS_DECODER_INITIALIZER_EMPTY(scst_target_list_decoders,
 					  sizeof(struct scst_target_list_params),
 					  scst_target_list_params_deinit);
@@ -944,7 +944,7 @@ static const struct spdk_json_object_decoder scst_group_decoders[] = {
 	{"target", offsetof(struct scst_group_params, target), spdk_json_decode_string},
 };
 
-const struct sto_ops_decoder scst_group_decoder =
+static const struct sto_ops_decoder scst_group_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_group_decoders,
 				    sizeof(struct scst_group_params),
 				    scst_group_params_deinit);
@@ -1036,7 +1036,7 @@ static const struct spdk_json_object_decoder scst_lun_add_decoders[] = {
 	{"attributes", offsetof(struct scst_lun_add_params, attributes), spdk_json_decode_string, true},
 };
 
-const struct sto_ops_decoder scst_lun_add_decoder =
+static const struct sto_ops_decoder scst_lun_add_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_lun_add_decoders,
 				    sizeof(struct scst_lun_add_params),
 				    scst_lun_add_params_deinit);
@@ -1097,7 +1097,7 @@ static const struct spdk_json_object_decoder scst_lun_del_decoders[] = {
 	{"group", offsetof(struct scst_lun_del_params, group), spdk_json_decode_string, true},
 };
 
-const struct sto_ops_decoder scst_lun_del_decoder =
+static const struct sto_ops_decoder scst_lun_del_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_lun_del_decoders,
 				    sizeof(struct scst_lun_del_params),
 				    scst_lun_del_params_deinit);
@@ -1176,7 +1176,7 @@ static const struct spdk_json_object_decoder scst_lun_clear_decoders[] = {
 	{"group", offsetof(struct scst_lun_clear_params, group), spdk_json_decode_string, true},
 };
 
-struct sto_ops_decoder scst_lun_clear_decoder =
+static struct sto_ops_decoder scst_lun_clear_decoder =
 	STO_OPS_DECODER_INITIALIZER(scst_lun_clear_decoders,
 				    sizeof(struct scst_lun_clear_params),
 				    scst_lun_clear_params_deinit);
