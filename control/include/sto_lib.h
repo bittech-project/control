@@ -12,29 +12,6 @@
 #include "sto_rpc_readdir.h"
 #include "sto_tree.h"
 
-typedef void (*sto_params_deinit)(void *params);
-
-typedef int (*sto_params_parse)(void *priv, void *params);
-
-struct sto_decoder {
-	const struct spdk_json_object_decoder *decoders;
-	size_t num_decoders;
-
-	uint32_t params_size;
-	sto_params_deinit params_deinit;
-
-	bool allow_empty;
-	bool initialized;
-};
-#define STO_DECODER_INITIALIZER(decoders, params_size, params_deinit)	\
-	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, false, true}
-
-#define STO_DECODER_INITIALIZER_EMPTY(decoders, params_size, params_deinit)	\
-	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, true, true}
-
-int sto_decoder_parse(struct sto_decoder *decoder, const struct spdk_json_val *data,
-		      sto_params_parse params_parse, void *priv);
-
 struct sto_err_context {
 	int rc;
 	const char *errno_msg;
@@ -53,32 +30,53 @@ void sto_err(struct sto_err_context *err, int rc);
 void sto_status_ok(struct spdk_json_write_ctx *w);
 void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err);
 
+typedef void (*sto_ops_decoder_params_deinit_t)(void *params);
+
+struct sto_ops_decoder {
+	const struct spdk_json_object_decoder *decoders;
+	size_t num_decoders;
+
+	uint32_t params_size;
+	sto_ops_decoder_params_deinit_t params_deinit;
+
+	bool allow_empty;
+};
+#define STO_OPS_DECODER_INITIALIZER(decoders, params_size, params_deinit)	\
+	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, false}
+
+#define STO_OPS_DECODER_INITIALIZER_EMPTY(decoders, params_size, params_deinit)	\
+	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, true}
+
 struct sto_req;
 
-typedef int (*sto_req_decode_cdb_t)(struct sto_req *req, void *params_constructor,
-				    const struct spdk_json_val *cdb);
 typedef int (*sto_req_exec_constructor_t)(struct sto_req *req, int state);
 typedef void (*sto_req_response_t)(struct sto_req *req, struct spdk_json_write_ctx *w);
 
 struct sto_req_ops {
-	sto_req_decode_cdb_t decode_cdb;
 	sto_req_exec_constructor_t exec_constructor;
 	sto_req_response_t response;
 };
 
+typedef void (*sto_req_params_deinit_t)(void *priv);
 typedef void (*sto_req_priv_deinit_t)(void *priv);
 
 struct sto_req_properties {
+	uint32_t params_size;
+	sto_req_params_deinit_t params_deinit;
+
 	uint32_t priv_size;
 	sto_req_priv_deinit_t priv_deinit;
 
 	struct sto_req_ops ops;
 };
 
+typedef int (*sto_ops_req_params_constructor_t)(void *arg1, void *arg2);
+
 struct sto_ops {
 	const char *name;
-	void *params_constructor;
+	const struct sto_ops_decoder *decoder;
 	const struct sto_req_properties *req_properties;
+	sto_ops_req_params_constructor_t req_params_constructor;
 };
 
 struct sto_op_table {
@@ -108,10 +106,15 @@ TAILQ_HEAD(sto_exec_list, sto_exec_ctx);
 struct sto_req {
 	struct sto_context ctx;
 
-	void *priv;
-	sto_req_priv_deinit_t priv_deinit;
+	struct {
+		void *params;
+		sto_req_params_deinit_t params_deinit;
 
-	const struct sto_req_ops *ops;
+		void *priv;
+		sto_req_priv_deinit_t priv_deinit;
+
+		const struct sto_req_ops *ops;
+	}; /* sto_req_type */
 
 	int returncode;
 	int state;
@@ -155,13 +158,10 @@ sto_req_done(struct sto_req *req)
 }
 
 struct sto_req *sto_req_alloc(const struct sto_req_properties *properties);
+int sto_req_parse_params(struct sto_req *req, const struct sto_ops_decoder *decoder,
+			 const struct spdk_json_val *values,
+			 sto_ops_req_params_constructor_t params_constructor);
 void sto_req_free(struct sto_req *req);
-
-static inline int
-sto_dummy_req_decode_cdb(struct sto_req *req, void *params_constructor, const struct spdk_json_val *cdb)
-{
-	return 0;
-}
 
 static inline int
 sto_dummy_req_exec_constructor(struct sto_req *req, int state)
@@ -180,21 +180,6 @@ struct sto_write_req_params {
 	char *data;
 };
 
-struct sto_write_req_params_constructor {
-	struct sto_decoder decoder;
-
-	const char *(*file_path)(void *params);
-	char *(*data)(void *params);
-
-	struct {
-		struct sto_write_req_params *params;
-	} inner;
-};
-
-struct sto_write_req_info {
-	struct sto_write_req_params params;
-};
-
 extern const struct sto_req_properties sto_write_req_properties;
 
 struct sto_read_req_params {
@@ -202,43 +187,10 @@ struct sto_read_req_params {
 	uint32_t size;
 };
 
-struct sto_read_req_params_constructor {
-	struct sto_decoder decoder;
-
-	const char *(*file_path)(void *params);
-	uint32_t (*size)(void *params);
-
-	struct {
-		struct sto_read_req_params *params;
-	} inner;
-};
-
-struct sto_read_req_info {
-	struct sto_read_req_params params;
-	char *buf;
-};
-
 extern const struct sto_req_properties sto_read_req_properties;
 
 struct sto_readlink_req_params {
 	const char *file;
-};
-
-struct sto_readlink_req_params_constructor {
-	struct sto_decoder decoder;
-
-	const char *(*file_path)(void *params);
-
-	struct {
-		struct sto_readlink_req_params *params;
-	} inner;
-};
-
-struct sto_readlink_req_info {
-	struct sto_req req;
-
-	struct sto_readlink_req_params params;
-	char *buf;
 };
 
 extern const struct sto_req_properties sto_readlink_req_properties;
@@ -250,23 +202,6 @@ struct sto_readdir_req_params {
 	const char *exclude_list[EXCLUDE_LIST_MAX];
 };
 
-struct sto_readdir_req_params_constructor {
-	struct sto_decoder decoder;
-
-	const char *(*name)(void *params);
-	char *(*dirpath)(void *params);
-	int (*exclude)(const char **arr);
-
-	struct {
-		struct sto_readdir_req_params *params;
-	} inner;
-};
-
-struct sto_readdir_req_info {
-	struct sto_readdir_req_params params;
-	struct sto_dirents dirents;
-};
-
 extern const struct sto_req_properties sto_readdir_req_properties;
 
 struct sto_tree_req_params {
@@ -275,25 +210,6 @@ struct sto_tree_req_params {
 	bool only_dirs;
 
 	sto_tree_info_json_t info_json;
-};
-
-struct sto_tree_req_params_constructor {
-	struct sto_decoder decoder;
-
-	char *(*dirpath)(void *params);
-	uint32_t (*depth)(void *params);
-	bool (*only_dirs)(void *params);
-
-	sto_tree_info_json_t info_json;
-
-	struct {
-		struct sto_tree_req_params *params;
-	} inner;
-};
-
-struct sto_tree_req_info {
-	struct sto_tree_req_params params;
-	struct sto_tree_node tree_root;
 };
 
 extern const struct sto_req_properties sto_tree_req_properties;
