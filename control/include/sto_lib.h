@@ -17,14 +17,6 @@ struct sto_err_context {
 	const char *errno_msg;
 };
 
-typedef void (*sto_context_done_t)(void *priv);
-
-struct sto_context {
-	void *priv;
-	sto_context_done_t done;
-	struct sto_err_context *err_ctx;
-};
-
 void sto_err(struct sto_err_context *err, int rc);
 
 void sto_status_ok(struct spdk_json_write_ctx *w);
@@ -88,6 +80,14 @@ struct sto_op_table {
 int sto_lib_init(void);
 void sto_lib_fini(void);
 
+typedef void (*sto_req_context_done_t)(void *priv);
+
+struct sto_req_context {
+	void *priv;
+	sto_req_context_done_t done;
+	struct sto_err_context *err_ctx;
+};
+
 typedef int (*sto_req_exec_t)(struct sto_req *req);
 
 struct sto_exec_entry {
@@ -104,7 +104,7 @@ struct sto_exec_ctx {
 TAILQ_HEAD(sto_exec_list, sto_exec_ctx);
 
 struct sto_req {
-	struct sto_context ctx;
+	struct sto_req_context ctx;
 
 	struct {
 		void *params;
@@ -152,7 +152,7 @@ sto_req_exec_done(void *priv, int rc)
 static inline void
 sto_req_done(struct sto_req *req)
 {
-	struct sto_context *ctx = &req->ctx;
+	struct sto_req_context *ctx = &req->ctx;
 
 	ctx->done(ctx->priv);
 }

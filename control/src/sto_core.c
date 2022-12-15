@@ -160,13 +160,13 @@ sto_core_process_start(const struct spdk_json_val *params, struct sto_core_args 
 static void sto_core_req_exec_done(void *priv);
 
 static void
-sto_core_req_init_ctx(struct sto_core_req *core_req, struct sto_context *ctx)
+sto_core_req_init_req_ctx(struct sto_core_req *core_req, struct sto_req_context *req_ctx)
 {
-	ctx->priv = core_req;
-	ctx->done = sto_core_req_exec_done;
-	ctx->err_ctx = &core_req->err_ctx;
+	req_ctx->priv = core_req;
+	req_ctx->done = sto_core_req_exec_done;
+	req_ctx->err_ctx = &core_req->err_ctx;
 
-	core_req->ctx = ctx;
+	core_req->req_ctx = req_ctx;
 }
 
 static struct sto_core_component *
@@ -194,7 +194,7 @@ sto_core_component_decode(const struct spdk_json_val *params)
 	return component;
 }
 
-static struct sto_context *
+static struct sto_req_context *
 sto_core_parse_ops(const struct sto_ops *op, const struct spdk_json_val *params)
 {
 	struct sto_req *req = NULL;
@@ -222,7 +222,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 	struct sto_core_component *component;
 	const struct sto_ops *op;
 	const struct spdk_json_val *params_cdb = NULL;
-	struct sto_context *ctx;
+	struct sto_req_context *req_ctx;
 	int rc = 0;
 
 	component = sto_core_component_decode(core_req->params);
@@ -237,14 +237,14 @@ sto_core_req_parse(struct sto_core_req *core_req)
 		return PTR_ERR(op);
 	}
 
-	ctx = sto_core_parse_ops(op, params_cdb);
-	if (spdk_unlikely(!ctx)) {
+	req_ctx = sto_core_parse_ops(op, params_cdb);
+	if (spdk_unlikely(!req_ctx)) {
 		SPDK_ERRLOG("Failed to parse ops\n");
 		rc = -EINVAL;
 		goto out;
 	}
 
-	sto_core_req_init_ctx(core_req, ctx);
+	sto_core_req_init_req_ctx(core_req, req_ctx);
 
 	sto_core_req_set_state(core_req, STO_CORE_REQ_STATE_EXEC);
 	sto_core_req_process(core_req);
@@ -267,7 +267,7 @@ sto_core_req_exec_done(void *priv)
 static void
 sto_core_req_exec(struct sto_core_req *core_req)
 {
-	struct sto_req *req = STO_REQ(core_req->ctx);
+	struct sto_req *req = STO_REQ(core_req->req_ctx);
 
 	sto_req_process_start(req);
 }
@@ -291,7 +291,7 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 		return;
 	}
 
-	req = STO_REQ(core_req->ctx);
+	req = STO_REQ(core_req->req_ctx);
 	req->ops->response(req, w);
 
 	return;
@@ -300,11 +300,11 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 void
 sto_core_req_free(struct sto_core_req *core_req)
 {
-	if (core_req->ctx) {
-		struct sto_req *req = STO_REQ(core_req->ctx);
+	if (core_req->req_ctx) {
+		struct sto_req *req = STO_REQ(core_req->req_ctx);
 
 		sto_req_free(req);
-		core_req->ctx = NULL;
+		core_req->req_ctx = NULL;
 	}
 
 	rte_free(core_req);

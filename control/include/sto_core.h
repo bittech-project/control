@@ -22,7 +22,7 @@ struct sto_core_req {
 
 	enum sto_core_req_state state;
 
-	struct sto_context *ctx;
+	struct sto_req_context *req_ctx;
 	struct sto_err_context err_ctx;
 
 	TAILQ_ENTRY(sto_core_req) list;
