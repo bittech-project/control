@@ -99,19 +99,20 @@ struct sto_exec_ctx {
 
 TAILQ_HEAD(sto_exec_list, sto_exec_ctx);
 
+struct sto_req_type {
+	void *params;
+	sto_req_params_deinit_t params_deinit;
+
+	void *priv;
+	sto_req_priv_deinit_t priv_deinit;
+
+	sto_req_response_t response;
+	sto_req_exec_constructor_t exec_constructor;
+};
+
 struct sto_req {
 	struct sto_req_context ctx;
-
-	struct {
-		void *params;
-		sto_req_params_deinit_t params_deinit;
-
-		void *priv;
-		sto_req_priv_deinit_t priv_deinit;
-
-		sto_req_response_t response;
-		sto_req_exec_constructor_t exec_constructor;
-	}; /* sto_req_type */
+	struct sto_req_type type;
 
 	int returncode;
 	int state;
@@ -155,9 +156,9 @@ sto_req_done(struct sto_req *req)
 }
 
 struct sto_req *sto_req_alloc(const struct sto_req_properties *properties);
-int sto_req_parse_params(struct sto_req *req, const struct sto_ops_decoder *decoder,
-			 const struct spdk_json_val *values,
-			 sto_ops_req_params_constructor_t params_constructor);
+int sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decoder *decoder,
+			      const struct spdk_json_val *values,
+			      sto_ops_req_params_constructor_t params_constructor);
 void sto_req_free(struct sto_req *req);
 
 static inline int

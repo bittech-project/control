@@ -207,118 +207,39 @@ sto_exec_list_free(struct sto_exec_list *list)
 }
 
 static int
-sto_req_params_alloc(struct sto_req *req, size_t params_size, sto_req_params_deinit_t params_deinit)
+sto_req_type_init(struct sto_req_type *type, const struct sto_req_properties *properties)
 {
-	req->params = rte_zmalloc(NULL, params_size, 0);
-	if (spdk_unlikely(!req->params)) {
-		SPDK_ERRLOG("Failed to alloc write req params\n");
-		return -ENOMEM;
-	}
-
-	req->params_deinit = params_deinit;
-
-	return 0;
-}
-
-static void
-sto_req_params_free(struct sto_req *req)
-{
-	if (!req->params) {
-		return;
-	}
-
-	if (req->params_deinit) {
-		req->params_deinit(req->params);
-	}
-
-	rte_free(req->params);
-}
-
-static int
-sto_req_priv_alloc(struct sto_req *req, size_t priv_size, sto_req_priv_deinit_t priv_deinit)
-{
-	req->priv = rte_zmalloc(NULL, priv_size, 0);
-	if (spdk_unlikely(!req->priv)) {
-		SPDK_ERRLOG("Failed to alloc STO req priv\n");
-		return -ENOMEM;
-	}
-
-	req->priv_deinit = priv_deinit;
-
-	return 0;
-}
-
-static void
-sto_req_priv_free(struct sto_req *req)
-{
-	if (!req->priv) {
-		return;
-	}
-
-	if (req->priv_deinit) {
-		req->priv_deinit(req->priv);
-	}
-
-	rte_free(req->priv);
-}
-
-static int
-sto_req_init(struct sto_req *req, const struct sto_req_properties *properties)
-{
-	int rc;
-
 	if (properties->params_size) {
-		rc = sto_req_params_alloc(req, properties->params_size, properties->params_deinit);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Failed to alloc STO req params\n");
+		type->params = rte_zmalloc(NULL, properties->params_size, 0);
+		if (spdk_unlikely(!type->params)) {
+			SPDK_ERRLOG("Failed to alloc req type params\n");
 			return -ENOMEM;
 		}
+
+		type->params_deinit = properties->params_deinit;
 	}
 
 	if (properties->priv_size) {
-		rc = sto_req_priv_alloc(req, properties->priv_size, properties->priv_deinit);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Failed to alloc STO req priv\n");
-			sto_req_params_free(req);
+		type->priv = rte_zmalloc(NULL, properties->priv_size, 0);
+		if (spdk_unlikely(!type->priv)) {
+			SPDK_ERRLOG("Failed to alloc req type priv\n");
+			rte_free(type->params);
 			return -ENOMEM;
 		}
+
+		type->priv_deinit = properties->priv_deinit;
 	}
 
-	req->response = properties->response;
-	req->exec_constructor = properties->exec_constructor;
+	type->response = properties->response;
+	type->exec_constructor = properties->exec_constructor;
 
 	return 0;
 }
 
-struct sto_req *
-sto_req_alloc(const struct sto_req_properties *properties)
-{
-	struct sto_req *req;
-	int rc;
-
-	req = rte_zmalloc(NULL, sizeof(*req), 0);
-	if (spdk_unlikely(!req)) {
-		SPDK_ERRLOG("Failed to alloc STO req\n");
-		return NULL;
-	}
-
-	rc = sto_req_init(req, properties);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to init STO req\n");
-		rte_free(req);
-		return NULL;
-	}
-
-	TAILQ_INIT(&req->exe_queue);
-	TAILQ_INIT(&req->rollback_stack);
-
-	return req;
-}
-
 int
-sto_req_parse_params(struct sto_req *req, const struct sto_ops_decoder *decoder,
-		     const struct spdk_json_val *values,
-		     sto_ops_req_params_constructor_t req_params_constructor)
+sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decoder *decoder,
+			  const struct spdk_json_val *values,
+			  sto_ops_req_params_constructor_t req_params_constructor)
 {
 	void *ops_params = NULL;
 	int rc = 0;
@@ -337,7 +258,7 @@ sto_req_parse_params(struct sto_req *req, const struct sto_ops_decoder *decoder,
 		}
 	}
 
-	rc = req_params_constructor(req->params, ops_params);
+	rc = req_params_constructor(type->params, ops_params);
 
 	if (decoder) {
 		sto_ops_decoder_params_free(decoder, ops_params);
@@ -346,11 +267,55 @@ sto_req_parse_params(struct sto_req *req, const struct sto_ops_decoder *decoder,
 	return rc;
 }
 
+static void
+sto_req_type_deinit(struct sto_req_type *type)
+{
+	if (type->params) {
+		if (type->params_deinit) {
+			type->params_deinit(type->params);
+		}
+
+		rte_free(type->params);
+	}
+
+	if (type->priv) {
+		if (type->priv_deinit) {
+			type->priv_deinit(type->priv);
+		}
+
+		rte_free(type->priv);
+	}
+}
+
+struct sto_req *
+sto_req_alloc(const struct sto_req_properties *properties)
+{
+	struct sto_req *req;
+	int rc;
+
+	req = rte_zmalloc(NULL, sizeof(*req), 0);
+	if (spdk_unlikely(!req)) {
+		SPDK_ERRLOG("Failed to alloc STO req\n");
+		return NULL;
+	}
+
+	rc = sto_req_type_init(&req->type, properties);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to init STO req\n");
+		rte_free(req);
+		return NULL;
+	}
+
+	TAILQ_INIT(&req->exe_queue);
+	TAILQ_INIT(&req->rollback_stack);
+
+	return req;
+}
+
 void
 sto_req_free(struct sto_req *req)
 {
-	sto_req_params_free(req);
-	sto_req_priv_free(req);
+	sto_req_type_deinit(&req->type);
 
 	sto_exec_list_free(&req->exe_queue);
 	sto_exec_list_free(&req->rollback_stack);
@@ -450,7 +415,7 @@ sto_req_exec(struct sto_req *req)
 			return;
 		}
 
-		rc = req->exec_constructor(req, req->state);
+		rc = req->type.exec_constructor(req, req->state);
 		if (spdk_unlikely(rc)) {
 			SPDK_ERRLOG("Failed to construct exec for req[%p]\n", req);
 			goto out_err;
@@ -508,7 +473,7 @@ sto_write_req_params_deinit(void *params_ptr)
 static int
 sto_write_req_exec(struct sto_req *req)
 {
-	struct sto_write_req_params *params = req->params;
+	struct sto_write_req_params *params = req->type.params;
 	struct sto_rpc_writefile_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
@@ -557,8 +522,8 @@ sto_read_req_params_deinit(void *params_ptr)
 static int
 sto_read_req_exec(struct sto_req *req)
 {
-	struct sto_read_req_priv *priv = req->priv;
-	struct sto_read_req_params *params = req->params;
+	struct sto_read_req_priv *priv = req->type.priv;
+	struct sto_read_req_params *params = req->type.params;
 	struct sto_rpc_readfile_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
@@ -582,7 +547,7 @@ sto_read_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_read_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_read_req_priv *priv = req->priv;
+	struct sto_read_req_priv *priv = req->type.priv;
 
 	spdk_json_write_string(w, priv->buf);
 }
@@ -619,8 +584,8 @@ sto_readlink_req_priv_deinit(void *priv_ptr)
 static int
 sto_readlink_req_exec(struct sto_req *req)
 {
-	struct sto_readlink_req_priv *priv = req->priv;
-	struct sto_readlink_req_params *params = req->params;
+	struct sto_readlink_req_priv *priv = req->type.priv;
+	struct sto_readlink_req_params *params = req->type.params;
 	struct sto_rpc_readlink_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
@@ -644,7 +609,7 @@ sto_readlink_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_readlink_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readlink_req_priv *priv = req->priv;
+	struct sto_readlink_req_priv *priv = req->type.priv;
 
 	spdk_json_write_string(w, priv->buf);
 }
@@ -682,8 +647,8 @@ sto_readdir_req_priv_deinit(void *priv_ptr)
 static int
 sto_readdir_req_exec(struct sto_req *req)
 {
-	struct sto_readdir_req_priv *priv = req->priv;
-	struct sto_readdir_req_params *params = req->params;
+	struct sto_readdir_req_priv *priv = req->type.priv;
+	struct sto_readdir_req_params *params = req->type.params;
 	struct sto_rpc_readdir_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
@@ -707,8 +672,8 @@ sto_readdir_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_readdir_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readdir_req_priv *priv = req->priv;
-	struct sto_readdir_req_params *params = req->params;
+	struct sto_readdir_req_priv *priv = req->type.priv;
+	struct sto_readdir_req_params *params = req->type.params;
 	struct sto_dirents_json_cfg cfg = {
 		.name = params->name,
 		.exclude_list = params->exclude_list,
@@ -749,8 +714,8 @@ sto_tree_req_priv_deinit(void *priv_ptr)
 static int
 sto_tree_req_exec(struct sto_req *req)
 {
-	struct sto_tree_req_priv *priv = req->priv;
-	struct sto_tree_req_params *params = req->params;
+	struct sto_tree_req_priv *priv = req->type.priv;
+	struct sto_tree_req_params *params = req->type.params;
 	struct sto_tree_args args = {
 		.priv = req,
 		.done = sto_req_exec_done,
@@ -774,8 +739,8 @@ sto_tree_req_exec_constructor(struct sto_req *req, int state)
 static void
 sto_tree_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_req_priv *priv = req->priv;
-	struct sto_tree_req_params *params = req->params;
+	struct sto_tree_req_priv *priv = req->type.priv;
+	struct sto_tree_req_params *params = req->type.params;
 	struct sto_tree_node *tree_root = &priv->tree_root;
 
 	if (params->info_json) {

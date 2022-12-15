@@ -206,7 +206,7 @@ sto_core_parse_ops(const struct sto_ops *op, const struct spdk_json_val *params)
 		return NULL;
 	}
 
-	rc = sto_req_parse_params(req, op->decoder, params, op->req_params_constructor);
+	rc = sto_req_type_parse_params(&req->type, op->decoder, params, op->req_params_constructor);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to decode CDB for req[%p], rc=%d\n", req, rc);
 		sto_req_free(req);
@@ -292,7 +292,7 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 	}
 
 	req = STO_REQ(core_req->req_ctx);
-	req->response(req, w);
+	req->type.response(req, w);
 
 	return;
 }
