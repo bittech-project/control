@@ -6,7 +6,7 @@
 #include <rte_malloc.h>
 
 #include "sto_utils.h"
-#include "err.h"
+#include "sto_err.h"
 
 struct sto_json_ctx *
 sto_json_ctx_alloc(void)

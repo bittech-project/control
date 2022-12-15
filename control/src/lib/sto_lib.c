@@ -8,7 +8,7 @@
 
 #include "sto_lib.h"
 #include "sto_rpc_aio.h"
-#include "err.h"
+#include "sto_err.h"
 
 #define STO_EXEC_POLL_PERIOD		1000 /* 1ms */
 #define STO_ROLLBACK_POLL_PERIOD	1000 /* 1ms */

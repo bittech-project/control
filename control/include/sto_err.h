@@ -3,7 +3,7 @@
 
 #include <spdk/likely.h>
 
-#include "compiler.h"
+#include "sto_compiler.h"
 
 /*
  * Kernel pointers have redundant information, so we can use a

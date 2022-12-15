@@ -5,7 +5,7 @@
 
 #include "sto_subsystem.h"
 #include "sto_core.h"
-#include "err.h"
+#include "sto_err.h"
 
 static TAILQ_HEAD(sto_subsystem_list, sto_subsystem) g_sto_subsystems =
 	TAILQ_HEAD_INITIALIZER(g_sto_subsystems);
