@@ -41,16 +41,11 @@ struct sto_ops_decoder {
 
 struct sto_req;
 
-typedef int (*sto_req_exec_constructor_t)(struct sto_req *req, int state);
-typedef void (*sto_req_response_t)(struct sto_req *req, struct spdk_json_write_ctx *w);
-
-struct sto_req_ops {
-	sto_req_exec_constructor_t exec_constructor;
-	sto_req_response_t response;
-};
-
 typedef void (*sto_req_params_deinit_t)(void *priv);
 typedef void (*sto_req_priv_deinit_t)(void *priv);
+
+typedef void (*sto_req_response_t)(struct sto_req *req, struct spdk_json_write_ctx *w);
+typedef int (*sto_req_exec_constructor_t)(struct sto_req *req, int state);
 
 struct sto_req_properties {
 	uint32_t params_size;
@@ -59,7 +54,8 @@ struct sto_req_properties {
 	uint32_t priv_size;
 	sto_req_priv_deinit_t priv_deinit;
 
-	struct sto_req_ops ops;
+	sto_req_response_t response;
+	sto_req_exec_constructor_t exec_constructor;
 };
 
 typedef int (*sto_ops_req_params_constructor_t)(void *arg1, void *arg2);
@@ -113,7 +109,8 @@ struct sto_req {
 		void *priv;
 		sto_req_priv_deinit_t priv_deinit;
 
-		const struct sto_req_ops *ops;
+		sto_req_response_t response;
+		sto_req_exec_constructor_t exec_constructor;
 	}; /* sto_req_type */
 
 	int returncode;

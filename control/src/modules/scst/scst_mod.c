@@ -78,10 +78,8 @@ iscsi_init_constructor(struct sto_req *req, int state)
 }
 
 const struct sto_req_properties sto_iscsi_init_req_properties = {
-	.ops = {
-		.exec_constructor = iscsi_init_constructor,
-		.response = sto_dummy_req_response,
-	}
+	.response = sto_dummy_req_response,
+	.exec_constructor = iscsi_init_constructor,
 };
 
 static int
@@ -101,10 +99,8 @@ iscsi_deinit_constructor(struct sto_req *req, int state)
 }
 
 const struct sto_req_properties sto_iscsi_deinit_req_properties = {
-	.ops = {
-		.exec_constructor = iscsi_deinit_constructor,
-		.response = sto_dummy_req_response,
-	}
+	.response = sto_dummy_req_response,
+	.exec_constructor = iscsi_deinit_constructor,
 };
 
 static void
@@ -148,10 +144,8 @@ iscsi_add_target_constructor(struct sto_req *req, int state)
 }
 
 const struct sto_req_properties sto_iscsi_add_target_req_properties = {
-	.ops = {
-		.exec_constructor = iscsi_add_target_constructor,
-		.response = sto_dummy_req_response,
-	}
+	.response = sto_dummy_req_response,
+	.exec_constructor = iscsi_add_target_constructor,
 };
 
 static const struct sto_ops scst_ops[] = {

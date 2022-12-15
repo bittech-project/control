@@ -284,7 +284,8 @@ sto_req_init(struct sto_req *req, const struct sto_req_properties *properties)
 		}
 	}
 
-	req->ops = &properties->ops;
+	req->response = properties->response;
+	req->exec_constructor = properties->exec_constructor;
 
 	return 0;
 }
@@ -449,7 +450,7 @@ sto_req_exec(struct sto_req *req)
 			return;
 		}
 
-		rc = req->ops->exec_constructor(req, req->state);
+		rc = req->exec_constructor(req, req->state);
 		if (spdk_unlikely(rc)) {
 			SPDK_ERRLOG("Failed to construct exec for req[%p]\n", req);
 			goto out_err;
@@ -531,10 +532,8 @@ const struct sto_req_properties sto_write_req_properties = {
 	.params_size = sizeof(struct sto_write_req_params),
 	.params_deinit = sto_write_req_params_deinit,
 
-	.ops = {
-		.exec_constructor = sto_write_req_exec_constructor,
-		.response = sto_dummy_req_response,
-	}
+	.response = sto_dummy_req_response,
+	.exec_constructor = sto_write_req_exec_constructor,
 };
 
 struct sto_read_req_priv {
@@ -595,10 +594,8 @@ const struct sto_req_properties sto_read_req_properties = {
 	.priv_size = sizeof(struct sto_read_req_priv),
 	.priv_deinit = sto_read_req_priv_deinit,
 
-	.ops = {
-		.exec_constructor = sto_read_req_exec_constructor,
-		.response = sto_read_req_response,
-	}
+	.response = sto_read_req_response,
+	.exec_constructor = sto_read_req_exec_constructor,
 };
 
 static void
@@ -659,10 +656,8 @@ const struct sto_req_properties sto_readlink_req_properties = {
 	.priv_size = sizeof(struct sto_readlink_req_priv),
 	.priv_deinit = sto_readlink_req_priv_deinit,
 
-	.ops = {
-		.exec_constructor = sto_readlink_req_exec_constructor,
-		.response = sto_readlink_req_response,
-	}
+	.response = sto_readlink_req_response,
+	.exec_constructor = sto_readlink_req_exec_constructor,
 };
 
 static void
@@ -729,10 +724,8 @@ const struct sto_req_properties sto_readdir_req_properties = {
 	.priv_size = sizeof(struct sto_readdir_req_priv),
 	.priv_deinit = sto_readdir_req_priv_deinit,
 
-	.ops = {
-		.exec_constructor = sto_readdir_req_exec_constructor,
-		.response = sto_readdir_req_response,
-	}
+	.response = sto_readdir_req_response,
+	.exec_constructor = sto_readdir_req_exec_constructor,
 };
 
 static void
@@ -800,10 +793,8 @@ const struct sto_req_properties sto_tree_req_properties = {
 	.priv_size = sizeof(struct sto_tree_req_priv),
 	.priv_deinit = sto_tree_req_priv_deinit,
 
-	.ops = {
-		.exec_constructor = sto_tree_req_exec_constructor,
-		.response = sto_tree_req_response,
-	}
+	.response = sto_tree_req_response,
+	.exec_constructor = sto_tree_req_exec_constructor,
 };
 
 int

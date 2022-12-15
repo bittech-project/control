@@ -292,7 +292,7 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 	}
 
 	req = STO_REQ(core_req->req_ctx);
-	req->ops->response(req, w);
+	req->response(req, w);
 
 	return;
 }
