@@ -3,6 +3,7 @@
 #include <spdk/log.h>
 
 #include "sto_module.h"
+#include "sto_utils.h"
 #include "sto_core.h"
 #include "sto_err.h"
 

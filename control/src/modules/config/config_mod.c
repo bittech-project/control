@@ -7,7 +7,7 @@
 
 #include "sto_version.h"
 #include "sto_module.h"
-#include "sto_lib.h"
+#include "sto_req.h"
 
 static void
 sto_version_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)

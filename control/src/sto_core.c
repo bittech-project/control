@@ -8,7 +8,8 @@
 #include <rte_malloc.h>
 
 #include "sto_core.h"
-#include "sto_lib.h"
+#include "sto_utils.h"
+#include "sto_req.h"
 #include "sto_subsystem.h"
 #include "sto_err.h"
 
@@ -352,9 +353,9 @@ sto_core_init(void)
 		return -ENOMEM;
 	}
 
-	rc = sto_lib_init();
+	rc = sto_req_lib_init();
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("sto_lib_init() failed, rc=%d\n", rc);
+		SPDK_ERRLOG("sto_req_lib_init() failed, rc=%d\n", rc);
 		return rc;
 	}
 
@@ -364,6 +365,6 @@ sto_core_init(void)
 void
 sto_core_fini(void)
 {
-	sto_lib_fini();
+	sto_req_lib_fini();
 	spdk_poller_unregister(&g_sto_core_req_poller);
 }
