@@ -5,7 +5,7 @@
 
 #include <rte_string_fns.h>
 
-#include "sto_req.h"
+#include "sto_generic_req.h"
 #include "sto_subsystem.h"
 
 #define SCST_ROOT "/sys/kernel/scst_tgt"

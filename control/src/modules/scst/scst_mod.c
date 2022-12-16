@@ -7,9 +7,9 @@
 
 #include "sto_module.h"
 #include "sto_core.h"
+#include "sto_generic_req.h"
 #include "sto_subsystem.h"
 #include "sto_rpc_subprocess.h"
-#include "sto_req.h"
 
 static int
 iscsi_start_daemon(struct sto_req *req)

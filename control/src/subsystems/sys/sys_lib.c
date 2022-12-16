@@ -3,7 +3,7 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include "sto_req.h"
+#include "sto_generic_req.h"
 #include "sto_subsystem.h"
 
 struct sys_writefile_params {
