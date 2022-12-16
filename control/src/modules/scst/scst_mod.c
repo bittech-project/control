@@ -16,7 +16,7 @@ iscsi_start_daemon(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
 		.priv = req,
-		.done = sto_req_exec_done,
+		.done = sto_req_step_done,
 	};
 
 	SPDK_ERRLOG("GLEB: Start iscsi-scstd\n");
@@ -29,7 +29,7 @@ iscsi_stop_daemon(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
 		.priv = req,
-		.done = sto_req_exec_done,
+		.done = sto_req_step_done,
 	};
 
 	SPDK_ERRLOG("GLEB: Stop iscsi-scstd\n");
@@ -42,7 +42,7 @@ iscsi_modprobe(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
 		.priv = req,
-		.done = sto_req_exec_done,
+		.done = sto_req_step_done,
 	};
 
 	SPDK_ERRLOG("GLEB: Modprobe iscsi-scst\n");
@@ -55,53 +55,29 @@ iscsi_rmmod(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
 		.priv = req,
-		.done = sto_req_exec_done,
+		.done = sto_req_step_done,
 	};
 	SPDK_ERRLOG("GLEB: Rmmod iscsi-scst\n");
 
 	return sto_rpc_subprocess_fmt("rmmod %s", &args, "iscsi-scst");
 }
 
-static int
-iscsi_init_constructor(struct sto_req *req, int state)
-{
-	switch (state) {
-	case 0:
-		const struct sto_exec_entry e[] = {
-			{iscsi_modprobe, iscsi_rmmod},
-			{iscsi_start_daemon, iscsi_stop_daemon},
-		};
-
-		return STO_REQ_ADD_EXEC_ENTRIES(req, e);
-	default:
-		return 0;
-	}
-}
-
 const struct sto_req_properties sto_iscsi_init_req_properties = {
 	.response = sto_dummy_req_response,
-	.exec_constructor = iscsi_init_constructor,
-};
-
-static int
-iscsi_deinit_constructor(struct sto_req *req, int state)
-{
-	switch (state) {
-	case 0:
-		const struct sto_exec_entry e[] = {
-			{iscsi_stop_daemon, NULL},
-			{iscsi_rmmod, NULL},
-		};
-
-		return STO_REQ_ADD_EXEC_ENTRIES(req, e);
-	default:
-		return 0;
+	.steps = {
+		STO_REQ_STEP(iscsi_modprobe, iscsi_rmmod),
+		STO_REQ_STEP(iscsi_start_daemon, iscsi_stop_daemon),
+		STO_REQ_STEP_TERMINATOR(),
 	}
-}
+};
 
 const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 	.response = sto_dummy_req_response,
-	.exec_constructor = iscsi_deinit_constructor,
+	.steps = {
+		STO_REQ_STEP(iscsi_stop_daemon, NULL),
+		STO_REQ_STEP(iscsi_rmmod, NULL),
+		STO_REQ_STEP_TERMINATOR(),
+	}
 };
 
 static void
@@ -112,7 +88,7 @@ iscsi_add_target_done(void *priv, struct sto_core_req *core_req)
 
 	sto_core_req_free(core_req);
 
-	sto_req_process(req, rc);
+	sto_req_step_next(req, rc);
 }
 
 static void
@@ -133,20 +109,12 @@ iscsi_add_target(struct sto_req *req)
 	return sto_subsystem_send("scst", "target_add", NULL, iscsi_add_target_params, &args);
 }
 
-static int
-iscsi_add_target_constructor(struct sto_req *req, int state)
-{
-	switch (state) {
-	case 0:
-		return sto_req_add_exec(req, iscsi_add_target, NULL);
-	default:
-		return 0;
-	}
-}
-
 const struct sto_req_properties sto_iscsi_add_target_req_properties = {
 	.response = sto_dummy_req_response,
-	.exec_constructor = iscsi_add_target_constructor,
+	.steps = {
+		STO_REQ_STEP(iscsi_add_target, NULL),
+		STO_REQ_STEP_TERMINATOR(),
+	}
 };
 
 static const struct sto_ops scst_ops[] = {

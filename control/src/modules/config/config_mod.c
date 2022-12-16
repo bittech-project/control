@@ -17,7 +17,9 @@ sto_version_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 
 const struct sto_req_properties sto_version_req_properties = {
 	.response = sto_version_req_response,
-	.exec_constructor = sto_dummy_req_exec_constructor,
+	.steps = {
+		STO_REQ_STEP_TERMINATOR(),
+	}
 };
 
 static const struct sto_ops config_ops[] = {

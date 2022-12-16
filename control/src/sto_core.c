@@ -269,7 +269,7 @@ sto_core_req_exec(struct sto_core_req *core_req)
 {
 	struct sto_req *req = STO_REQ(core_req->req_ctx);
 
-	sto_req_process_start(req);
+	sto_req_step_start(req);
 }
 
 static void
