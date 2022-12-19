@@ -16,14 +16,19 @@ static struct spdk_poller *g_sto_req_action_poller;
 static TAILQ_HEAD(sto_req_list, sto_req) g_sto_req_list = TAILQ_HEAD_INITIALIZER(g_sto_req_list);
 
 
+static void sto_req_type_deinit(struct sto_req_type *type);
+
 static int
 sto_req_type_init(struct sto_req_type *type, const struct sto_req_properties *properties)
 {
+	int rc = 0;
+
 	if (properties->params_size) {
 		type->params = rte_zmalloc(NULL, properties->params_size, 0);
 		if (spdk_unlikely(!type->params)) {
 			SPDK_ERRLOG("Failed to alloc req type params\n");
-			return -ENOMEM;
+			rc = -ENOMEM;
+			goto error;
 		}
 
 		type->params_deinit = properties->params_deinit;
@@ -33,7 +38,8 @@ sto_req_type_init(struct sto_req_type *type, const struct sto_req_properties *pr
 		type->priv = rte_zmalloc(NULL, properties->priv_size, 0);
 		if (spdk_unlikely(!type->priv)) {
 			SPDK_ERRLOG("Failed to alloc req type priv\n");
-			return -ENOMEM;
+			rc = -ENOMEM;
+			goto error;
 		}
 
 		type->priv_deinit = properties->priv_deinit;
@@ -42,6 +48,31 @@ sto_req_type_init(struct sto_req_type *type, const struct sto_req_properties *pr
 	type->response = properties->response;
 
 	return 0;
+
+error:
+	sto_req_type_deinit(type);
+
+	return rc;
+}
+
+static void
+sto_req_type_deinit(struct sto_req_type *type)
+{
+	if (type->params) {
+		if (type->params_deinit) {
+			type->params_deinit(type->params);
+		}
+
+		rte_free(type->params);
+	}
+
+	if (type->priv) {
+		if (type->priv_deinit) {
+			type->priv_deinit(type->priv);
+		}
+
+		rte_free(type->priv);
+	}
 }
 
 int
@@ -73,26 +104,6 @@ sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decode
 	}
 
 	return rc;
-}
-
-static void
-sto_req_type_deinit(struct sto_req_type *type)
-{
-	if (type->params) {
-		if (type->params_deinit) {
-			type->params_deinit(type->params);
-		}
-
-		rte_free(type->params);
-	}
-
-	if (type->priv) {
-		if (type->priv_deinit) {
-			type->priv_deinit(type->priv);
-		}
-
-		rte_free(type->priv);
-	}
 }
 
 struct sto_req *
