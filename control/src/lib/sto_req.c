@@ -130,26 +130,15 @@ free_req:
 	return NULL;
 }
 
-static void sto_req_action_free(struct sto_req_action *action);
+static void sto_req_action_list_free(struct sto_req_action_list *actions);
 
 void
 sto_req_free(struct sto_req *req)
 {
-	struct sto_req_action *action, *tmp;
-
 	sto_req_type_deinit(&req->type);
 
-	TAILQ_FOREACH_SAFE(action, &req->action_queue, list, tmp) {
-		TAILQ_REMOVE(&req->action_queue, action, list);
-
-		sto_req_action_free(action);
-	}
-
-	TAILQ_FOREACH_SAFE(action, &req->rollback_stack, list, tmp) {
-		TAILQ_REMOVE(&req->rollback_stack, action, list);
-
-		sto_req_action_free(action);
-	}
+	sto_req_action_list_free(&req->action_queue);
+	sto_req_action_list_free(&req->rollback_stack);
 
 	rte_free(req);
 }
@@ -174,6 +163,18 @@ static void
 sto_req_action_free(struct sto_req_action *action)
 {
 	rte_free(action);
+}
+
+static void
+sto_req_action_list_free(struct sto_req_action_list *actions)
+{
+	struct sto_req_action *action, *tmp;
+
+	TAILQ_FOREACH_SAFE(action, actions, list, tmp) {
+		TAILQ_REMOVE(actions, action, list);
+
+		sto_req_action_free(action);
+	}
 }
 
 int
@@ -204,7 +205,7 @@ sto_req_add_raw_step(struct sto_req *req, sto_req_action_t action_fn, sto_req_ac
 			return -ENOMEM;
 		}
 
-		TAILQ_INSERT_HEAD(&req->rollback_stack, action, list);
+		TAILQ_INSERT_HEAD(&req->rollback_stack, rollback, list);
 	}
 
 	return 0;
