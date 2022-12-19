@@ -19,14 +19,17 @@ struct sto_req;
 typedef int (*sto_req_action_t)(struct sto_req *req);
 
 enum sto_req_action_type {
-	STO_REQ_ACTION_SINGLE,
+	STO_REQ_ACTION_NORMAL,
 	STO_REQ_ACTION_ROLLBACK,
-	STO_REQ_ACTION_CONSTRUCTOR,
 };
 
 struct sto_req_action {
-	enum sto_req_action_type type;
 	sto_req_action_t fn;
+
+	void *priv;
+	void (*priv_free)(void *priv);
+
+	int (*execute)(struct sto_req_action *action, struct sto_req *req);
 
 	TAILQ_ENTRY(sto_req_action) list;
 };
@@ -54,10 +57,12 @@ struct sto_req {
 	int returncode;
 	bool rollback;
 
-	TAILQ_ENTRY(sto_req) list;
+	struct sto_req_action *cur_rollback;
 
 	struct sto_req_action_list action_queue;
 	struct sto_req_action_list rollback_stack;
+
+	TAILQ_ENTRY(sto_req) list;
 };
 
 #define STO_REQ(x) \
@@ -109,12 +114,13 @@ sto_req_step_start(struct sto_req *req)
 	sto_req_step_next(req, 0);
 }
 
-int sto_req_add_raw_step(struct sto_req *req, sto_req_action_t action_fn, sto_req_action_t rollback_fn);
+int sto_req_add_action(struct sto_req *req, enum sto_req_action_type type,
+		       sto_req_action_t action_fn, sto_req_action_t rollback_fn);
 
 static inline int
 sto_req_add_step(struct sto_req *req, const struct sto_req_step *step)
 {
-	return sto_req_add_raw_step(req, step->action_fn, step->rollback_fn);
+	return sto_req_add_action(req, STO_REQ_ACTION_NORMAL, step->action_fn, step->rollback_fn);
 }
 
 int sto_req_add_steps(struct sto_req *req, const struct sto_req_step *steps);

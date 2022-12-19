@@ -142,11 +142,16 @@ free_req:
 }
 
 static void sto_req_action_list_free(struct sto_req_action_list *actions);
+static void sto_req_action_free(struct sto_req_action *action);
 
 void
 sto_req_free(struct sto_req *req)
 {
 	sto_req_type_deinit(&req->type);
+
+	if (req->cur_rollback) {
+		sto_req_action_free(req->cur_rollback);
+	}
 
 	sto_req_action_list_free(&req->action_queue);
 	sto_req_action_list_free(&req->rollback_stack);
@@ -154,10 +159,52 @@ sto_req_free(struct sto_req *req)
 	rte_free(req);
 }
 
+static int
+sto_req_action_execute(struct sto_req_action *action, struct sto_req *req)
+{
+	int rc = 0;
+
+	if (req->cur_rollback) {
+		TAILQ_INSERT_HEAD(&req->rollback_stack, req->cur_rollback, list);
+	}
+
+	req->cur_rollback = action->priv;
+	action->priv = NULL;
+
+	rc = action->fn(req);
+
+	sto_req_action_free(action);
+
+	return rc;
+}
+
+static void
+sto_req_action_priv_free(void *priv)
+{
+	struct sto_req_action *rollback = priv;
+
+	sto_req_action_free(rollback);
+}
+
+static int
+sto_req_rollback_execute(struct sto_req_action *action, struct sto_req *req)
+{
+	int rc = 0;
+
+	rc = action->fn(req);
+
+	sto_req_action_free(action);
+
+	return rc;
+}
+
 static struct sto_req_action *
-sto_req_action_alloc(sto_req_action_t action_fn)
+sto_req_action_alloc(enum sto_req_action_type type,
+		     sto_req_action_t action_fn, sto_req_action_t rollback_fn)
 {
 	struct sto_req_action *action;
+
+	assert(action_fn);
 
 	action = rte_zmalloc(NULL, sizeof(*action), 0);
 	if (spdk_unlikely(!action)) {
@@ -167,13 +214,63 @@ sto_req_action_alloc(sto_req_action_t action_fn)
 
 	action->fn = action_fn;
 
+	switch (type) {
+	case STO_REQ_ACTION_NORMAL:
+		action->execute = sto_req_action_execute;
+
+		if (!rollback_fn) {
+			break;
+		}
+
+		action->priv = sto_req_action_alloc(STO_REQ_ACTION_ROLLBACK, rollback_fn, NULL);
+		if (spdk_unlikely(!action->priv)) {
+			SPDK_ERRLOG("Failed to alloc priv for action\n");
+			goto free_action;
+		}
+
+		action->priv_free = sto_req_action_priv_free;
+
+		break;
+	case STO_REQ_ACTION_ROLLBACK:
+		action->execute = sto_req_rollback_execute;
+		break;
+	default:
+		SPDK_ERRLOG("Unknown action type %d\n", type);
+		goto free_action;
+	}
+
 	return action;
+
+free_action:
+	rte_free(action);
+
+	return NULL;
 }
 
 static void
 sto_req_action_free(struct sto_req_action *action)
 {
+	if (action->priv && action->priv_free) {
+		action->priv_free(action->priv);
+	}
+
 	rte_free(action);
+}
+
+int
+sto_req_add_action(struct sto_req *req, enum sto_req_action_type type,
+		   sto_req_action_t action_fn, sto_req_action_t rollback_fn)
+{
+	struct sto_req_action *action;
+
+	action = sto_req_action_alloc(type, action_fn, rollback_fn);
+	if (spdk_unlikely(!action)) {
+		return -ENOMEM;
+	}
+
+	TAILQ_INSERT_TAIL(&req->action_queue, action, list);
+
+	return 0;
 }
 
 static void
@@ -186,40 +283,6 @@ sto_req_action_list_free(struct sto_req_action_list *actions)
 
 		sto_req_action_free(action);
 	}
-}
-
-int
-sto_req_add_raw_step(struct sto_req *req, sto_req_action_t action_fn, sto_req_action_t rollback_fn)
-{
-	struct sto_req_action *action;
-
-	assert(action_fn);
-
-	action = sto_req_action_alloc(action_fn);
-	if (spdk_unlikely(!action)) {
-		SPDK_ERRLOG("Failed to allocate action\n");
-		return -ENOMEM;
-	}
-
-	TAILQ_INSERT_TAIL(&req->action_queue, action, list);
-
-	if (rollback_fn) {
-		struct sto_req_action *rollback;
-
-		rollback = sto_req_action_alloc(rollback_fn);
-		if (spdk_unlikely(!rollback)) {
-			SPDK_ERRLOG("Failed to allocate rollback action\n");
-
-			TAILQ_REMOVE(&req->action_queue, action, list);
-			sto_req_action_free(action);
-
-			return -ENOMEM;
-		}
-
-		TAILQ_INSERT_HEAD(&req->rollback_stack, rollback, list);
-	}
-
-	return 0;
 }
 
 int
@@ -294,10 +357,7 @@ sto_req_action(struct sto_req *req)
 		goto finish;
 	}
 
-	rc = action->fn(req);
-
-	sto_req_action_free(action);
-
+	rc = action->execute(action, req);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to action for req[%p]\n", req);
 
