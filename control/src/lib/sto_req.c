@@ -97,7 +97,7 @@ sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decode
 		}
 	}
 
-	rc = req_params_constructor(type->params, ops_params);
+	rc = req_params_constructor(type->params, decoder ? ops_params : (void *) iter);
 
 	if (decoder) {
 		sto_ops_decoder_params_free(decoder, ops_params);

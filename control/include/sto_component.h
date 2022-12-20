@@ -26,6 +26,7 @@ static void __attribute__((constructor)) sto_core_component_ ## COMPONENT ## _re
 }
 
 struct sto_core_component *sto_core_component_find(const char *name);
+
 struct sto_core_component *sto_core_component_next(struct sto_core_component *component);
 
 static inline struct sto_core_component *

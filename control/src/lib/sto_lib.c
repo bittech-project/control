@@ -75,7 +75,7 @@ sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 
 	params_size = decoder->params_size;
 
-	params = rte_zmalloc(NULL, params_size, 0);
+	params = calloc(1, params_size);
 	if (spdk_unlikely(!params)) {
 		SPDK_ERRLOG("Failed to alloc decoder params\n");
 		rc = -ENOMEM;
@@ -110,5 +110,5 @@ sto_ops_decoder_params_free(const struct sto_ops_decoder *decoder, void *ops_par
 		decoder->params_deinit(ops_params);
 	}
 
-	rte_free(ops_params);
+	free(ops_params);
 }
