@@ -35,6 +35,101 @@
 #define SCST_RESYNC_IO	"resync_size"
 #define SCST_T10_IO	"t10_dev_id"
 
+static inline const char *
+scst_handler_mgmt(const char *handler)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+				  handler, SCST_MGMT_IO);
+}
+
+static inline const char *
+scst_dev_groups_mgmt(void)
+{
+	return spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS, SCST_MGMT_IO);
+}
+
+static inline const char *
+scst_dev_group_devices_mgmt(const char *dev_group)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+				  dev_group, "devices", SCST_MGMT_IO);
+}
+
+static inline const char *
+scst_dev_group_target_groups_mgmt(const char *dev_group)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+				  dev_group, "target_groups", SCST_MGMT_IO);
+}
+
+static inline const char *
+scst_dev_group_target_group_mgmt(const char *dev_group, const char *target_group)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
+				  dev_group, "target_groups", target_group, SCST_MGMT_IO);
+}
+
+static inline const char *
+scst_target_driver_mgmt(const char *target_driver)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+				  target_driver, SCST_MGMT_IO);
+}
+
+static inline const char *
+scst_target_ini_groups_mgmt(const char *target_driver, const char *target)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+				  target_driver, target, "ini_groups", SCST_MGMT_IO);
+}
+
+static inline const char *
+scst_target_lun_mgmt(const char *target_driver, const char *target, const char *ini_group)
+{
+	if (ini_group) {
+		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
+					  SCST_TARGETS, target_driver,
+					  target, "ini_groups", ini_group,
+					  "luns", SCST_MGMT_IO);
+	}
+
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
+				  SCST_TARGETS, target_driver,
+				  target, "luns", SCST_MGMT_IO);
+}
+
+static int
+scst_parse_attributes(char *attributes, char **data)
+{
+	char *parsed_attributes, *c, *tmp;
+	int rc = 0;
+
+	parsed_attributes = strdup(attributes);
+	if (spdk_unlikely(!parsed_attributes)) {
+		SPDK_ERRLOG("Failed to alloc memory for parsed attributes\n");
+		return -ENOMEM;
+	}
+
+	for (c = parsed_attributes; *c != '\0'; c++) {
+		if (*c == ',') {
+			*c = ';';
+		}
+	}
+
+	tmp = spdk_sprintf_append_realloc(*data, " %s", parsed_attributes);
+	if (spdk_unlikely(!tmp)) {
+		SPDK_ERRLOG("Failed to realloc memory for attributes data\n");
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	*data = tmp;
+
+	free(parsed_attributes);
+out:
+	return rc;
+}
+
 static char *
 scst_attr(const char *buf, bool nonkey)
 {
@@ -264,38 +359,6 @@ scst_driver_list_constructor(void *arg1, void *arg2)
 	return 0;
 }
 
-static int
-scst_parse_attributes(char *attributes, char **data)
-{
-	char *parsed_attributes, *c, *tmp;
-	int rc = 0;
-
-	parsed_attributes = strdup(attributes);
-	if (spdk_unlikely(!parsed_attributes)) {
-		SPDK_ERRLOG("Failed to alloc memory for parsed attributes\n");
-		return -ENOMEM;
-	}
-
-	for (c = parsed_attributes; *c != '\0'; c++) {
-		if (*c == ',') {
-			*c = ';';
-		}
-	}
-
-	tmp = spdk_sprintf_append_realloc(*data, " %s", parsed_attributes);
-	if (spdk_unlikely(!tmp)) {
-		SPDK_ERRLOG("Failed to realloc memory for attributes data\n");
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	*data = tmp;
-
-	free(parsed_attributes);
-out:
-	return rc;
-}
-
 struct scst_dev_open_params {
 	char *name;
 	char *handler;
@@ -331,8 +394,7 @@ scst_dev_open_constructor(void *arg1, void *arg2)
 	char *data;
 	int rc;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
-					      ops_params->handler, SCST_MGMT_IO);
+	req_params->file = scst_handler_mgmt(ops_params->handler);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -383,8 +445,7 @@ scst_dev_close_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_dev_open_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
-					      ops_params->handler, SCST_MGMT_IO);
+	req_params->file = scst_handler_mgmt(ops_params->handler);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -481,7 +542,7 @@ scst_dgrp_add_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_dgrp_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS, SCST_MGMT_IO);
+	req_params->file = scst_dev_groups_mgmt();
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -500,7 +561,7 @@ scst_dgrp_del_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_dgrp_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS, SCST_MGMT_IO);
+	req_params->file = scst_dev_groups_mgmt();
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -563,8 +624,7 @@ scst_dgrp_add_dev_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_dgrp_dev_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-					      ops_params->name, "devices", SCST_MGMT_IO);
+	req_params->file = scst_dev_group_devices_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -583,8 +643,7 @@ scst_dgrp_del_dev_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_dgrp_dev_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-					      ops_params->name, "devices", SCST_MGMT_IO);
+	req_params->file = scst_dev_group_devices_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -627,8 +686,7 @@ scst_tgrp_add_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_tgrp_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-					      ops_params->dgrp_name, "target_groups", SCST_MGMT_IO);
+	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -647,8 +705,7 @@ scst_tgrp_del_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_tgrp_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-					      ops_params->dgrp_name, "target_groups", SCST_MGMT_IO);
+	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -737,9 +794,8 @@ scst_tgrp_add_tgt_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_tgrp_tgt_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-					      ops_params->dgrp_name, "target_groups",
-					      ops_params->tgrp_name, SCST_MGMT_IO);
+	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp_name,
+							    ops_params->tgrp_name);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -758,9 +814,8 @@ scst_tgrp_del_tgt_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_tgrp_tgt_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
-					      ops_params->dgrp_name, "target_groups",
-					      ops_params->tgrp_name, SCST_MGMT_IO);
+	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp_name,
+							    ops_params->tgrp_name);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -803,8 +858,7 @@ scst_target_add_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_target_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-					      ops_params->driver, SCST_MGMT_IO);
+	req_params->file = scst_target_driver_mgmt(ops_params->driver);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -823,8 +877,7 @@ scst_target_del_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_target_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-					      ops_params->driver, SCST_MGMT_IO);
+	req_params->file = scst_target_driver_mgmt(ops_params->driver);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -955,9 +1008,7 @@ scst_group_add_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_group_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-					      ops_params->driver, ops_params->target,
-					      "ini_groups", SCST_MGMT_IO);
+	req_params->file = scst_target_ini_groups_mgmt(ops_params->driver, ops_params->target);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -976,9 +1027,7 @@ scst_group_del_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_group_params *ops_params = arg2;
 
-	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-					      ops_params->driver, ops_params->target,
-					      "ini_groups", SCST_MGMT_IO);
+	req_params->file = scst_target_ini_groups_mgmt(ops_params->driver, ops_params->target);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -989,21 +1038,6 @@ scst_group_del_constructor(void *arg1, void *arg2)
 	}
 
 	return 0;
-}
-
-static const char *
-scst_lun_mgmt_file_constructor(char *driver, char *target, char *group)
-{
-	if (group) {
-		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
-					  SCST_TARGETS, driver,
-					  target, "ini_groups", group,
-					  "luns", SCST_MGMT_IO);
-	}
-
-	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
-				  SCST_TARGETS, driver,
-				  target, "luns", SCST_MGMT_IO);
 }
 
 struct scst_lun_add_params {
@@ -1049,8 +1083,8 @@ scst_lun_add_constructor(void *arg1, void *arg2)
 	char *data;
 	int rc;
 
-	req_params->file = scst_lun_mgmt_file_constructor(ops_params->driver,
-							  ops_params->target, ops_params->group);
+	req_params->file = scst_target_lun_mgmt(ops_params->driver,
+						ops_params->target, ops_params->group);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -1108,8 +1142,8 @@ scst_lun_del_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_lun_del_params *ops_params = arg2;
 
-	req_params->file = scst_lun_mgmt_file_constructor(ops_params->driver,
-							  ops_params->target, ops_params->group);
+	req_params->file = scst_target_lun_mgmt(ops_params->driver,
+						ops_params->target, ops_params->group);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -1130,8 +1164,8 @@ scst_lun_replace_constructor(void *arg1, void *arg2)
 	char *data;
 	int rc;
 
-	req_params->file = scst_lun_mgmt_file_constructor(ops_params->driver,
-							  ops_params->target, ops_params->group);
+	req_params->file = scst_target_lun_mgmt(ops_params->driver,
+						ops_params->target, ops_params->group);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -1187,8 +1221,8 @@ scst_lun_clear_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_lun_clear_params *ops_params = arg2;
 
-	req_params->file = scst_lun_mgmt_file_constructor(ops_params->driver,
-							  ops_params->target, ops_params->group);
+	req_params->file = scst_target_lun_mgmt(ops_params->driver,
+						ops_params->target, ops_params->group);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
