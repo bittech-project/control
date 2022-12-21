@@ -1,6 +1,9 @@
 #ifndef _STO_UTILS_H_
 #define _STO_UTILS_H_
 
+#include <spdk/stdinc.h>
+#include <spdk/json.h>
+
 struct spdk_json_val;
 
 struct sto_json_ctx {
@@ -14,24 +17,33 @@ struct sto_json_ctx *sto_json_ctx_alloc(void);
 int sto_json_ctx_write_cb(void *cb_ctx, const void *data, size_t size);
 void sto_json_ctx_free(struct sto_json_ctx *ctx);
 
-int sto_json_decode_object_name(const struct spdk_json_val *values, char **value);
-int sto_json_decode_object_str(const struct spdk_json_val *values,
-			       const char *name, char **value);
+struct sto_json_iter {
+	const struct spdk_json_val *values;
+	int offset;
+	int len;
+};
 
-const struct spdk_json_val *sto_json_next_object(const struct spdk_json_val *values);
-const struct spdk_json_val *sto_json_copy_object(const struct spdk_json_val *values);
+static inline void
+sto_json_iter_init(struct sto_json_iter *iter, const struct spdk_json_val *values)
+{
+	iter->values = values;
+	iter->offset = values->type == SPDK_JSON_VAL_OBJECT_BEGIN ? 1 : 0;
+	iter->len = values->len;
+}
 
 static inline const struct spdk_json_val *
-sto_json_next_object_and_free(const struct spdk_json_val *values)
+sto_json_iter_ptr(const struct sto_json_iter *iter)
 {
-	const struct spdk_json_val *next_obj;
-
-	next_obj = sto_json_next_object(values);
-
-	free((struct spdk_json_val *) values);
-
-	return next_obj;
+	return iter->len ? iter->values + iter->offset : NULL;
 }
+
+int sto_json_iter_decode_name(const struct sto_json_iter *iter, char **value);
+int sto_json_iter_decode_str(const struct sto_json_iter *iter, const char *name, char **value);
+
+int sto_json_iter_next(struct sto_json_iter *iter);
+const struct spdk_json_val *sto_json_iter_cut_tail(const struct sto_json_iter *iter);
+
+void sto_json_print(const struct spdk_json_val *values);
 
 bool sto_find_match_str(const char *key, const char *strings[]);
 

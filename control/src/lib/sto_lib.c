@@ -6,6 +6,7 @@
 #include <rte_malloc.h>
 
 #include "sto_lib.h"
+#include "sto_utils.h"
 #include "sto_err.h"
 
 void
@@ -37,31 +38,60 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_object_end(w);
 }
 
-void *
-sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder, const struct spdk_json_val *values)
+const struct sto_ops *
+sto_op_table_find(const struct sto_op_table *op_table, const char *op_name)
 {
-	void *ops_params;
-	uint32_t params_size;
+	int i;
 
+	for (i = 0; i < op_table->size; i++) {
+		const struct sto_ops *op = &op_table->ops[i];
+
+		if (!strcmp(op_name, op->name)) {
+			return op;
+		}
+	}
+
+	return NULL;
+}
+
+void *
+sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
+			     const struct sto_json_iter *iter)
+{
+	const struct spdk_json_val *values;
+	void *params = NULL;
+	uint32_t params_size;
+	int rc = 0;
+
+	values = sto_json_iter_cut_tail(iter);
 	if (!values) {
 		return decoder->allow_empty ? NULL : ERR_PTR(-EINVAL);
 	}
 
 	params_size = decoder->params_size;
 
-	ops_params = rte_zmalloc(NULL, params_size, 0);
-	if (spdk_unlikely(!ops_params)) {
-		SPDK_ERRLOG("Failed to alloc ops decoder params\n");
-		return ERR_PTR(-ENOMEM);
+	params = rte_zmalloc(NULL, params_size, 0);
+	if (spdk_unlikely(!params)) {
+		SPDK_ERRLOG("Failed to alloc decoder params\n");
+		rc = -ENOMEM;
+		goto out;
 	}
 
-	if (spdk_json_decode_object(values, decoder->decoders, decoder->num_decoders, ops_params)) {
-		SPDK_ERRLOG("Failed to decode ops_params\n");
-		sto_ops_decoder_params_free(decoder, ops_params);
-		return ERR_PTR(-EINVAL);
+	if (spdk_json_decode_object(values, decoder->decoders, decoder->num_decoders, params)) {
+		SPDK_ERRLOG("Failed to decode params\n");
+		rc = -EINVAL;
+		goto free_params;
 	}
 
-	return ops_params;
+out:
+	free((struct spdk_json_val *) values);
+
+	return rc ? ERR_PTR(rc) : params;
+
+free_params:
+	sto_ops_decoder_params_free(decoder, params);
+
+	goto out;
 }
 
 void

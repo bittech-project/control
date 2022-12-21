@@ -181,34 +181,14 @@ free_ctx:
 	return rc;
 }
 
-static const struct sto_ops *
-sto_subsystem_find_ops(struct sto_subsystem *subsystem, const char *op_name)
-{
-	const struct sto_op_table *op_table;
-	int i;
-
-	op_table = subsystem->op_table;
-	assert(op_table);
-
-	for (i = 0; i < op_table->size; i++) {
-		const struct sto_ops *op = &op_table->ops[i];
-
-		if (!strcmp(op_name, op->name)) {
-			return op;
-		}
-	}
-
-	return NULL;
-}
-
-static struct sto_subsystem *
-sto_subsystem_parse(const struct spdk_json_val *params)
+static const struct sto_op_table *
+sto_subsystem_decode(const struct sto_json_iter *iter)
 {
 	struct sto_subsystem *subsystem;
 	char *subsystem_name = NULL;
 	int rc = 0;
 
-	rc = sto_json_decode_object_str(params, "subsystem", &subsystem_name);
+	rc = sto_json_iter_decode_str(iter, "subsystem", &subsystem_name);
 	if (rc) {
 		SPDK_ERRLOG("Failed to decode subsystem for rc=%d\n", rc);
 		return ERR_PTR(rc);
@@ -223,69 +203,9 @@ sto_subsystem_parse(const struct spdk_json_val *params)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return subsystem;
+	return subsystem->op_table;
 }
 
-static const struct sto_ops *
-sto_subsystem_parse_ops(struct sto_subsystem *subsystem, const struct spdk_json_val *params)
-{
-	char *op_name = NULL;
-	const struct sto_ops *op;
-	int rc = 0;
-
-	rc = sto_json_decode_object_str(params, "op", &op_name);
-	if (rc) {
-		SPDK_ERRLOG("Failed to decode op, rc=%d\n", rc);
-		return ERR_PTR(rc);
-	}
-
-	op = sto_subsystem_find_ops(subsystem, op_name);
-	if (!op) {
-		SPDK_ERRLOG("Failed to find op %s\n", op_name);
-		free(op_name);
-		return ERR_PTR(-EINVAL);
-	}
-
-	free(op_name);
-
-	return op;
-}
-
-static const struct sto_ops *
-sto_subsystem_decode_ops(const struct spdk_json_val *params,
-			 const struct spdk_json_val **params_cdb)
-{
-	struct sto_subsystem *subsystem;
-	const struct spdk_json_val *op_cdb;
-	const struct sto_ops *op;
-
-	if (*params_cdb) {
-		SPDK_ERRLOG("Params CDB is already set\n");
-		return ERR_PTR(-EINVAL);
-	}
-
-	subsystem = sto_subsystem_parse(params);
-	if (IS_ERR(subsystem)) {
-		SPDK_ERRLOG("Failed to parse subsystem\n");
-		return ERR_CAST(subsystem);
-	}
-
-	op_cdb = sto_json_next_object(params);
-	if (IS_ERR_OR_NULL(op_cdb)) {
-		SPDK_ERRLOG("Failed to decode next JSON object\n");
-		return op_cdb ? ERR_CAST(op_cdb) : ERR_PTR(-EINVAL);
-	}
-
-	op = sto_subsystem_parse_ops(subsystem, op_cdb);
-
-	*params_cdb = sto_json_next_object_and_free(op_cdb);
-	if (IS_ERR(*params_cdb)) {
-		SPDK_ERRLOG("Failed to decode next JSON object\n");
-		return ERR_CAST(*params_cdb);
-	}
-
-	return op;
-}
-
-static struct sto_core_component g_subsystem_component = STO_CORE_COMPONENT_INITIALIZER("subsystem", sto_subsystem_decode_ops);
+static struct sto_core_component g_subsystem_component =
+	STO_CORE_COMPONENT_INITIALIZER("subsystem", sto_subsystem_decode);
 STO_CORE_COMPONENT_REGISTER(g_subsystem_component)

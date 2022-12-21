@@ -77,7 +77,7 @@ sto_req_type_deinit(struct sto_req_type *type)
 
 int
 sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decoder *decoder,
-			  const struct spdk_json_val *values,
+			  const struct sto_json_iter *iter,
 			  sto_ops_req_params_constructor_t req_params_constructor)
 {
 	void *ops_params = NULL;
@@ -90,7 +90,7 @@ sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decode
 	}
 
 	if (decoder) {
-		ops_params = sto_ops_decoder_params_parse(decoder, values);
+		ops_params = sto_ops_decoder_params_parse(decoder, iter);
 		if (IS_ERR(ops_params)) {
 			SPDK_ERRLOG("Failed to parse ops params\n");
 			return PTR_ERR(ops_params);

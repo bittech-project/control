@@ -4,7 +4,7 @@
 #include <spdk/util.h>
 
 struct spdk_json_write_ctx;
-struct spdk_json_val;
+struct sto_json_iter;
 
 struct sto_err_context {
 	int rc;
@@ -34,7 +34,7 @@ struct sto_ops_decoder {
 	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, true}
 
 void *sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
-		 		   const struct spdk_json_val *values);
+		 		   const struct sto_json_iter *iter);
 void sto_ops_decoder_params_free(const struct sto_ops_decoder *decoder,
 				 void *ops_params);
 
@@ -52,5 +52,7 @@ struct sto_op_table {
 	size_t size;
 };
 #define STO_OP_TABLE_INITIALIZER(ops) {ops, SPDK_COUNTOF(ops)}
+
+const struct sto_ops *sto_op_table_find(const struct sto_op_table *op_table, const char *op_name);
 
 #endif /* _STO_LIB_H_ */

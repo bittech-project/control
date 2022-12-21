@@ -169,14 +169,14 @@ sto_core_req_init_req_ctx(struct sto_core_req *core_req, struct sto_req_context 
 	core_req->req_ctx = req_ctx;
 }
 
-static struct sto_core_component *
-sto_core_component_decode(const struct spdk_json_val *params)
+static const struct sto_op_table *
+sto_core_component_decode(const struct sto_json_iter *iter)
 {
 	struct sto_core_component *component;
 	char *component_name = NULL;
 	int rc = 0;
 
-	rc = sto_json_decode_object_name(params, &component_name);
+	rc = sto_json_iter_decode_name(iter, &component_name);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to decode component name, rc=%d\n", rc);
 		return ERR_PTR(rc);
@@ -191,11 +191,37 @@ sto_core_component_decode(const struct spdk_json_val *params)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return component;
+	return component->decode(iter);
+}
+
+static const struct sto_ops *
+sto_core_decode_ops(const struct sto_op_table *op_table,
+		    const struct sto_json_iter *iter)
+{
+	const struct sto_ops *op;
+	char *op_name = NULL;
+	int rc = 0;
+
+	rc = sto_json_iter_decode_str(iter, "op", &op_name);
+	if (rc) {
+		SPDK_ERRLOG("Failed to decode op, rc=%d\n", rc);
+		return ERR_PTR(rc);
+	}
+
+	op = sto_op_table_find(op_table, op_name);
+	if (!op) {
+		SPDK_ERRLOG("Failed to find op %s\n", op_name);
+		free(op_name);
+		return ERR_PTR(-EINVAL);
+	}
+
+	free(op_name);
+
+	return op;
 }
 
 static struct sto_req_context *
-sto_core_parse_ops(const struct sto_ops *op, const struct spdk_json_val *params)
+sto_core_parse_ops(const struct sto_ops *op, const struct sto_json_iter *iter)
 {
 	struct sto_req *req = NULL;
 	int rc;
@@ -206,7 +232,7 @@ sto_core_parse_ops(const struct sto_ops *op, const struct spdk_json_val *params)
 		return NULL;
 	}
 
-	rc = sto_req_type_parse_params(&req->type, op->decoder, params, op->req_params_constructor);
+	rc = sto_req_type_parse_params(&req->type, op->decoder, iter, op->req_params_constructor);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to decode CDB for req[%p], rc=%d\n", req, rc);
 		sto_req_free(req);
@@ -219,38 +245,52 @@ sto_core_parse_ops(const struct sto_ops *op, const struct spdk_json_val *params)
 static int
 sto_core_req_parse(struct sto_core_req *core_req)
 {
-	struct sto_core_component *component;
+	struct sto_json_iter iter;
+	const struct sto_op_table *op_table;
 	const struct sto_ops *op;
-	const struct spdk_json_val *params_cdb = NULL;
 	struct sto_req_context *req_ctx;
 	int rc = 0;
 
-	component = sto_core_component_decode(core_req->params);
-	if (IS_ERR(component)) {
-		SPDK_ERRLOG("Failed to parse component for req[%p]\n", core_req);
-		return PTR_ERR(component);
+	if (spdk_unlikely(!core_req->params)) {
+		return -EINVAL;
 	}
 
-	op = component->decode_ops(core_req->params, &params_cdb);
+	sto_json_iter_init(&iter, core_req->params);
+
+	op_table = sto_core_component_decode(&iter);
+	if (IS_ERR_OR_NULL(op_table)) {
+		SPDK_ERRLOG("Failed to decode component: req[%p]\n", core_req);
+		return IS_ERR(op) ? PTR_ERR(op) : -ENOENT;
+	}
+
+	rc = sto_json_iter_next(&iter);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to get next JSON object\n");
+		return rc;
+	}
+
+	op = sto_core_decode_ops(op_table, &iter);
 	if (IS_ERR(op)) {
-		SPDK_ERRLOG("%s component failed to decode ops\n", component->name);
+		SPDK_ERRLOG("Failed to decode ops: req[%p]\n", core_req);
 		return PTR_ERR(op);
 	}
 
-	req_ctx = sto_core_parse_ops(op, params_cdb);
+	rc = sto_json_iter_next(&iter);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to get next JSON object\n");
+		return rc;
+	}
+
+	req_ctx = sto_core_parse_ops(op, &iter);
 	if (spdk_unlikely(!req_ctx)) {
-		SPDK_ERRLOG("Failed to parse ops\n");
-		rc = -EINVAL;
-		goto out;
+		SPDK_ERRLOG("Failed to parse ops: req[%p]\n", core_req);
+		return -EINVAL;
 	}
 
 	sto_core_req_init_req_ctx(core_req, req_ctx);
 
 	sto_core_req_set_state(core_req, STO_CORE_REQ_STATE_EXEC);
 	sto_core_req_process(core_req);
-
-out:
-	free((struct spdk_json_val *) params_cdb);
 
 	return rc;
 }

@@ -5,6 +5,7 @@
 
 #include <rte_malloc.h>
 
+#include "sto_utils.h"
 #include "sto_client.h"
 
 #define STO_CLIENT_MAX_CONNS	64
@@ -79,25 +80,6 @@ sto_client_check_busy_list(struct sto_client *client)
 	return true;
 }
 
-struct json_write_buf {
-	char data[1024];
-	unsigned cur_off;
-};
-
-static int
-__json_write_stdout(void *cb_ctx, const void *data, size_t size)
-{
-	struct json_write_buf *buf = cb_ctx;
-	size_t rc;
-
-	rc = snprintf(buf->data + buf->cur_off, sizeof(buf->data) - buf->cur_off,
-		      "%s", (const char *)data);
-	if (rc > 0) {
-		buf->cur_off += rc;
-	}
-	return rc == size ? 0 : -1;
-}
-
 static void sto_rpc_cmd_free(struct sto_rpc_cmd *cmd);
 
 static void
@@ -114,17 +96,7 @@ sto_client_response(struct spdk_jsonrpc_client_response *response)
 
 	/* Check for error response */
 	if (response->error != NULL) {
-		struct json_write_buf buf = {};
-		struct spdk_json_write_ctx *w = spdk_json_write_begin(__json_write_stdout,
-						&buf, SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE);
-
-		if (w == NULL) {
-			SPDK_ERRLOG("error response: (?)\n");
-		} else {
-			spdk_json_write_val(w, response->error);
-			spdk_json_write_end(w);
-			SPDK_ERRLOG("error response: \n%s\n", buf.data);
-		}
+		sto_json_print(response->error);
 		rc = -EFAULT;
 	}
 

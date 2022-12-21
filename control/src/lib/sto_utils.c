@@ -74,16 +74,19 @@ sto_json_ctx_free(struct sto_json_ctx *ctx)
 }
 
 int
-sto_json_decode_object_name(const struct spdk_json_val *values, char **value)
+sto_json_iter_decode_name(const struct sto_json_iter *iter, char **value)
 {
+	const struct spdk_json_val *values;
 	const struct spdk_json_val *name_json;
 
-	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
-		SPDK_ERRLOG("Invalid JSON %p\n", values);
+	values = sto_json_iter_ptr(iter);
+
+	if (!values) {
+		SPDK_ERRLOG("Zero length JSON object iter\n");
 		return -EINVAL;
 	}
 
-	name_json = &values[1];
+	name_json = &values[0];
 	if (spdk_json_decode_string(name_json, value)) {
 		SPDK_ERRLOG("Failed to decode JSON object name\n");
 		return -EDOM;
@@ -91,25 +94,27 @@ sto_json_decode_object_name(const struct spdk_json_val *values, char **value)
 
 	return 0;
 }
+
 int
-sto_json_decode_object_str(const struct spdk_json_val *values,
-			   const char *name, char **value)
+sto_json_iter_decode_str(const struct sto_json_iter *iter, const char *name, char **value)
 {
+	const struct spdk_json_val *values;
 	const struct spdk_json_val *name_json, *value_json;
 
-	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
-		SPDK_ERRLOG("Invalid JSON %p\n", values);
+	if (iter->len < 2) {
+		SPDK_ERRLOG("JSON iter length < 2: %d\n", iter->len);
 		return -EINVAL;
 	}
 
-	name_json = &values[1];
+	values = sto_json_iter_ptr(iter);
+
+	name_json = &values[0];
 	if (!spdk_json_strequal(name_json, name)) {
 		SPDK_ERRLOG("JSON object name doesn't correspond to %s\n", name);
 		return -ENOENT;
 	}
 
-	value_json = &values[2];
-
+	value_json = &values[1];
 	if (spdk_json_decode_string(value_json, value)) {
 		SPDK_ERRLOG("Failed to decode string from JSON object %s\n", name);
 		return -EDOM;
@@ -118,50 +123,44 @@ sto_json_decode_object_str(const struct spdk_json_val *values,
 	return 0;
 }
 
-static int
-sto_json_decode_value_len(const struct spdk_json_val *values)
+int
+sto_json_iter_next(struct sto_json_iter *iter)
 {
-	const struct spdk_json_val *value_json;
+	const struct spdk_json_val *values;
+	int val_len;
 
-	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
-		SPDK_ERRLOG("Invalid JSON %p\n", values);
+	if (iter->len < 2) {
+		SPDK_ERRLOG("JSON iter length < 2: %d\n", iter->len);
 		return -EINVAL;
 	}
 
-	value_json = &values[2];
+	values = sto_json_iter_ptr(iter);
 
-	return 1 + spdk_json_val_len(value_json);
+	val_len = 1 + spdk_json_val_len(&values[1]);
+
+	iter->offset += val_len;
+	iter->len -= val_len;
+
+	return 0;
 }
 
 const struct spdk_json_val *
-sto_json_next_object(const struct spdk_json_val *values)
+sto_json_iter_cut_tail(const struct sto_json_iter *iter)
 {
+	const struct spdk_json_val *values;
 	struct spdk_json_val *obj;
-	uint32_t obj_len, size;
-	int val_len = 0;
+	uint32_t size;
 	int i;
 
-	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
-		SPDK_ERRLOG("Invalid JSON %p\n", values);
-		return ERR_PTR(-EINVAL);
-	}
-
-	SPDK_NOTICELOG("Start parse JSON for next object: len=%u\n", values->len);
-
-	val_len = sto_json_decode_value_len(values);
-	if (val_len < 0) {
-		SPDK_ERRLOG("Failed to decode JSON value len\n");
-		return ERR_PTR(val_len);
-	}
-
-	obj_len = values->len - val_len;
-	if (!obj_len) {
-		SPDK_NOTICELOG("Next JSON object len is equal zero: val_len=%u values_len=%u\n",
-			       val_len, values->len);
+	values = sto_json_iter_ptr(iter);
+	if (!values) {
+		SPDK_NOTICELOG("Next JSON object len is equal zero\n");
 		return NULL;
 	}
 
-	size = obj_len + 2;
+	SPDK_NOTICELOG("Start parse JSON for next object: len=%u\n", iter->len);
+
+	size = iter->len + 2;
 
 	obj = calloc(size, sizeof(struct spdk_json_val));
 	if (spdk_unlikely(!obj)) {
@@ -170,44 +169,54 @@ sto_json_next_object(const struct spdk_json_val *values)
 	}
 
 	obj->type = SPDK_JSON_VAL_OBJECT_BEGIN;
-	obj->len = obj_len;
+	obj->len = iter->len;
 
-	for (i = 1; i <= obj_len + 1; i++) {
-		obj[i].start = values[i + val_len].start;
-		obj[i].len = values[i + val_len].len;
-		obj[i].type = values[i + val_len].type;
+	for (i = 1; i <= iter->len + 1; i++) {
+		obj[i].start = values[i - 1].start;
+		obj[i].len = values[i - 1].len;
+		obj[i].type = values[i - 1].type;
 	}
 
 	return obj;
 }
 
-const struct spdk_json_val *
-sto_json_copy_object(const struct spdk_json_val *values)
+struct json_write_buf {
+	char data[1024];
+	unsigned cur_off;
+};
+
+static int
+__json_write_stdout(void *cb_ctx, const void *data, size_t size)
 {
-	struct spdk_json_val *obj;
-	uint32_t size;
-	int i;
+	struct json_write_buf *buf = cb_ctx;
+	size_t rc;
 
-	if (!values || values->type != SPDK_JSON_VAL_OBJECT_BEGIN || !values->len) {
-		SPDK_ERRLOG("Invalid JSON %p\n", values);
-		return ERR_PTR(-EINVAL);
+	rc = snprintf(buf->data + buf->cur_off, sizeof(buf->data) - buf->cur_off,
+		      "%s", (const char *)data);
+	if (rc > 0) {
+		buf->cur_off += rc;
+	}
+	return rc == size ? 0 : -1;
+}
+
+void
+sto_json_print(const struct spdk_json_val *values)
+{
+	struct json_write_buf buf = {};
+	struct spdk_json_write_ctx *w;
+
+	w = spdk_json_write_begin(__json_write_stdout,
+				  &buf, SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE);
+	if (spdk_unlikely(!w)) {
+		SPDK_ERRLOG("Failed to alloc SPDK JSON write context\n");
+		return;
 	}
 
-	size = values->len + 1;
+	spdk_json_write_val(w, values);
 
-	obj = calloc(values->len, sizeof(struct spdk_json_val));
-	if (spdk_unlikely(!obj)) {
-		SPDK_ERRLOG("Failed to alloc next JSON object: size=%u\n", size);
-		return ERR_PTR(-ENOMEM);
-	}
+	spdk_json_write_end(w);
 
-	for (i = 0; i <= values->len + 1; i++) {
-		obj[i].start = values[i].start;
-		obj[i].len = values[i].len;
-		obj[i].type = values[i].type;
-	}
-
-	return obj;
+	SPDK_ERRLOG("JSON: \n%s\n", buf.data);
 }
 
 bool

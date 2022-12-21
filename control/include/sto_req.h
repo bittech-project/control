@@ -143,7 +143,7 @@ sto_req_done(struct sto_req *req)
 
 struct sto_req *sto_req_alloc(const struct sto_req_properties *properties);
 int sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decoder *decoder,
-			      const struct spdk_json_val *values,
+			      const struct sto_json_iter *iter,
 			      sto_ops_req_params_constructor_t params_constructor);
 void sto_req_free(struct sto_req *req);
 

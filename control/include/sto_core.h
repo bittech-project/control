@@ -7,6 +7,8 @@
 
 struct spdk_json_write_ctx;
 struct sto_core_req;
+struct spdk_json_val;
+struct sto_json_iter;
 
 typedef void (*sto_core_req_done_t)(struct sto_core_req *req);
 
@@ -31,18 +33,15 @@ struct sto_core_req {
 	sto_core_req_done_t done;
 };
 
-typedef const struct sto_ops *(*sto_core_component_decode_ops_t)(const struct spdk_json_val *params,
-								 const struct spdk_json_val **params_cdb);
-
 struct sto_core_component {
 	const char *name;
 
-	sto_core_component_decode_ops_t decode_ops;
+	const struct sto_op_table *(*decode)(const struct sto_json_iter *iter);
 
 	TAILQ_ENTRY(sto_core_component) list;
 };
 
-#define STO_CORE_COMPONENT_INITIALIZER(name, decode_ops) {name, decode_ops}
+#define STO_CORE_COMPONENT_INITIALIZER(name, decode) {name, decode}
 
 void sto_core_add_component(struct sto_core_component *component);
 
