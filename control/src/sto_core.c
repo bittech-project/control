@@ -9,6 +9,7 @@
 
 #include "sto_core.h"
 #include "sto_utils.h"
+#include "sto_component.h"
 #include "sto_req.h"
 #include "sto_err.h"
 
@@ -16,50 +17,8 @@
 
 static struct spdk_poller *g_sto_core_req_poller;
 
-static TAILQ_HEAD(sto_component_list, sto_core_component) g_sto_components =
-	TAILQ_HEAD_INITIALIZER(g_sto_components);
-
 static TAILQ_HEAD(sto_core_req_list, sto_core_req) g_sto_core_req_list =
 	TAILQ_HEAD_INITIALIZER(g_sto_core_req_list);
-
-
-static struct sto_core_component *
-_core_component_find(struct sto_component_list *list, const char *name)
-{
-	struct sto_core_component *component;
-
-	TAILQ_FOREACH(component, list, list) {
-		if (!strcmp(name, component->name)) {
-			return component;
-		}
-	}
-
-	return NULL;
-}
-
-static struct sto_core_component *
-_core_component_next(struct sto_core_component *component, struct sto_component_list *list)
-{
-	return !component ? TAILQ_FIRST(list) : TAILQ_NEXT(component, list);
-}
-
-struct sto_core_component *
-sto_core_component_find(const char *name)
-{
-	return _core_component_find(&g_sto_components, name);
-}
-
-struct sto_core_component *
-sto_core_component_next(struct sto_core_component *component)
-{
-	return _core_component_next(component, &g_sto_components);
-}
-
-void
-sto_core_add_component(struct sto_core_component *component)
-{
-	TAILQ_INSERT_TAIL(&g_sto_components, component, list);
-}
 
 
 static const char *const sto_core_req_state_names[] = {
@@ -167,31 +126,6 @@ sto_core_req_init_req_ctx(struct sto_core_req *core_req, struct sto_req_context 
 	req_ctx->err_ctx = &core_req->err_ctx;
 
 	core_req->req_ctx = req_ctx;
-}
-
-static const struct sto_op_table *
-sto_core_component_decode(const struct sto_json_iter *iter)
-{
-	struct sto_core_component *component;
-	char *component_name = NULL;
-	int rc = 0;
-
-	rc = sto_json_iter_decode_name(iter, &component_name);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to decode component name, rc=%d\n", rc);
-		return ERR_PTR(rc);
-	}
-
-	component = sto_core_component_find(component_name);
-
-	free(component_name);
-
-	if (spdk_unlikely(!component)) {
-		SPDK_ERRLOG("Failed to find component\n");
-		return ERR_PTR(-EINVAL);
-	}
-
-	return component->decode(iter);
 }
 
 static const struct sto_ops *

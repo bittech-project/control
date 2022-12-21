@@ -16,7 +16,8 @@ LDFLAGS = -pthread $(SPDK_LDFLAGS) -Wl,--whole-archive,-Bstatic \
 	  $(SPDK_DPDK_LIB) -Wl,--no-whole-archive,-Bdynamic $(SPDK_SYS_LIB) \
 	  $(STO_SERVER_LDFLAGS) -Wl,--no-whole-archive,-Bdynamic $(STO_SERVER_LIB)
 
-C_SRCS = main.c sto_spdk_subsystem.c sto_control.c sto_control_rpc.c sto_client.c sto_core.c sto_subsystem.c sto_module.c \
+C_SRCS = main.c sto_spdk_subsystem.c sto_control.c sto_control_rpc.c sto_client.c sto_core.c \
+	 sto_component.c sto_subsystem.c sto_module.c \
 	 lib/sto_lib.c lib/sto_req.c lib/sto_generic_req.c lib/sto_utils.c lib/sto_inode.c lib/sto_tree.c \
 	 server_rpc/sto_rpc_subprocess.c server_rpc/sto_rpc_aio.c server_rpc/sto_rpc_readdir.c \
 	 subsystems/scst/scst_lib.c subsystems/sys/sys_lib.c \

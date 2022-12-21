@@ -8,7 +8,6 @@
 struct spdk_json_write_ctx;
 struct sto_core_req;
 struct spdk_json_val;
-struct sto_json_iter;
 
 typedef void (*sto_core_req_done_t)(struct sto_core_req *req);
 
@@ -32,38 +31,6 @@ struct sto_core_req {
 	void *priv;
 	sto_core_req_done_t done;
 };
-
-struct sto_core_component {
-	const char *name;
-
-	const struct sto_op_table *(*decode)(const struct sto_json_iter *iter);
-
-	TAILQ_ENTRY(sto_core_component) list;
-};
-
-#define STO_CORE_COMPONENT_INITIALIZER(name, decode) {name, decode}
-
-void sto_core_add_component(struct sto_core_component *component);
-
-#define STO_CORE_COMPONENT_REGISTER(_name)				\
-static void __attribute__((constructor)) _name ## _register(void)	\
-{									\
-	sto_core_add_component(&_name);					\
-}
-
-struct sto_core_component *sto_core_component_find(const char *name);
-struct sto_core_component *sto_core_component_next(struct sto_core_component *component);
-
-static inline struct sto_core_component *
-sto_core_component_first(void)
-{
-	return sto_core_component_next(NULL);
-}
-
-#define STO_CORE_FOREACH_COMPONENT(component)			\
-	for ((component) = sto_core_component_first();		\
-	     (component);					\
-	     (component) = sto_core_component_next((component)))
 
 int sto_core_init(void);
 void sto_core_fini(void);

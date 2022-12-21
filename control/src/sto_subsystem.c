@@ -7,6 +7,7 @@
 
 #include "sto_subsystem.h"
 #include "sto_utils.h"
+#include "sto_component.h"
 #include "sto_core.h"
 #include "sto_err.h"
 
