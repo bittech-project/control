@@ -207,6 +207,4 @@ sto_subsystem_decode(const struct sto_json_iter *iter)
 	return subsystem->op_table;
 }
 
-static struct sto_core_component g_subsystem_component =
-	STO_CORE_COMPONENT_INITIALIZER("subsystem", sto_subsystem_decode);
-STO_CORE_COMPONENT_REGISTER(g_subsystem_component)
+STO_CORE_REGISTER_COMPONENT(subsystem, sto_subsystem_decode)

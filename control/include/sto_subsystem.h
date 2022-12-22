@@ -12,9 +12,7 @@ struct sto_subsystem {
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };
-#define STO_SUBSYSTEM_INITIALIZER(name, op_table) {name, op_table}
 
-void sto_add_subsystem(struct sto_subsystem *subsystem);
 struct sto_subsystem *sto_subsystem_find(const char *name);
 
 struct spdk_json_write_ctx;
@@ -32,10 +30,16 @@ int sto_subsystem_send(const char *subsystem, const char *op,
 		       void *params, sto_subsystem_dump_params_t dump_params,
 		       struct sto_subsystem_args *args);
 
-#define STO_SUBSYSTEM_REGISTER(_name)					\
-static void __attribute__((constructor)) _name ## _register(void)	\
-{									\
-	sto_add_subsystem(&_name);					\
+void sto_add_subsystem(struct sto_subsystem *subsystem);
+
+#define STO_SUBSYSTEM_REGISTER(SUBSYSTEM, OP_TABLE)					\
+static struct sto_subsystem sto_subsystem_ ## SUBSYSTEM = {				\
+	.name = # SUBSYSTEM,								\
+	.op_table = OP_TABLE,								\
+};											\
+static void __attribute__((constructor)) sto_subsystem_ ## SUBSYSTEM ## _register(void)	\
+{											\
+	sto_add_subsystem(&sto_subsystem_ ## SUBSYSTEM);				\
 }
 
 #endif /* _STO_SUBSYSTEM_H_ */

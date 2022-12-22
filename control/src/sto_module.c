@@ -62,6 +62,4 @@ sto_module_decode(const struct sto_json_iter *iter)
 	return module->op_table;
 }
 
-static struct sto_core_component g_module_component =
-	STO_CORE_COMPONENT_INITIALIZER("module", sto_module_decode);
-STO_CORE_COMPONENT_REGISTER(g_module_component)
+STO_CORE_REGISTER_COMPONENT(module, sto_module_decode)

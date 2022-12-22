@@ -13,14 +13,16 @@ struct sto_core_component {
 	TAILQ_ENTRY(sto_core_component) list;
 };
 
-#define STO_CORE_COMPONENT_INITIALIZER(name, decode) {name, decode}
-
 void sto_core_add_component(struct sto_core_component *component);
 
-#define STO_CORE_COMPONENT_REGISTER(_name)				\
-static void __attribute__((constructor)) _name ## _register(void)	\
-{									\
-	sto_core_add_component(&_name);					\
+#define STO_CORE_REGISTER_COMPONENT(COMPONENT, DECODE)						\
+static struct sto_core_component sto_core_component_ ## COMPONENT = {				\
+	.name = # COMPONENT,									\
+	.decode = DECODE,									\
+};												\
+static void __attribute__((constructor)) sto_core_component_ ## COMPONENT ## _regsiter(void)	\
+{												\
+	sto_core_add_component(&sto_core_component_ ## COMPONENT);				\
 }
 
 struct sto_core_component *sto_core_component_find(const char *name);

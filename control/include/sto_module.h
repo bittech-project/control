@@ -12,15 +12,19 @@ struct sto_module {
 
 	TAILQ_ENTRY(sto_module) list;
 };
-#define STO_MODULE_INITIALIZER(name, op_table) {name, op_table}
 
-void sto_add_module(struct sto_module *module);
 struct sto_module *sto_module_find(const char *name);
 
-#define STO_MODULE_REGISTER(_name)					\
-static void __attribute__((constructor)) _name ## _register(void)	\
-{									\
-	sto_add_module(&_name);						\
+void sto_add_module(struct sto_module *module);
+
+#define STO_MODULE_REGISTER(MODULE, OP_TABLE)						\
+static struct sto_module sto_module_ ## MODULE = {					\
+	.name = # MODULE,								\
+	.op_table = OP_TABLE,								\
+};											\
+static void __attribute__((constructor)) sto_module_ ## MODULE ## _register(void)	\
+{											\
+	sto_add_module(&sto_module_ ## MODULE);						\
 }
 
 #endif /* _STO_MODULE_H_ */

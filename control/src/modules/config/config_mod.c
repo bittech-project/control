@@ -31,5 +31,4 @@ static const struct sto_ops config_ops[] = {
 
 static const struct sto_op_table config_op_table = STO_OP_TABLE_INITIALIZER(config_ops);
 
-static struct sto_module g_config_module = STO_MODULE_INITIALIZER("config", &config_op_table);
-STO_MODULE_REGISTER(g_config_module);
+STO_MODULE_REGISTER(config, &config_op_table);

@@ -190,5 +190,4 @@ static const struct sto_ops sys_ops[] = {
 
 static const struct sto_op_table sys_op_table = STO_OP_TABLE_INITIALIZER(sys_ops);
 
-static struct sto_subsystem g_sys_subsystem = STO_SUBSYSTEM_INITIALIZER("sys", &sys_op_table);
-STO_SUBSYSTEM_REGISTER(g_sys_subsystem);
+STO_SUBSYSTEM_REGISTER(sys, &sys_op_table);
