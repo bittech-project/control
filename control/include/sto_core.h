@@ -26,10 +26,10 @@ struct sto_core_req {
 	struct sto_req_context *req_ctx;
 	struct sto_err_context err_ctx;
 
-	TAILQ_ENTRY(sto_core_req) list;
-
 	void *priv;
 	sto_core_req_done_t done;
+
+	TAILQ_ENTRY(sto_core_req) list;
 };
 
 int sto_core_init(void);
@@ -45,6 +45,12 @@ struct sto_core_args {
 };
 
 int sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args);
+
+typedef void (*sto_core_dump_params_t)(void *priv, struct spdk_json_write_ctx *w);
+
+int sto_core_process_component(const char *component, const char *object, const char *op_name,
+			       void *params, sto_core_dump_params_t dump_params,
+			       struct sto_core_args *args);
 
 static inline void
 sto_core_req_set_state(struct sto_core_req *req, enum sto_core_req_state new_state)

@@ -116,6 +116,131 @@ sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *
 	return 0;
 }
 
+struct sto_core_component_ctx {
+	struct sto_json_ctx *json_ctx;
+
+	void *user_priv;
+	sto_core_req_done_t user_done;
+};
+
+static struct sto_json_ctx *
+sto_core_dump_component(const char *component, const char *object, const char *op,
+			void *params, sto_core_dump_params_t dump_params)
+{
+	struct sto_json_ctx *json_ctx;
+	struct spdk_json_write_ctx *w;
+
+	json_ctx = sto_json_ctx_alloc();
+	if (spdk_unlikely(!json_ctx)) {
+		SPDK_ERRLOG("Failed to alloc json context\n");
+		return NULL;
+	}
+
+	w = spdk_json_write_begin(sto_json_ctx_write_cb, json_ctx, 0);
+	if (spdk_unlikely(!w)) {
+		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
+		goto free_ctx;
+	}
+
+	spdk_json_write_object_begin(w);
+	spdk_json_write_named_string(w, component, object);
+	spdk_json_write_named_string(w, "op", op);
+
+	if (dump_params) {
+		dump_params(params, w);
+	}
+
+	spdk_json_write_object_end(w);
+	spdk_json_write_end(w);
+
+	return json_ctx;
+
+free_ctx:
+	sto_json_ctx_free(json_ctx);
+
+	return NULL;
+}
+
+static struct sto_core_component_ctx *
+sto_core_component_ctx_alloc(const char *component, const char *object, const char *op_name,
+			     void *params, sto_core_dump_params_t dump_params,
+			     struct sto_core_args *args)
+{
+	struct sto_core_component_ctx *ctx;
+
+	ctx = rte_zmalloc(NULL, sizeof(*ctx), 0);
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to alloc component context\n");
+		return NULL;
+	}
+
+	ctx->json_ctx = sto_core_dump_component(component, object, op_name, params, dump_params);
+	if (spdk_unlikely(!ctx->json_ctx)) {
+		SPDK_ERRLOG("Failed to dump component %s\n", component);
+		goto free_ctx;
+	}
+
+	ctx->user_priv = args->priv;
+	ctx->user_done = args->done;
+
+	return ctx;
+
+free_ctx:
+	rte_free(ctx);
+
+	return NULL;
+}
+
+static void
+sto_core_component_ctx_free(struct sto_core_component_ctx *ctx)
+{
+	sto_json_ctx_free(ctx->json_ctx);
+	rte_free(ctx);
+}
+
+static void
+sto_core_process_component_done(struct sto_core_req *core_req)
+{
+	struct sto_core_component_ctx *ctx = core_req->priv;
+
+	core_req->priv = ctx->user_priv;
+	ctx->user_done(core_req);
+
+	sto_core_component_ctx_free(ctx);
+}
+
+int
+sto_core_process_component(const char *component, const char *object, const char *op_name,
+			   void *params, sto_core_dump_params_t dump_params,
+			   struct sto_core_args *args)
+{
+	struct sto_core_component_ctx *ctx;
+	struct sto_core_args __args = {};
+	int rc = 0;
+
+	ctx = sto_core_component_ctx_alloc(component, object, op_name, params, dump_params, args);
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to alloc component context\n");
+		return -ENOMEM;
+	}
+
+	__args.priv = ctx;
+	__args.done = sto_core_process_component_done;
+
+	rc = sto_core_process_json(ctx->json_ctx->values, &__args);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to core process json\n");
+		goto free_ctx;
+	}
+
+	return 0;
+
+free_ctx:
+	sto_core_component_ctx_free(ctx);
+
+	return rc;
+}
+
 static void sto_core_req_exec_done(void *priv);
 
 static void

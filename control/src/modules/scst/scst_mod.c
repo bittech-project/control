@@ -3,12 +3,9 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include <rte_malloc.h>
-
 #include "sto_module.h"
 #include "sto_core.h"
 #include "sto_generic_req.h"
-#include "sto_subsystem.h"
 #include "sto_rpc_subprocess.h"
 
 static int
@@ -81,9 +78,9 @@ const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 };
 
 static void
-iscsi_add_target_done(void *priv, struct sto_core_req *core_req)
+iscsi_add_target_done(struct sto_core_req *core_req)
 {
-	struct sto_req *req = priv;
+	struct sto_req *req = core_req->priv;
 	int rc = core_req->err_ctx.rc;
 
 	sto_core_req_free(core_req);
@@ -101,12 +98,12 @@ iscsi_add_target_params(void *priv, struct spdk_json_write_ctx *w)
 static int
 iscsi_add_target(struct sto_req *req)
 {
-	struct sto_subsystem_args args = {
+	struct sto_core_args args = {
 		.priv = req,
 		.done = iscsi_add_target_done,
 	};
 
-	return sto_subsystem_send("scst", "target_add", NULL, iscsi_add_target_params, &args);
+	return sto_core_process_component("subsystem", "scst", "target_add", NULL, iscsi_add_target_params, &args);
 }
 
 const struct sto_req_properties sto_iscsi_add_target_req_properties = {
