@@ -27,11 +27,24 @@ struct sto_ops_decoder {
 
 	bool allow_empty;
 };
-#define STO_OPS_DECODER_INITIALIZER(decoders, params_size, params_deinit)	\
-	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, false}
 
-#define STO_OPS_DECODER_INITIALIZER_EMPTY(decoders, params_size, params_deinit)	\
-	{decoders, SPDK_COUNTOF(decoders), params_size, params_deinit, true}
+#define STO_OPS_DECODER_INITIALIZER(_decoders, _params_size, _params_deinit)	\
+	{									\
+		.decoders = _decoders,						\
+		.num_decoders = SPDK_COUNTOF(_decoders),			\
+		.params_size = _params_size,					\
+		.params_deinit = _params_deinit,				\
+		.allow_empty = false,						\
+	}
+
+#define STO_OPS_DECODER_INITIALIZER_EMPTY(_decoders, _params_size, _params_deinit)	\
+	{										\
+		.decoders = _decoders,							\
+		.num_decoders = SPDK_COUNTOF(_decoders),				\
+		.params_size = _params_size,						\
+		.params_deinit = _params_deinit,					\
+		.allow_empty = true,							\
+	}
 
 void *sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 		 		   const struct sto_json_iter *iter);
@@ -51,7 +64,12 @@ struct sto_op_table {
 	const struct sto_ops *ops;
 	size_t size;
 };
-#define STO_OP_TABLE_INITIALIZER(ops) {ops, SPDK_COUNTOF(ops)}
+
+#define STO_OP_TABLE_INITIALIZER(_ops)		\
+	{					\
+		.ops = _ops,			\
+		.size = SPDK_COUNTOF(_ops),	\
+	}
 
 const struct sto_ops *sto_op_table_find(const struct sto_op_table *op_table, const char *op_name);
 
