@@ -44,7 +44,7 @@ struct sto_core_args {
 	sto_core_req_done_t done;
 };
 
-int sto_core_process_start(const struct spdk_json_val *params, struct sto_core_args *args);
+int sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args);
 
 static inline void
 sto_core_req_set_state(struct sto_core_req *req, enum sto_core_req_state new_state)

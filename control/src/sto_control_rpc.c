@@ -30,7 +30,7 @@ sto_control_rpc(struct spdk_jsonrpc_request *request, const struct spdk_json_val
 	};
 	int rc;
 
-	rc = sto_core_process_start(params, &args);
+	rc = sto_core_process_json(params, &args);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to start core process\n");
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));

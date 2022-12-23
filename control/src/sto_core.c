@@ -99,7 +99,7 @@ sto_core_req_submit(struct sto_core_req *core_req)
 }
 
 int
-sto_core_process_start(const struct spdk_json_val *params, struct sto_core_args *args)
+sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args)
 {
 	struct sto_core_req *req;
 

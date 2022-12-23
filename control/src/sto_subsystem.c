@@ -165,7 +165,7 @@ sto_subsystem_send(const char *subsystem, const char *op,
 	core_args.priv = ctx;
 	core_args.done = sto_subsystem_send_done;
 
-	rc = sto_core_process_start(json_ctx->values, &core_args);
+	rc = sto_core_process_json(json_ctx->values, &core_args);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to start core process\n");
 		goto free_json_ctx;
