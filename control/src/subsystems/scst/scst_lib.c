@@ -392,7 +392,6 @@ scst_dev_open_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_dev_open_params *ops_params = arg2;
 	char *data;
-	int rc;
 
 	req_params->file = scst_handler_mgmt(ops_params->handler);
 	if (spdk_unlikely(!req_params->file)) {
@@ -404,10 +403,12 @@ scst_dev_open_constructor(void *arg1, void *arg2)
 		return -ENOMEM;
 	}
 
-	rc = scst_parse_attributes(ops_params->attributes, &data);
-	if (spdk_unlikely(rc)) {
-		free(data);
-		return -ENOMEM;
+	if (ops_params->attributes) {
+		int rc = scst_parse_attributes(ops_params->attributes, &data);
+		if (spdk_unlikely(rc)) {
+			free(data);
+			return rc;
+		}
 	}
 
 	req_params->data = data;
@@ -1081,7 +1082,6 @@ scst_lun_add_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_lun_add_params *ops_params = arg2;
 	char *data;
-	int rc;
 
 	req_params->file = scst_target_lun_mgmt(ops_params->driver,
 						ops_params->target, ops_params->group);
@@ -1095,11 +1095,12 @@ scst_lun_add_constructor(void *arg1, void *arg2)
 		return -ENOMEM;
 	}
 
-	rc = scst_parse_attributes(ops_params->attributes, &data);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to fill scst attrs\n");
-		free(data);
-		return -ENOMEM;
+	if (ops_params->attributes) {
+		int rc = scst_parse_attributes(ops_params->attributes, &data);
+		if (spdk_unlikely(rc)) {
+			free(data);
+			return rc;
+		}
 	}
 
 	req_params->data = data;
@@ -1162,7 +1163,6 @@ scst_lun_replace_constructor(void *arg1, void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	struct scst_lun_add_params *ops_params = arg2;
 	char *data;
-	int rc;
 
 	req_params->file = scst_target_lun_mgmt(ops_params->driver,
 						ops_params->target, ops_params->group);
@@ -1176,11 +1176,12 @@ scst_lun_replace_constructor(void *arg1, void *arg2)
 		return -ENOMEM;
 	}
 
-	rc = scst_parse_attributes(ops_params->attributes, &data);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to fill scst attrs\n");
-		free(data);
-		return -ENOMEM;
+	if (ops_params->attributes) {
+		int rc = scst_parse_attributes(ops_params->attributes, &data);
+		if (spdk_unlikely(rc)) {
+			free(data);
+			return rc;
+		}
 	}
 
 	req_params->data = data;
