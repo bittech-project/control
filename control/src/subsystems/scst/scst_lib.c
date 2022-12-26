@@ -309,7 +309,7 @@ scst_snapshot_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_
 }
 
 static int
-scst_snapshot_constructor(void *arg1, void *arg2)
+scst_snapshot_constructor(void *arg1, const void *arg2)
 {
 	struct sto_tree_req_params *req_params = arg1;
 
@@ -324,7 +324,7 @@ scst_snapshot_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_handler_list_constructor(void *arg1, void *arg2)
+scst_handler_list_constructor(void *arg1, const void *arg2)
 {
 	struct sto_readdir_req_params *req_params = arg1;
 
@@ -342,7 +342,7 @@ scst_handler_list_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_driver_list_constructor(void *arg1, void *arg2)
+scst_driver_list_constructor(void *arg1, const void *arg2)
 {
 	struct sto_readdir_req_params *req_params = arg1;
 
@@ -387,10 +387,10 @@ static const struct sto_ops_decoder scst_dev_open_decoder =
 				    scst_dev_open_params_deinit);
 
 static int
-scst_dev_open_constructor(void *arg1, void *arg2)
+scst_dev_open_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_dev_open_params *ops_params = arg2;
+	const struct scst_dev_open_params *ops_params = arg2;
 	char *data;
 
 	req_params->file = scst_handler_mgmt(ops_params->handler);
@@ -441,10 +441,10 @@ static const struct sto_ops_decoder scst_dev_close_decoder =
 				    scst_dev_close_params_deinit);
 
 static int
-scst_dev_close_constructor(void *arg1, void *arg2)
+scst_dev_close_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_dev_open_params *ops_params = arg2;
+	const struct scst_dev_open_params *ops_params = arg2;
 
 	req_params->file = scst_handler_mgmt(ops_params->handler);
 	if (spdk_unlikely(!req_params->file)) {
@@ -480,10 +480,10 @@ static const struct sto_ops_decoder scst_dev_resync_decoder =
 				    scst_dev_resync_params_deinit);
 
 static int
-scst_dev_resync_constructor(void *arg1, void *arg2)
+scst_dev_resync_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_dev_resync_params *ops_params = arg2;
+	const struct scst_dev_resync_params *ops_params = arg2;
 
 	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEVICES,
 					      ops_params->name, "resync_size");
@@ -500,7 +500,7 @@ scst_dev_resync_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_dev_list_constructor(void *arg1, void *arg2)
+scst_dev_list_constructor(void *arg1, const void *arg2)
 {
 	struct sto_readdir_req_params *req_params = arg1;
 
@@ -538,10 +538,10 @@ static const struct sto_ops_decoder scst_dgrp_decoder =
 				    scst_dgrp_params_deinit);
 
 static int
-scst_dgrp_add_constructor(void *arg1, void *arg2)
+scst_dgrp_add_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_dgrp_params *ops_params = arg2;
+	const struct scst_dgrp_params *ops_params = arg2;
 
 	req_params->file = scst_dev_groups_mgmt();
 	if (spdk_unlikely(!req_params->file)) {
@@ -557,10 +557,10 @@ scst_dgrp_add_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_dgrp_del_constructor(void *arg1, void *arg2)
+scst_dgrp_del_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_dgrp_params *ops_params = arg2;
+	const struct scst_dgrp_params *ops_params = arg2;
 
 	req_params->file = scst_dev_groups_mgmt();
 	if (spdk_unlikely(!req_params->file)) {
@@ -576,7 +576,7 @@ scst_dgrp_del_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_dgrp_list_constructor(void *arg1, void *arg2)
+scst_dgrp_list_constructor(void *arg1, const void *arg2)
 {
 	struct sto_readdir_req_params *req_params = arg1;
 
@@ -620,10 +620,10 @@ static const struct sto_ops_decoder scst_dgrp_dev_decoder =
 				    scst_dgrp_dev_params_deinit);
 
 static int
-scst_dgrp_add_dev_constructor(void *arg1, void *arg2)
+scst_dgrp_add_dev_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_dgrp_dev_params *ops_params = arg2;
+	const struct scst_dgrp_dev_params *ops_params = arg2;
 
 	req_params->file = scst_dev_group_devices_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
@@ -639,10 +639,10 @@ scst_dgrp_add_dev_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_dgrp_del_dev_constructor(void *arg1, void *arg2)
+scst_dgrp_del_dev_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_dgrp_dev_params *ops_params = arg2;
+	const struct scst_dgrp_dev_params *ops_params = arg2;
 
 	req_params->file = scst_dev_group_devices_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
@@ -682,10 +682,10 @@ static const struct sto_ops_decoder scst_tgrp_decoder =
 				    scst_tgrp_params_deinit);
 
 static int
-scst_tgrp_add_constructor(void *arg1, void *arg2)
+scst_tgrp_add_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_tgrp_params *ops_params = arg2;
+	const struct scst_tgrp_params *ops_params = arg2;
 
 	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
@@ -701,10 +701,10 @@ scst_tgrp_add_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_tgrp_del_constructor(void *arg1, void *arg2)
+scst_tgrp_del_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_tgrp_params *ops_params = arg2;
+	const struct scst_tgrp_params *ops_params = arg2;
 
 	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->name);
 	if (spdk_unlikely(!req_params->file)) {
@@ -741,10 +741,10 @@ static const struct sto_ops_decoder scst_tgrp_list_decoder =
 				    scst_tgrp_list_params_deinit);
 
 static int
-scst_tgrp_list_constructor(void *arg1, void *arg2)
+scst_tgrp_list_constructor(void *arg1, const void *arg2)
 {
 	struct sto_readdir_req_params *req_params = arg1;
-	struct scst_tgrp_list_params *ops_params = arg2;
+	const struct scst_tgrp_list_params *ops_params = arg2;
 
 	req_params->name = spdk_sprintf_alloc("Target Groups");
 	if (spdk_unlikely(!req_params->name)) {
@@ -790,10 +790,10 @@ static const struct sto_ops_decoder scst_tgrp_tgt_decoder =
 				    scst_tgrp_tgt_params_deinit);
 
 static int
-scst_tgrp_add_tgt_constructor(void *arg1, void *arg2)
+scst_tgrp_add_tgt_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_tgrp_tgt_params *ops_params = arg2;
+	const struct scst_tgrp_tgt_params *ops_params = arg2;
 
 	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp_name,
 							    ops_params->tgrp_name);
@@ -810,10 +810,10 @@ scst_tgrp_add_tgt_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_tgrp_del_tgt_constructor(void *arg1, void *arg2)
+scst_tgrp_del_tgt_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_tgrp_tgt_params *ops_params = arg2;
+	const struct scst_tgrp_tgt_params *ops_params = arg2;
 
 	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp_name,
 							    ops_params->tgrp_name);
@@ -854,10 +854,10 @@ static const struct sto_ops_decoder scst_target_decoder =
 				    scst_target_params_deinit);
 
 static int
-scst_target_add_constructor(void *arg1, void *arg2)
+scst_target_add_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_target_params *ops_params = arg2;
+	const struct scst_target_params *ops_params = arg2;
 
 	req_params->file = scst_target_driver_mgmt(ops_params->driver);
 	if (spdk_unlikely(!req_params->file)) {
@@ -873,10 +873,10 @@ scst_target_add_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_target_del_constructor(void *arg1, void *arg2)
+scst_target_del_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_target_params *ops_params = arg2;
+	const struct scst_target_params *ops_params = arg2;
 
 	req_params->file = scst_target_driver_mgmt(ops_params->driver);
 	if (spdk_unlikely(!req_params->file)) {
@@ -913,10 +913,10 @@ static const struct sto_ops_decoder scst_target_list_decoder =
 					  scst_target_list_params_deinit);
 
 static int
-scst_target_list_constructor(void *arg1, void *arg2)
+scst_target_list_constructor(void *arg1, const void *arg2)
 {
 	struct sto_tree_req_params *req_params = arg1;
-	struct scst_target_list_params *ops_params = arg2;
+	const struct scst_target_list_params *ops_params = arg2;
 
 	if (ops_params) {
 		req_params->dirpath = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT,
@@ -937,10 +937,10 @@ scst_target_list_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_target_enable_constructor(void *arg1, void *arg2)
+scst_target_enable_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_target_params *ops_params = arg2;
+	const struct scst_target_params *ops_params = arg2;
 
 	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
 				  ops_params->driver, ops_params->target, "enabled");
@@ -957,10 +957,10 @@ scst_target_enable_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_target_disable_constructor(void *arg1, void *arg2)
+scst_target_disable_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_target_params *ops_params = arg2;
+	const struct scst_target_params *ops_params = arg2;
 
 	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
 					      ops_params->driver, ops_params->target, "enabled");
@@ -1004,10 +1004,10 @@ static const struct sto_ops_decoder scst_group_decoder =
 				    scst_group_params_deinit);
 
 static int
-scst_group_add_constructor(void *arg1, void *arg2)
+scst_group_add_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_group_params *ops_params = arg2;
+	const struct scst_group_params *ops_params = arg2;
 
 	req_params->file = scst_target_ini_groups_mgmt(ops_params->driver, ops_params->target);
 	if (spdk_unlikely(!req_params->file)) {
@@ -1023,10 +1023,10 @@ scst_group_add_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_group_del_constructor(void *arg1, void *arg2)
+scst_group_del_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_group_params *ops_params = arg2;
+	const struct scst_group_params *ops_params = arg2;
 
 	req_params->file = scst_target_ini_groups_mgmt(ops_params->driver, ops_params->target);
 	if (spdk_unlikely(!req_params->file)) {
@@ -1077,10 +1077,10 @@ static const struct sto_ops_decoder scst_lun_add_decoder =
 				    scst_lun_add_params_deinit);
 
 static int
-scst_lun_add_constructor(void *arg1, void *arg2)
+scst_lun_add_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_lun_add_params *ops_params = arg2;
+	const struct scst_lun_add_params *ops_params = arg2;
 	char *data;
 
 	req_params->file = scst_target_lun_mgmt(ops_params->driver,
@@ -1138,10 +1138,10 @@ static const struct sto_ops_decoder scst_lun_del_decoder =
 				    scst_lun_del_params_deinit);
 
 static int
-scst_lun_del_constructor(void *arg1, void *arg2)
+scst_lun_del_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_lun_del_params *ops_params = arg2;
+	const struct scst_lun_del_params *ops_params = arg2;
 
 	req_params->file = scst_target_lun_mgmt(ops_params->driver,
 						ops_params->target, ops_params->group);
@@ -1158,10 +1158,10 @@ scst_lun_del_constructor(void *arg1, void *arg2)
 }
 
 static int
-scst_lun_replace_constructor(void *arg1, void *arg2)
+scst_lun_replace_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_lun_add_params *ops_params = arg2;
+	const struct scst_lun_add_params *ops_params = arg2;
 	char *data;
 
 	req_params->file = scst_target_lun_mgmt(ops_params->driver,
@@ -1217,10 +1217,10 @@ static struct sto_ops_decoder scst_lun_clear_decoder =
 				    scst_lun_clear_params_deinit);
 
 static int
-scst_lun_clear_constructor(void *arg1, void *arg2)
+scst_lun_clear_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct scst_lun_clear_params *ops_params = arg2;
+	const struct scst_lun_clear_params *ops_params = arg2;
 
 	req_params->file = scst_target_lun_mgmt(ops_params->driver,
 						ops_params->target, ops_params->group);

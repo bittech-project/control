@@ -31,10 +31,10 @@ static const struct sto_ops_decoder sys_writefile_decoder =
 				    sys_writefile_params_deinit);
 
 static int
-sys_writefile_constructor(void *arg1, void *arg2)
+sys_writefile_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	struct sys_writefile_params *ops_params = arg2;
+	const struct sys_writefile_params *ops_params = arg2;
 
 	req_params->file = strdup(ops_params->filepath);
 	if (spdk_unlikely(!req_params->file)) {
@@ -72,10 +72,10 @@ static const struct sto_ops_decoder sys_readfile_decoder =
 				    sys_readfile_params_deinit);
 
 static int
-sys_readfile_constructor(void *arg1, void *arg2)
+sys_readfile_constructor(void *arg1, const void *arg2)
 {
 	struct sto_read_req_params *req_params = arg1;
-	struct sys_readfile_params *ops_params = arg2;
+	const struct sys_readfile_params *ops_params = arg2;
 
 	req_params->file = strdup(ops_params->filepath);
 	if (spdk_unlikely(!req_params->file)) {
@@ -109,10 +109,10 @@ static const struct sto_ops_decoder sys_readlink_decoder =
 				    sys_readlink_params_deinit);
 
 static int
-sys_readlink_constructor(void *arg1, void *arg2)
+sys_readlink_constructor(void *arg1, const void *arg2)
 {
 	struct sto_readlink_req_params *req_params = arg1;
-	struct sys_readlink_params *ops_params = arg2;
+	const struct sys_readlink_params *ops_params = arg2;
 
 	req_params->file = strdup(ops_params->filepath);
 	if (spdk_unlikely(!req_params->file)) {
@@ -143,10 +143,10 @@ static const struct sto_ops_decoder sys_readdir_decoder =
 				    sys_readdir_params_deinit);
 
 static int
-sys_readdir_constructor(void *arg1, void *arg2)
+sys_readdir_constructor(void *arg1, const void *arg2)
 {
 	struct sto_readdir_req_params *req_params = arg1;
-	struct sys_readdir_params *ops_params = arg2;
+	const struct sys_readdir_params *ops_params = arg2;
 
 	req_params->name = spdk_sprintf_alloc("Files");
 	if (spdk_unlikely(!req_params->name)) {

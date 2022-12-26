@@ -64,6 +64,11 @@ sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 	int rc = 0;
 
 	values = sto_json_iter_cut_tail(iter);
+	if (IS_ERR(values)) {
+		SPDK_ERRLOG("Failed to create new JSON object from iter\n");
+		return ERR_CAST(values);
+	}
+
 	if (!values) {
 		return decoder->allow_empty ? NULL : ERR_PTR(-EINVAL);
 	}

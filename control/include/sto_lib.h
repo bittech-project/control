@@ -51,7 +51,7 @@ void *sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 void sto_ops_decoder_params_free(const struct sto_ops_decoder *decoder,
 				 void *ops_params);
 
-typedef int (*sto_ops_req_params_constructor_t)(void *arg1, void *arg2);
+typedef int (*sto_ops_req_params_constructor_t)(void *arg1, const void *arg2);
 
 struct sto_ops {
 	const char *name;
