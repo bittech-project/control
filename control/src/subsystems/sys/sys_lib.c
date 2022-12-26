@@ -166,25 +166,25 @@ static const struct sto_ops sys_ops[] = {
 		.name = "writefile",
 		.decoder = &sys_writefile_decoder,
 		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = &sys_writefile_constructor,
+		.req_params_constructor = sys_writefile_constructor,
 	},
 	{
 		.name = "readfile",
 		.decoder = &sys_readfile_decoder,
 		.req_properties = &sto_read_req_properties,
-		.req_params_constructor = &sys_readfile_constructor,
+		.req_params_constructor = sys_readfile_constructor,
 	},
 	{
 		.name = "readlink",
 		.decoder = &sys_readlink_decoder,
 		.req_properties = &sto_readlink_req_properties,
-		.req_params_constructor = &sys_readlink_constructor,
+		.req_params_constructor = sys_readlink_constructor,
 	},
 	{
 		.name = "readdir",
 		.decoder = &sys_readdir_decoder,
 		.req_properties = &sto_readdir_req_properties,
-		.req_params_constructor = &sys_readdir_constructor,
+		.req_params_constructor = sys_readdir_constructor,
 	},
 };
 
