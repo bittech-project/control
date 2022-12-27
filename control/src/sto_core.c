@@ -118,20 +118,50 @@ sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *
 
 struct sto_core_component_ctx {
 	void *buf;
+	size_t size;
 
 	const struct spdk_json_val *values;
-	size_t values_cnt;
 
 	void *user_priv;
 	sto_core_req_done_t user_done;
 };
 
 static int
+sto_core_component_ctx_parse_buf(struct sto_core_component_ctx *ctx)
+{
+	void *end;
+	size_t values_cnt;
+	ssize_t rc;
+
+	rc = spdk_json_parse(ctx->buf, ctx->size, NULL, 0, &end, 0);
+	if (spdk_unlikely(rc < 0)) {
+		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
+		return rc;
+	}
+
+	values_cnt = rc;
+
+	ctx->values = calloc(values_cnt, sizeof(struct spdk_json_val));
+	if (spdk_unlikely(!ctx->values)) {
+		SPDK_ERRLOG("Failed to alloc json values: cnt=%zu\n",
+			    values_cnt);
+		return -ENOMEM;
+	}
+
+	rc = spdk_json_parse(ctx->buf, ctx->size, (struct spdk_json_val *) ctx->values,
+			     values_cnt, &end, 0);
+	if (rc != (ssize_t) values_cnt) {
+		SPDK_ERRLOG("Parsing JSON failed (%zd)\n", rc);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int
 sto_core_component_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 {
 	struct sto_core_component_ctx *ctx = cb_ctx;
-	void *end;
-	ssize_t rc;
 
 	ctx->buf = calloc(1, size);
 	if (spdk_unlikely(!ctx->buf)) {
@@ -139,31 +169,11 @@ sto_core_component_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 		return -ENOMEM;
 	}
 
+	ctx->size = size;
+
 	memcpy(ctx->buf, data, size);
 
-	rc = spdk_json_parse(ctx->buf, size, NULL, 0, &end, 0);
-	if (spdk_unlikely(rc < 0)) {
-		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
-		return rc;
-	}
-
-	ctx->values_cnt = rc;
-
-	ctx->values = calloc(ctx->values_cnt, sizeof(struct spdk_json_val));
-	if (spdk_unlikely(!ctx->values)) {
-		SPDK_ERRLOG("Failed to alloc json values: cnt=%zu\n",
-			    ctx->values_cnt);
-		return -ENOMEM;
-	}
-
-	rc = spdk_json_parse(ctx->buf, size, (struct spdk_json_val *) ctx->values,
-			     ctx->values_cnt, &end, 0);
-	if (rc != (ssize_t) ctx->values_cnt) {
-		SPDK_ERRLOG("Parsing JSON failed (%zd)\n", rc);
-		return -EINVAL;
-	}
-
-	return 0;
+	return sto_core_component_ctx_parse_buf(ctx);
 }
 
 static void sto_core_component_ctx_free(struct sto_core_component_ctx *ctx);
