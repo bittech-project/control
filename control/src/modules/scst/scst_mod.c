@@ -4,7 +4,6 @@
 #include <spdk/string.h>
 
 #include "sto_module.h"
-#include "sto_core.h"
 #include "sto_utils.h"
 #include "sto_generic_req.h"
 #include "sto_rpc_subprocess.h"
@@ -75,79 +74,6 @@ const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 	.steps = {
 		STO_REQ_STEP(iscsi_stop_daemon, NULL),
 		STO_REQ_STEP(iscsi_rmmod, NULL),
-		STO_REQ_STEP_TERMINATOR(),
-	}
-};
-
-struct sto_passthrough_req_params {
-	char *component;
-	char *object;
-	char *op;
-
-	struct spdk_json_val *params;
-};
-
-static void
-sto_passthrough_req_params_deinit(void *params_ptr)
-{
-	struct sto_passthrough_req_params *params = params_ptr;
-
-	free(params->component);
-	free(params->object);
-	free(params->op);
-
-	free((struct spdk_json_val *) params->params);
-}
-
-static void
-sto_passthrough_req_done(struct sto_core_req *core_req)
-{
-	struct sto_req *req = core_req->priv;
-	int rc = core_req->err_ctx.rc;
-
-	sto_core_req_free(core_req);
-
-	sto_req_step_next(req, rc);
-}
-
-static void
-sto_passthrough_req_dump_params(void *priv, struct spdk_json_write_ctx *w)
-{
-	struct spdk_json_val *params = priv;
-	struct spdk_json_val *it;
-
-	if (!params) {
-		return;
-	}
-
-	sto_json_print(params);
-
-	for (it = spdk_json_object_first(params); it; it = spdk_json_next(it)) {
-		spdk_json_write_val(w, it);
-		spdk_json_write_val(w, it + 1);
-	}
-}
-
-static int
-sto_passthrough_req(struct sto_req *req)
-{
-	struct sto_passthrough_req_params *params = req->type.params;
-	struct sto_core_args args = {
-		.priv = req,
-		.done = sto_passthrough_req_done,
-	};
-
-	return sto_core_process_component(params->component, params->object, params->op,
-					  params->params, sto_passthrough_req_dump_params, &args);
-}
-
-const struct sto_req_properties sto_passthrough_req_properties = {
-	.params_size = sizeof(struct sto_passthrough_req_params),
-	.params_deinit = sto_passthrough_req_params_deinit,
-
-	.response = sto_dummy_req_response,
-	.steps = {
-		STO_REQ_STEP(sto_passthrough_req, NULL),
 		STO_REQ_STEP_TERMINATOR(),
 	}
 };

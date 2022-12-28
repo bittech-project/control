@@ -49,4 +49,14 @@ struct sto_tree_req_params {
 
 extern const struct sto_req_properties sto_tree_req_properties;
 
+struct sto_passthrough_req_params {
+	char *component;
+	char *object;
+	char *op;
+
+	struct spdk_json_val *params;
+};
+
+extern const struct sto_req_properties sto_passthrough_req_properties;
+
 #endif /* _STO_GENERIC_REQ_H_ */
