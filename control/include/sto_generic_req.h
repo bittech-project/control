@@ -1,8 +1,12 @@
 #ifndef _STO_GENERIC_REQ_H_
 #define _STO_GENERIC_REQ_H_
 
+#include <spdk/likely.h>
+
 #include "sto_req.h"
+#include "sto_utils.h"
 #include "sto_tree.h"
+#include "sto_err.h"
 
 static inline void
 sto_dummy_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
@@ -58,5 +62,54 @@ struct sto_passthrough_req_params {
 };
 
 extern const struct sto_req_properties sto_passthrough_req_properties;
+
+static inline int
+sto_passthrough_req_params_set_common(struct sto_passthrough_req_params *req_params,
+				      const char *object, const char *op_name,
+				      const struct sto_json_iter *iter)
+{
+	req_params->object = strdup(object);
+	if (spdk_unlikely(!req_params->object)) {
+		return -ENOMEM;
+	}
+
+	req_params->op = strdup(op_name);
+	if (spdk_unlikely(!req_params->op)) {
+		return -ENOMEM;
+	}
+
+	req_params->params = (struct spdk_json_val *) sto_json_iter_cut_tail(iter);
+	if (IS_ERR(req_params->params)) {
+		return PTR_ERR(req_params->params);
+	}
+
+	return 0;
+}
+
+static inline int
+sto_passthrough_req_params_set_subsystem(struct sto_passthrough_req_params *req_params,
+					 const char *subsystem, const char *op_name,
+					 const struct sto_json_iter *iter)
+{
+	req_params->component = strdup("subsystem");
+	if (spdk_unlikely(!req_params->component)) {
+		return -ENOMEM;
+	}
+
+	return sto_passthrough_req_params_set_common(req_params, subsystem, op_name, iter);
+}
+
+static inline int
+sto_passthrough_req_params_set_module(struct sto_passthrough_req_params *req_params,
+				      const char *module, const char *op_name,
+				      const struct sto_json_iter *iter)
+{
+	req_params->component = strdup("module");
+	if (spdk_unlikely(!req_params->component)) {
+		return -ENOMEM;
+	}
+
+	return sto_passthrough_req_params_set_common(req_params, module, op_name, iter);
+}
 
 #endif /* _STO_GENERIC_REQ_H_ */

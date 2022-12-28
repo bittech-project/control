@@ -84,27 +84,7 @@ scst_dev_open_constructor(void *arg1, const void *arg2)
 	struct sto_passthrough_req_params *req_params = arg1;
 	const struct sto_json_iter *iter = arg2;
 
-	req_params->component = strdup("subsystem");
-	if (spdk_unlikely(!req_params->component)) {
-		return -ENOMEM;
-	}
-
-	req_params->object = strdup("scst");
-	if (spdk_unlikely(!req_params->object)) {
-		return -ENOMEM;
-	}
-
-	req_params->op = strdup("dev_open");
-	if (spdk_unlikely(!req_params->op)) {
-		return -ENOMEM;
-	}
-
-	req_params->params = (struct spdk_json_val *) sto_json_iter_cut_tail(iter);
-	if (IS_ERR(req_params->params)) {
-		return PTR_ERR(req_params->params);
-	}
-
-	return 0;
+	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dev_open", iter);
 }
 
 static const struct sto_ops scst_ops[] = {
