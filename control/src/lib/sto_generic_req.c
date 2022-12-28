@@ -281,13 +281,20 @@ sto_passthrough_req_params_deinit(void *params_ptr)
 	free((struct spdk_json_val *) params->params);
 }
 
+struct sto_passthrough_req_priv {
+	struct sto_core_req *core_req;
+};
+
 static void
 sto_passthrough_req_done(struct sto_core_req *core_req)
 {
 	struct sto_req *req = core_req->priv;
 	int rc = core_req->err_ctx.rc;
 
-	sto_core_req_free(core_req);
+	if (spdk_likely(!rc)) {
+		struct sto_passthrough_req_priv *priv = req->type.priv;
+		priv->core_req = core_req;
+	}
 
 	sto_req_step_next(req, rc);
 }
@@ -321,11 +328,25 @@ sto_passthrough_req(struct sto_req *req)
 					  params->params, sto_passthrough_req_dump_params, &args);
 }
 
+static void
+sto_passthrough_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+{
+	struct sto_passthrough_req_priv *priv = req->type.priv;
+
+	assert(priv->core_req);
+
+	sto_core_req_response(priv->core_req, w);
+
+	sto_core_req_free(priv->core_req);
+}
+
 const struct sto_req_properties sto_passthrough_req_properties = {
 	.params_size = sizeof(struct sto_passthrough_req_params),
 	.params_deinit = sto_passthrough_req_params_deinit,
 
-	.response = sto_dummy_req_response,
+	.priv_size = sizeof(struct sto_passthrough_req_priv),
+
+	.response = sto_passthrough_req_response,
 	.steps = {
 		STO_REQ_STEP(sto_passthrough_req, NULL),
 		STO_REQ_STEP_TERMINATOR(),

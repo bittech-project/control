@@ -87,11 +87,25 @@ scst_dev_open_constructor(void *arg1, const void *arg2)
 	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dev_open", iter);
 }
 
+static int
+scst_handler_list_constructor(void *arg1, const void *arg2)
+{
+	struct sto_passthrough_req_params *req_params = arg1;
+	const struct sto_json_iter *iter = arg2;
+
+	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "handler_list", iter);
+}
+
 static const struct sto_ops scst_ops[] = {
 	{
 		.name = "dev_open",
 		.req_properties = &sto_passthrough_req_properties,
 		.req_params_constructor = scst_dev_open_constructor,
+	},
+	{
+		.name = "handler_list",
+		.req_properties = &sto_passthrough_req_properties,
+		.req_params_constructor = scst_handler_list_constructor,
 	},
 	{
 		.name = "iscsi_init",
