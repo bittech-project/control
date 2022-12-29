@@ -73,20 +73,9 @@ if __name__ == "__main__":
 
             params[k] = v
 
-    def control_subsystem(args):
-        params = {
-            'subsystem': args.name,
-            'op': args.operation,
-        }
-
-        control_set_params(params, args.params)
-
-        json = args.client.call('control', params)
-        print_json(json)
-
     def control_module(args):
         params = {
-            'module': args.name,
+            'module': args.module,
             'op': args.operation,
         }
 
@@ -95,34 +84,18 @@ if __name__ == "__main__":
         json = args.client.call('control', params)
         print_json(json)
 
-    control_parser = subparsers.add_parser('control', help='Send RPC request to the Control')
-    control_subparsers = control_parser.add_subparsers()
+    p = subparsers.add_parser('control', help='Send RPC request to the Control')
 
-    subsystem_parser = control_subparsers.add_parser('subsystem', help='Send RPC request to the Control subsystem')
-    subsystem_args = subsystem_parser.add_argument_group('Control subsystem arguments')
-    subsystem_args.add_argument('-n', '--name',
-                                help='Control subsystem name',
-                                required=True, type=str)
-    subsystem_args.add_argument('-op', '--operation',
-                                help='Control subsystem operation name',
-                                required=True, type=str)
-    subsystem_args.add_argument('-p', '--params', nargs='+',
-                                help='Space-separated key:value Control subsystem parameters pairs',
-                                required=False, type=str)
-    subsystem_parser.set_defaults(func=control_subsystem)
-
-    module_parser = control_subparsers.add_parser('module', help='Send RPC request to the Control module')
-    module_args = module_parser.add_argument_group('Control module arguments')
-    module_args.add_argument('-n', '--name',
-                             help='Control module name',
-                             required=True, type=str)
-    module_args.add_argument('-op', '--operation',
-                             help='Control module operation name',
-                             required=True, type=str)
-    module_args.add_argument('-p', '--params', nargs='+',
-                             help='Space-separated key:value Control module parameters pairs',
-                             required=False, type=str)
-    module_parser.set_defaults(func=control_module)
+    p.add_argument('-m', '--module',
+                   help='Control module name',
+                   required=True, type=str)
+    p.add_argument('-op', '--operation',
+                   help='Control module operation name',
+                   required=True, type=str)
+    p.add_argument('-p', '--params', nargs='+',
+                   help='Space-separated key:value Control module parameters pairs',
+                   required=False, type=str)
+    p.set_defaults(func=control_module)
 
     def spdk_get_version(args):
         print_json(rpc.spdk_get_version(args.client))
