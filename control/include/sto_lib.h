@@ -22,7 +22,7 @@ struct sto_ops_decoder {
 	const struct spdk_json_object_decoder *decoders;
 	size_t num_decoders;
 
-	uint32_t params_size;
+	size_t params_size;
 	sto_ops_decoder_params_deinit_t params_deinit;
 
 	bool allow_empty;

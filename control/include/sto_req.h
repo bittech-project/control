@@ -93,10 +93,10 @@ struct sto_req_step {
 	}
 
 struct sto_req_properties {
-	uint32_t params_size;
+	size_t params_size;
 	sto_req_params_deinit_t params_deinit;
 
-	uint32_t priv_size;
+	size_t priv_size;
 	sto_req_priv_deinit_t priv_deinit;
 
 	sto_req_response_t response;
