@@ -4,9 +4,8 @@
 #include <spdk/util.h>
 #include <spdk/string.h>
 
-#include <rte_string_fns.h>
-
 #include "sto_tree.h"
+#include "sto_utils.h"
 #include "sto_inode.h"
 
 struct sto_tree_cmd {
@@ -201,7 +200,7 @@ sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
 		return NULL;
 	}
 
-	ret = rte_strsplit(buf, strlen(buf), tokens, SPDK_COUNTOF(tokens), '/');
+	ret = sto_strsplit(buf, strlen(buf), tokens, SPDK_COUNTOF(tokens), '/');
 	if (spdk_unlikely(ret <= 0)) {
 		SPDK_ERRLOG("Failed to split link\n");
 		goto out;

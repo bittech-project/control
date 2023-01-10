@@ -3,8 +3,6 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include <rte_string_fns.h>
-
 #include "sto_generic_req.h"
 #include "sto_subsystem.h"
 
@@ -148,7 +146,7 @@ scst_attr(const char *buf, bool nonkey)
 		return NULL;
 	}
 
-	ret = rte_strsplit(tmp_buf, strlen(tmp_buf), lines, SPDK_COUNTOF(lines), '\n');
+	ret = sto_strsplit(tmp_buf, strlen(tmp_buf), lines, SPDK_COUNTOF(lines), '\n');
 	if (spdk_unlikely(ret == -1)) {
 		SPDK_ERRLOG("Failed to split scst attr\n");
 		goto out;

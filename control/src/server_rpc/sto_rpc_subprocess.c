@@ -2,9 +2,8 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include <rte_string_fns.h>
-
 #include "sto_client.h"
+#include "sto_utils.h"
 #include "sto_rpc_subprocess.h"
 
 struct sto_rpc_subprocess_info {
@@ -179,7 +178,7 @@ sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ..
 		return -ENOMEM;
 	}
 
-	ret = rte_strsplit(argv_s, strlen(argv_s), argv, SPDK_COUNTOF(argv), ' ');
+	ret = sto_strsplit(argv_s, strlen(argv_s), argv, SPDK_COUNTOF(argv), ' ');
 	if (spdk_unlikely(ret <= 0)) {
 		SPDK_ERRLOG("Failed to split subprocess arguments string, ret=%d\n", ret);
 		rc = -EINVAL;

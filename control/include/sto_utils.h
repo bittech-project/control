@@ -36,4 +36,6 @@ void sto_json_print(const struct spdk_json_val *values);
 
 bool sto_find_match_str(const char *key, const char *strings[]);
 
+int sto_strsplit(char *string, int stringlen, char **tokens, int maxtokens, char delim);
+
 #endif /* _STO_UTILS_H_ */
