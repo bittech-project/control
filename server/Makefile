@@ -1,12 +1,13 @@
 SHELL = /bin/bash
 
 CONTROL_ROOT_DIR := $(abspath $(CURDIR)/..)
+include $(CONTROL_ROOT_DIR)/mk/sto.common.mk
 include $(CONTROL_ROOT_DIR)/mk/spdk.mk
 
 LIBNAME = server
 LIB = libsto_$(LIBNAME).so
 
-CFLAGS = -fPIC -Wall -g -O2 -pthread -I./include $(SPDK_CFLAGS)
+CFLAGS = -fPIC -O2 -pthread -I./include
 LDFLAGS = -shared -Wl,-soname,$(LIB) -pthread
 
 C_SRCS = sto_server.c sto_exec.c sto_srv_rpc.c sto_srv_subprocess.c \
@@ -19,7 +20,7 @@ $(LIB): $(OBJS)
 	$(CC) $(LDFLAGS) $^ -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(COMMON_CFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJS) $(LIB)
