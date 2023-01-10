@@ -356,7 +356,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 	op_table = sto_core_component_decode(&iter);
 	if (IS_ERR_OR_NULL(op_table)) {
 		SPDK_ERRLOG("Failed to decode component: req[%p]\n", core_req);
-		return IS_ERR(op) ? PTR_ERR(op) : -ENOENT;
+		return IS_ERR(op) ? (int) PTR_ERR(op) : -ENOENT;
 	}
 
 	rc = sto_json_iter_next(&iter);

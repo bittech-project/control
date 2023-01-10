@@ -41,7 +41,7 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 const struct sto_ops *
 sto_op_table_find(const struct sto_op_table *op_table, const char *op_name)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < op_table->size; i++) {
 		const struct sto_ops *op = &op_table->ops[i];

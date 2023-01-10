@@ -41,7 +41,7 @@ static struct sto_exec_ops srv_writefile_ops = {
 	.exec_done = sto_srv_writefile_exec_done,
 };
 
-struct sto_srv_writefile_req *
+static struct sto_srv_writefile_req *
 sto_srv_writefile_req_alloc(const struct spdk_json_val *params)
 {
 	struct sto_srv_writefile_req *req;
@@ -171,7 +171,7 @@ static struct sto_exec_ops srv_readfile_ops = {
 	.exec_done = sto_srv_readfile_exec_done,
 };
 
-struct sto_srv_readfile_req *
+static struct sto_srv_readfile_req *
 sto_srv_readfile_req_alloc(const struct spdk_json_val *params)
 {
 	struct sto_srv_readfile_req *req;
@@ -319,7 +319,7 @@ static struct sto_exec_ops srv_readlink_ops = {
 	.exec_done = sto_srv_readlink_exec_done,
 };
 
-struct sto_srv_readlink_req *
+static struct sto_srv_readlink_req *
 sto_srv_readlink_req_alloc(const struct spdk_json_val *params)
 {
 	struct sto_srv_readlink_req *req;

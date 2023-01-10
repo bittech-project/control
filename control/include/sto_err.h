@@ -29,13 +29,13 @@ PTR_ERR(const void *ptr)
 	return (uintptr_t) ptr;
 }
 
-static inline uintptr_t __must_check
+static inline bool __must_check
 IS_ERR(const void *ptr)
 {
 	return IS_ERR_VALUE((uintptr_t) ptr);
 }
 
-static inline uintptr_t __must_check
+static inline bool __must_check
 IS_ERR_OR_NULL(const void *ptr)
 {
 	return spdk_unlikely(!ptr) || IS_ERR_VALUE((uintptr_t) ptr);

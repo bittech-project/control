@@ -288,7 +288,8 @@ sto_dir_inode_read_done(struct sto_inode *inode)
 	struct sto_dir_inode *dir_inode = sto_dir_inode(inode);
 	struct sto_dirents *dirents = &dir_inode->dirents;
 	struct sto_tree_node *node, *parent_node;
-	int rc = 0, i;
+	size_t i;
+	int rc = 0;
 
 	parent_node = inode->node;
 

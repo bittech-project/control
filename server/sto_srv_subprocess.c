@@ -35,7 +35,7 @@ sto_srv_subprocess_cmd_decode(const struct spdk_json_val *val, void *out)
 static void
 sto_srv_subprocess_cmd_free(struct sto_srv_subprocess_arg_list *arg_list)
 {
-	ssize_t i;
+	size_t i;
 
 	for (i = 0; i < arg_list->numargs; i++) {
 		free((char *) arg_list->args[i]);

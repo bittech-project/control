@@ -41,7 +41,7 @@ sto_dirent_free(struct sto_dirent *dirent)
 void
 sto_dirents_free(struct sto_dirents *dirents)
 {
-	int i;
+	size_t i;
 
 	if (spdk_unlikely(!dirents->cnt)) {
 		return;
@@ -193,7 +193,7 @@ void
 sto_dirents_info_json(struct sto_dirents *dirents,
 		      struct sto_dirents_json_cfg *cfg, struct spdk_json_write_ctx *w)
 {
-	int i;
+	size_t i;
 
 	spdk_json_write_object_begin(w);
 
