@@ -5,8 +5,6 @@
 #include <spdk/util.h>
 #include <spdk/string.h>
 
-#include <rte_malloc.h>
-
 #include "sto_core.h"
 #include "sto_utils.h"
 #include "sto_component.h"
@@ -67,7 +65,7 @@ sto_core_req_alloc(const struct spdk_json_val *params)
 {
 	struct sto_core_req *core_req;
 
-	core_req = rte_zmalloc(NULL, sizeof(*core_req), 0);
+	core_req = calloc(1, sizeof(*core_req));
 	if (spdk_unlikely(!core_req)) {
 		SPDK_ERRLOG("Cann't allocate memory for core req\n");
 		return NULL;
@@ -187,7 +185,7 @@ sto_core_component_ctx_alloc(const char *component, const char *object, const ch
 	struct spdk_json_write_ctx *w;
 	int rc;
 
-	ctx = rte_zmalloc(NULL, sizeof(*ctx), 0);
+	ctx = calloc(1, sizeof(*ctx));
 	if (spdk_unlikely(!ctx)) {
 		SPDK_ERRLOG("Failed to alloc component context\n");
 		return NULL;
@@ -232,7 +230,7 @@ sto_core_component_ctx_free(struct sto_core_component_ctx *ctx)
 	free((struct spdk_json_val *) ctx->values);
 	free(ctx->buf);
 
-	rte_free(ctx);
+	free(ctx);
 }
 
 static void
@@ -443,7 +441,7 @@ sto_core_req_free(struct sto_core_req *core_req)
 		core_req->req_ctx = NULL;
 	}
 
-	rte_free(core_req);
+	free(core_req);
 }
 
 static void

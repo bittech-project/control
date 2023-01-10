@@ -4,8 +4,6 @@
 #include <spdk/util.h>
 #include <spdk/string.h>
 
-#include <rte_malloc.h>
-
 #include "sto_rpc_aio.h"
 #include "sto_tree.h"
 #include "sto_inode.h"
@@ -204,7 +202,7 @@ sto_file_inode_destroy(struct sto_inode *inode)
 	sto_inode_free(inode);
 
 	free(file_inode->buf);
-	rte_free(file_inode);
+	free(file_inode);
 }
 
 static struct sto_inode_ops sto_file_inode_ops = {
@@ -220,7 +218,7 @@ sto_file_inode_create(void)
 	struct sto_file_inode *file_inode;
 	struct sto_inode *inode;
 
-	file_inode = rte_zmalloc(NULL, sizeof(*file_inode), 0);
+	file_inode = calloc(1, sizeof(*file_inode));
 	if (spdk_unlikely(!file_inode)) {
 		SPDK_ERRLOG("Failed to create file node\n");
 		return NULL;
@@ -327,7 +325,7 @@ sto_dir_inode_destroy(struct sto_inode *inode)
 	sto_inode_free(inode);
 
 	sto_dirents_free(&dir_inode->dirents);
-	rte_free(dir_inode);
+	free(dir_inode);
 }
 
 static struct sto_inode_ops sto_dir_inode_ops = {
@@ -343,7 +341,7 @@ sto_dir_inode_create(void)
 	struct sto_dir_inode *dir_inode;
 	struct sto_inode *inode;
 
-	dir_inode = rte_zmalloc(NULL, sizeof(*dir_inode), 0);
+	dir_inode = calloc(1, sizeof(*dir_inode));
 	if (spdk_unlikely(!dir_inode)) {
 		SPDK_ERRLOG("Failed to create dir node\n");
 		return NULL;
@@ -381,7 +379,7 @@ sto_lnk_inode_create(void)
 	struct sto_file_inode *file_inode;
 	struct sto_inode *inode;
 
-	file_inode = rte_zmalloc(NULL, sizeof(*file_inode), 0);
+	file_inode = calloc(1, sizeof(*file_inode));
 	if (spdk_unlikely(!file_inode)) {
 		SPDK_ERRLOG("Failed to create lnk node\n");
 		return NULL;

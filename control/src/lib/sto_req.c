@@ -4,8 +4,6 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include <rte_malloc.h>
-
 #include "sto_req.h"
 #include "sto_err.h"
 
@@ -24,7 +22,7 @@ sto_req_type_init(struct sto_req_type *type, const struct sto_req_properties *pr
 	int rc = 0;
 
 	if (properties->params_size) {
-		type->params = rte_zmalloc(NULL, properties->params_size, 0);
+		type->params = calloc(1, properties->params_size);
 		if (spdk_unlikely(!type->params)) {
 			SPDK_ERRLOG("Failed to alloc req type params\n");
 			rc = -ENOMEM;
@@ -35,7 +33,7 @@ sto_req_type_init(struct sto_req_type *type, const struct sto_req_properties *pr
 	}
 
 	if (properties->priv_size) {
-		type->priv = rte_zmalloc(NULL, properties->priv_size, 0);
+		type->priv = calloc(1, properties->priv_size);
 		if (spdk_unlikely(!type->priv)) {
 			SPDK_ERRLOG("Failed to alloc req type priv\n");
 			rc = -ENOMEM;
@@ -63,7 +61,7 @@ sto_req_type_deinit(struct sto_req_type *type)
 			type->params_deinit(type->params);
 		}
 
-		rte_free(type->params);
+		free(type->params);
 	}
 
 	if (type->priv) {
@@ -71,7 +69,7 @@ sto_req_type_deinit(struct sto_req_type *type)
 			type->priv_deinit(type->priv);
 		}
 
-		rte_free(type->priv);
+		free(type->priv);
 	}
 }
 
@@ -112,7 +110,7 @@ sto_req_alloc(const struct sto_req_properties *properties)
 	struct sto_req *req;
 	int rc;
 
-	req = rte_zmalloc(NULL, sizeof(*req), 0);
+	req = calloc(1, sizeof(*req));
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("Failed to alloc STO req\n");
 		return NULL;
@@ -156,7 +154,7 @@ sto_req_free(struct sto_req *req)
 	sto_req_action_list_free(&req->action_queue);
 	sto_req_action_list_free(&req->rollback_stack);
 
-	rte_free(req);
+	free(req);
 }
 
 static int
@@ -206,7 +204,7 @@ sto_req_action_alloc(enum sto_req_action_type type,
 
 	assert(action_fn);
 
-	action = rte_zmalloc(NULL, sizeof(*action), 0);
+	action = calloc(1, sizeof(*action));
 	if (spdk_unlikely(!action)) {
 		SPDK_ERRLOG("Failed to alloc action\n");
 		return NULL;
@@ -242,7 +240,7 @@ sto_req_action_alloc(enum sto_req_action_type type,
 	return action;
 
 free_action:
-	rte_free(action);
+	free(action);
 
 	return NULL;
 }
@@ -254,7 +252,7 @@ sto_req_action_free(struct sto_req_action *action)
 		action->priv_free(action->priv);
 	}
 
-	rte_free(action);
+	free(action);
 }
 
 int

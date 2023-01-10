@@ -2,7 +2,6 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include <rte_malloc.h>
 #include <rte_string_fns.h>
 
 #include "sto_client.h"
@@ -44,7 +43,7 @@ sto_rpc_subprocess_cmd_alloc(void)
 {
 	struct sto_rpc_subprocess_cmd *cmd;
 
-	cmd = rte_zmalloc(NULL, sizeof(*cmd), 0);
+	cmd = calloc(1, sizeof(*cmd));
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Cann't allocate memory for subprocess\n");
 		return NULL;
@@ -64,7 +63,7 @@ sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd,
 static void
 sto_rpc_subprocess_cmd_free(struct sto_rpc_subprocess_cmd *cmd)
 {
-	rte_free(cmd);
+	free(cmd);
 }
 
 static void

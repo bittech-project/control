@@ -4,7 +4,6 @@
 #include <spdk/util.h>
 #include <spdk/string.h>
 
-#include <rte_malloc.h>
 #include <rte_string_fns.h>
 
 #include "sto_tree.h"
@@ -27,7 +26,7 @@ sto_tree_cmd_alloc(struct sto_tree_node *tree_root)
 {
 	struct sto_tree_cmd *cmd;
 
-	cmd = rte_zmalloc(NULL, sizeof(*cmd), 0);
+	cmd = calloc(1, sizeof(*cmd));
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Cann't allocate memory for STO tree cmd\n");
 		return NULL;
@@ -50,7 +49,7 @@ static void
 sto_tree_cmd_free(struct sto_tree_cmd *cmd)
 {
 	cmd->tree_root->priv = NULL;
-	rte_free(cmd);
+	free(cmd);
 }
 
 static void
@@ -143,7 +142,7 @@ sto_tree_node_alloc(void)
 {
 	struct sto_tree_node *node;
 
-	node = rte_zmalloc(NULL, sizeof(*node), 0);
+	node = calloc(1, sizeof(*node));
 	if (spdk_unlikely(!node)) {
 		SPDK_ERRLOG("Failed to alloc node\n");
 		return NULL;
@@ -242,7 +241,7 @@ static void
 sto_tree_node_free(struct sto_tree_node *node)
 {
 	__sto_tree_node_free(node);
-	rte_free(node);
+	free(node);
 }
 
 static int

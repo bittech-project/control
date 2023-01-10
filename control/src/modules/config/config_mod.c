@@ -3,8 +3,6 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include <rte_malloc.h>
-
 #include "sto_version.h"
 #include "sto_module.h"
 #include "sto_req.h"

@@ -2,8 +2,6 @@
 #include <spdk/likely.h>
 #include <spdk/util.h>
 
-#include <rte_malloc.h>
-
 #include "sto_utils.h"
 #include "sto_lib.h"
 #include "sto_client.h"
@@ -81,7 +79,7 @@ sto_rpc_readdir_cmd_alloc(void)
 {
 	struct sto_rpc_readdir_cmd *cmd;
 
-	cmd = rte_zmalloc(NULL, sizeof(*cmd), 0);
+	cmd = calloc(1, sizeof(*cmd));
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Cann't allocate memory for STO readdir cmd\n");
 		return NULL;
@@ -100,7 +98,7 @@ sto_rpc_readdir_cmd_init_cb(struct sto_rpc_readdir_cmd *cmd, sto_rpc_readdir_don
 static void
 sto_rpc_readdir_cmd_free(struct sto_rpc_readdir_cmd *cmd)
 {
-	rte_free(cmd);
+	free(cmd);
 }
 
 static void
