@@ -10,11 +10,15 @@ static TAILQ_HEAD(sto_component_list, sto_core_component) g_sto_components =
 
 
 static struct sto_core_component *
-_core_component_find(struct sto_component_list *list, const char *name)
+_core_component_find(struct sto_component_list *list, const char *name, bool skip_internal)
 {
 	struct sto_core_component *component;
 
 	TAILQ_FOREACH(component, list, list) {
+		if (skip_internal && component->internal) {
+			continue;
+		}
+
 		if (!strcmp(name, component->name)) {
 			return component;
 		}
@@ -30,9 +34,9 @@ _core_component_next(struct sto_core_component *component, struct sto_component_
 }
 
 struct sto_core_component *
-sto_core_component_find(const char *name)
+sto_core_component_find(const char *name, bool skip_internal)
 {
-	return _core_component_find(&g_sto_components, name);
+	return _core_component_find(&g_sto_components, name, skip_internal);
 }
 
 struct sto_core_component *
@@ -48,7 +52,7 @@ sto_core_add_component(struct sto_core_component *component)
 }
 
 const struct sto_op_table *
-sto_core_component_decode(const struct sto_json_iter *iter)
+sto_core_component_decode(const struct sto_json_iter *iter, bool internal_user)
 {
 	struct sto_core_component *component;
 	char *component_name = NULL;
@@ -60,7 +64,7 @@ sto_core_component_decode(const struct sto_json_iter *iter)
 		return ERR_PTR(rc);
 	}
 
-	component = sto_core_component_find(component_name);
+	component = sto_core_component_find(component_name, !internal_user);
 
 	free(component_name);
 

@@ -62,4 +62,4 @@ sto_subsystem_decode(const struct sto_json_iter *iter)
 	return subsystem->op_table;
 }
 
-STO_CORE_REGISTER_COMPONENT(subsystem, sto_subsystem_decode)
+STO_CORE_REGISTER_INTERNAL_COMPONENT(subsystem, sto_subsystem_decode)

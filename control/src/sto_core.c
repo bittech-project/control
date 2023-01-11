@@ -61,7 +61,7 @@ sto_core_req_poll(void *ctx)
 }
 
 static struct sto_core_req *
-sto_core_req_alloc(const struct spdk_json_val *params)
+sto_core_req_alloc(const struct spdk_json_val *params, bool internal)
 {
 	struct sto_core_req *core_req;
 
@@ -72,6 +72,7 @@ sto_core_req_alloc(const struct spdk_json_val *params)
 	}
 
 	core_req->params = params;
+	core_req->internal = internal;
 	sto_core_req_set_state(core_req, STO_CORE_REQ_STATE_PARSE);
 
 	return core_req;
@@ -96,12 +97,12 @@ sto_core_req_submit(struct sto_core_req *core_req)
 	sto_core_req_process(core_req);
 }
 
-int
-sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args)
+static int
+__sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args, bool internal)
 {
 	struct sto_core_req *req;
 
-	req = sto_core_req_alloc(params);
+	req = sto_core_req_alloc(params, internal);
 	if (spdk_unlikely(!req)) {
 		SPDK_ERRLOG("Failed to create STO req\n");
 		return -ENOMEM;
@@ -112,6 +113,12 @@ sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *
 	sto_core_req_submit(req);
 
 	return 0;
+}
+
+int
+sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args)
+{
+	return __sto_core_process_json(params, args, false);
 }
 
 struct sto_core_component_ctx {
@@ -262,7 +269,7 @@ sto_core_process_component(const char *component, const char *object, const char
 	__args.priv = ctx;
 	__args.done = sto_core_process_component_done;
 
-	rc = sto_core_process_json(ctx->values, &__args);
+	rc = __sto_core_process_json(ctx->values, &__args, true);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to core process json\n");
 		goto free_ctx;
@@ -351,7 +358,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 
 	sto_json_iter_init(&iter, core_req->params);
 
-	op_table = sto_core_component_decode(&iter);
+	op_table = sto_core_component_decode(&iter, core_req->internal);
 	if (IS_ERR_OR_NULL(op_table)) {
 		SPDK_ERRLOG("Failed to decode component: req[%p]\n", core_req);
 		return IS_ERR(op) ? (int) PTR_ERR(op) : -ENOENT;

@@ -30,6 +30,8 @@ struct sto_core_req {
 	sto_core_req_done_t done;
 
 	TAILQ_ENTRY(sto_core_req) list;
+
+	bool internal;
 };
 
 int sto_core_init(void);
