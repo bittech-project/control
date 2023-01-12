@@ -8,6 +8,7 @@
 struct spdk_json_write_ctx;
 struct sto_core_req;
 struct spdk_json_val;
+struct sto_req;
 
 typedef void (*sto_core_req_done_t)(struct sto_core_req *req);
 
@@ -53,6 +54,14 @@ typedef void (*sto_core_dump_params_t)(void *priv, struct spdk_json_write_ctx *w
 int sto_core_process_component(const char *component, const char *object, const char *op_name,
 			       void *params, sto_core_dump_params_t dump_params,
 			       struct sto_core_args *args);
+
+int sto_module_submit_req(struct sto_req *req, sto_core_req_done_t done,
+			  const char *module, const char *op_name,
+			  void *params, sto_core_dump_params_t dump_params);
+
+int sto_subsystem_submit_req(struct sto_req *req, sto_core_req_done_t done,
+			     const char *subsystem, const char *op_name,
+			     void *params, sto_core_dump_params_t dump_params);
 
 static inline void
 sto_core_req_set_state(struct sto_core_req *req, enum sto_core_req_state new_state)
