@@ -332,8 +332,8 @@ sto_passthrough_req(struct sto_req *req)
 		.done = sto_passthrough_req_done,
 	};
 
-	return sto_core_process_component(params->component, params->object, params->op,
-					  params->params, sto_passthrough_req_dump_params, &args);
+	return sto_core_process_raw(params->component, params->object, params->op,
+				    params->params, sto_passthrough_req_dump_params, &args);
 }
 
 static void

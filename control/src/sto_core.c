@@ -37,7 +37,7 @@ sto_core_req_state_name(enum sto_core_req_state state)
 	return sto_core_req_state_names[index];
 }
 
-static void sto_core_process(struct sto_core_req *core_req);
+static void sto_core_process_req(struct sto_core_req *core_req);
 
 static int
 sto_core_req_poll(void *ctx)
@@ -54,7 +54,7 @@ sto_core_req_poll(void *ctx)
 	TAILQ_FOREACH_SAFE(core_req, &core_req_list, list, tmp) {
 		TAILQ_REMOVE(&core_req_list, core_req, list);
 
-		sto_core_process(core_req);
+		sto_core_process_req(core_req);
 	}
 
 	return SPDK_POLLER_BUSY;
@@ -86,19 +86,19 @@ sto_core_req_init_cb(struct sto_core_req *core_req, sto_core_req_done_t done, vo
 }
 
 static void
-sto_core_req_process(struct sto_core_req *core_req)
+sto_core_queue_req(struct sto_core_req *core_req)
 {
 	TAILQ_INSERT_TAIL(&g_sto_core_req_list, core_req, list);
 }
 
 static void
-sto_core_req_submit(struct sto_core_req *core_req)
+sto_core_submit_req(struct sto_core_req *core_req)
 {
-	sto_core_req_process(core_req);
+	sto_core_queue_req(core_req);
 }
 
 static int
-__sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args, bool internal)
+__sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args, bool internal)
 {
 	struct sto_core_req *req;
 
@@ -110,18 +110,18 @@ __sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args
 
 	sto_core_req_init_cb(req, args->done, args->priv);
 
-	sto_core_req_submit(req);
+	sto_core_submit_req(req);
 
 	return 0;
 }
 
 int
-sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args)
+sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args)
 {
-	return __sto_core_process_json(params, args, false);
+	return __sto_core_process(params, args, false);
 }
 
-struct sto_core_component_ctx {
+struct sto_core_ctx {
 	void *buf;
 	size_t size;
 
@@ -132,7 +132,7 @@ struct sto_core_component_ctx {
 };
 
 static int
-sto_core_component_ctx_parse_buf(struct sto_core_component_ctx *ctx)
+sto_core_ctx_parse_buf(struct sto_core_ctx *ctx)
 {
 	void *end;
 	size_t values_cnt;
@@ -164,9 +164,9 @@ sto_core_component_ctx_parse_buf(struct sto_core_component_ctx *ctx)
 }
 
 static int
-sto_core_component_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
+sto_core_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 {
-	struct sto_core_component_ctx *ctx = cb_ctx;
+	struct sto_core_ctx *ctx = cb_ctx;
 
 	ctx->buf = calloc(1, size);
 	if (spdk_unlikely(!ctx->buf)) {
@@ -178,17 +178,17 @@ sto_core_component_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 
 	memcpy(ctx->buf, data, size);
 
-	return sto_core_component_ctx_parse_buf(ctx);
+	return sto_core_ctx_parse_buf(ctx);
 }
 
-static void sto_core_component_ctx_free(struct sto_core_component_ctx *ctx);
+static void sto_core_ctx_free(struct sto_core_ctx *ctx);
 
-static struct sto_core_component_ctx *
-sto_core_component_ctx_alloc(const char *component, const char *object, const char *op_name,
+static struct sto_core_ctx *
+sto_core_ctx_alloc(const char *component, const char *object, const char *op_name,
 			     void *params, sto_core_dump_params_t dump_params,
 			     struct sto_core_args *args)
 {
-	struct sto_core_component_ctx *ctx;
+	struct sto_core_ctx *ctx;
 	struct spdk_json_write_ctx *w;
 	int rc;
 
@@ -198,7 +198,7 @@ sto_core_component_ctx_alloc(const char *component, const char *object, const ch
 		return NULL;
 	}
 
-	w = spdk_json_write_begin(sto_core_component_ctx_write_cb, ctx, 0);
+	w = spdk_json_write_begin(sto_core_ctx_write_cb, ctx, 0);
 	if (spdk_unlikely(!w)) {
 		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
 		goto free_ctx;
@@ -226,13 +226,13 @@ sto_core_component_ctx_alloc(const char *component, const char *object, const ch
 	return ctx;
 
 free_ctx:
-	sto_core_component_ctx_free(ctx);
+	sto_core_ctx_free(ctx);
 
 	return NULL;
 }
 
 static void
-sto_core_component_ctx_free(struct sto_core_component_ctx *ctx)
+sto_core_ctx_free(struct sto_core_ctx *ctx)
 {
 	free((struct spdk_json_val *) ctx->values);
 	free(ctx->buf);
@@ -241,35 +241,35 @@ sto_core_component_ctx_free(struct sto_core_component_ctx *ctx)
 }
 
 static void
-sto_core_process_component_done(struct sto_core_req *core_req)
+sto_core_process_raw_done(struct sto_core_req *core_req)
 {
-	struct sto_core_component_ctx *ctx = core_req->priv;
+	struct sto_core_ctx *ctx = core_req->priv;
 
 	core_req->priv = ctx->user_priv;
 	ctx->user_done(core_req);
 
-	sto_core_component_ctx_free(ctx);
+	sto_core_ctx_free(ctx);
 }
 
 int
-sto_core_process_component(const char *component, const char *object, const char *op_name,
-			   void *params, sto_core_dump_params_t dump_params,
-			   struct sto_core_args *args)
+sto_core_process_raw(const char *component, const char *object, const char *op_name,
+		     void *params, sto_core_dump_params_t dump_params,
+		     struct sto_core_args *args)
 {
-	struct sto_core_component_ctx *ctx;
+	struct sto_core_ctx *ctx;
 	struct sto_core_args __args = {};
 	int rc = 0;
 
-	ctx = sto_core_component_ctx_alloc(component, object, op_name, params, dump_params, args);
+	ctx = sto_core_ctx_alloc(component, object, op_name, params, dump_params, args);
 	if (spdk_unlikely(!ctx)) {
 		SPDK_ERRLOG("Failed to alloc component context\n");
 		return -ENOMEM;
 	}
 
 	__args.priv = ctx;
-	__args.done = sto_core_process_component_done;
+	__args.done = sto_core_process_raw_done;
 
-	rc = __sto_core_process_json(ctx->values, &__args, true);
+	rc = __sto_core_process(ctx->values, &__args, true);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to core process json\n");
 		goto free_ctx;
@@ -278,7 +278,7 @@ sto_core_process_component(const char *component, const char *object, const char
 	return 0;
 
 free_ctx:
-	sto_core_component_ctx_free(ctx);
+	sto_core_ctx_free(ctx);
 
 	return rc;
 }
@@ -304,7 +304,7 @@ sto_module_submit_req(struct sto_req *req, sto_core_req_done_t done,
 		.done = done ?: sto_req_core_done,
 	};
 
-	return sto_core_process_component("module", module, op_name, params, dump_params, &args);
+	return sto_core_process_raw("module", module, op_name, params, dump_params, &args);
 }
 
 int
@@ -317,7 +317,7 @@ sto_subsystem_submit_req(struct sto_req *req, sto_core_req_done_t done,
 		.done = done ?: sto_req_core_done,
 	};
 
-	return sto_core_process_component("subsystem", subsystem, op_name, params, dump_params, &args);
+	return sto_core_process_raw("subsystem", subsystem, op_name, params, dump_params, &args);
 }
 
 static void sto_core_req_exec_done(void *priv);
@@ -428,7 +428,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 	sto_core_req_init_req_ctx(core_req, req_ctx);
 
 	sto_core_req_set_state(core_req, STO_CORE_REQ_STATE_EXEC);
-	sto_core_req_process(core_req);
+	sto_core_queue_req(core_req);
 
 	return rc;
 }
@@ -439,7 +439,7 @@ sto_core_req_exec_done(void *priv)
 	struct sto_core_req *core_req = priv;
 
 	sto_core_req_set_state(core_req, STO_CORE_REQ_STATE_DONE);
-	sto_core_req_process(core_req);
+	sto_core_queue_req(core_req);
 }
 
 static void
@@ -489,7 +489,7 @@ sto_core_req_free(struct sto_core_req *core_req)
 }
 
 static void
-sto_core_process(struct sto_core_req *core_req)
+sto_core_process_req(struct sto_core_req *core_req)
 {
 	int rc = 0;
 

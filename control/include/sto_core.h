@@ -47,13 +47,13 @@ struct sto_core_args {
 	sto_core_req_done_t done;
 };
 
-int sto_core_process_json(const struct spdk_json_val *params, struct sto_core_args *args);
+int sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args);
 
 typedef void (*sto_core_dump_params_t)(void *priv, struct spdk_json_write_ctx *w);
 
-int sto_core_process_component(const char *component, const char *object, const char *op_name,
-			       void *params, sto_core_dump_params_t dump_params,
-			       struct sto_core_args *args);
+int sto_core_process_raw(const char *component, const char *object, const char *op_name,
+			 void *params, sto_core_dump_params_t dump_params,
+			 struct sto_core_args *args);
 
 int sto_module_submit_req(struct sto_req *req, sto_core_req_done_t done,
 			  const char *module, const char *op_name,
