@@ -399,6 +399,30 @@ sto_req_step_next(struct sto_req *req, int rc)
 	TAILQ_INSERT_TAIL(&g_sto_req_list, req, list);
 }
 
+static void
+sto_req_core_done(struct sto_core_req *core_req)
+{
+	struct sto_req *req = core_req->priv;
+	int rc = core_req->err_ctx.rc;
+
+	sto_core_req_free(core_req);
+
+	sto_req_step_next(req, rc);
+}
+
+int
+sto_req_core_submit(struct sto_req *req, sto_core_req_done_t done,
+		    const char *component, const char *object, const char *op_name,
+		    void *params, sto_core_dump_params_t dump_params)
+{
+	struct sto_core_args args = {
+		.priv = req,
+		.done = done ?: sto_req_core_done,
+	};
+
+	return sto_core_process_raw(component, object, op_name, params, dump_params, &args);
+}
+
 int
 sto_req_lib_init(void)
 {

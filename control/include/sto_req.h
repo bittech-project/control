@@ -5,6 +5,7 @@
 #include <spdk/util.h>
 
 #include "sto_lib.h"
+#include "sto_core.h"
 
 typedef void (*sto_req_context_done_t)(void *priv);
 
@@ -146,5 +147,25 @@ int sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_de
 			      const struct sto_json_iter *iter,
 			      sto_ops_req_params_constructor_t params_constructor);
 void sto_req_free(struct sto_req *req);
+
+int sto_req_core_submit(struct sto_req *req, sto_core_req_done_t done,
+			const char *component, const char *object, const char *op_name,
+			void *params, sto_core_dump_params_t dump_params);
+
+static inline int
+sto_req_module_submit(struct sto_req *req, sto_core_req_done_t done,
+		      const char *module, const char *op_name,
+		      void *params, sto_core_dump_params_t dump_params)
+{
+	return sto_req_core_submit(req, done, "module", module, op_name, params, dump_params);
+}
+
+static inline int
+sto_req_subsystem_submit(struct sto_req *req, sto_core_req_done_t done,
+			 const char *subsystem, const char *op_name,
+			 void *params, sto_core_dump_params_t dump_params)
+{
+	return sto_req_core_submit(req, done, "subsystem", subsystem, op_name, params, dump_params);
+}
 
 #endif /* _STO_REQ_H_ */

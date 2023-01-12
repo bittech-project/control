@@ -283,43 +283,6 @@ free_ctx:
 	return rc;
 }
 
-static void
-sto_req_core_done(struct sto_core_req *core_req)
-{
-	struct sto_req *req = core_req->priv;
-	int rc = core_req->err_ctx.rc;
-
-	sto_core_req_free(core_req);
-
-	sto_req_step_next(req, rc);
-}
-
-int
-sto_module_submit_req(struct sto_req *req, sto_core_req_done_t done,
-		      const char *module, const char *op_name,
-		      void *params, sto_core_dump_params_t dump_params)
-{
-	struct sto_core_args args = {
-		.priv = req,
-		.done = done ?: sto_req_core_done,
-	};
-
-	return sto_core_process_raw("module", module, op_name, params, dump_params, &args);
-}
-
-int
-sto_subsystem_submit_req(struct sto_req *req, sto_core_req_done_t done,
-			 const char *subsystem, const char *op_name,
-			 void *params, sto_core_dump_params_t dump_params)
-{
-	struct sto_core_args args = {
-		.priv = req,
-		.done = done ?: sto_req_core_done,
-	};
-
-	return sto_core_process_raw("subsystem", subsystem, op_name, params, dump_params, &args);
-}
-
 static void sto_core_req_exec_done(void *priv);
 
 static void
