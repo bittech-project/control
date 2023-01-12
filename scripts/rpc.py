@@ -60,13 +60,13 @@ if __name__ == "__main__":
             return
 
         try:
-            params_list = {k: v for k, v in (p.split(':') for p in data)}
+            params_map = {k: v for k, v in (p.split('=', 1) for p in data)}
         except ValueError:
             print("'params' format not correct")
-            print("expected format: space-separated key:value pairs")
+            print("expected format: space-separated key=value pairs")
             exit(1)
 
-        for k, v in params_list.items():
+        for k, v in params_map.items():
             if k in params.keys():
                 print("{} parameter already set".format(k))
                 exit(1)
@@ -92,9 +92,14 @@ if __name__ == "__main__":
     p.add_argument('-op', '--operation',
                    help='Control module operation name',
                    required=True, type=str)
-    p.add_argument('-p', '--params', nargs='+',
-                   help='Space-separated key:value Control module parameters pairs',
-                   required=False, type=str)
+    p.add_argument('-p', '--params', metavar="KEY=VALUE", nargs='+',
+                   help="Set a number of key-value pairs "
+                   "(do not put spaces before or after the = sign). "
+                   "If a value contains spaces, you should define "
+                   "it with double quotes: "
+                   'foo="this is a sentence". Note that '
+                   "values are always treated as strings.",
+                   required=False)
     p.set_defaults(func=control_module)
 
     def spdk_get_version(args):
