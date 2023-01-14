@@ -3,12 +3,11 @@
 
 #include <spdk/queue.h>
 
-struct sto_op_table;
+#include "sto_hashtable.h"
 
 struct sto_module {
 	const char *name;
-
-	const struct sto_op_table *op_table;
+	const struct sto_hashtable *op_map;
 
 	TAILQ_ENTRY(sto_module) list;
 };
@@ -20,10 +19,16 @@ void sto_add_module(struct sto_module *module);
 #define STO_MODULE_REGISTER(MODULE, OP_TABLE)						\
 static struct sto_module sto_module_ ## MODULE = {					\
 	.name = # MODULE,								\
-	.op_table = OP_TABLE,								\
 };											\
 static void __attribute__((constructor)) sto_module_ ## MODULE ## _register(void)	\
 {											\
+	const struct sto_hashtable *ht;							\
+											\
+	ht = sto_ops_map_alloc((OP_TABLE));						\
+	assert(ht);									\
+											\
+	sto_module_ ## MODULE.op_map = ht;						\
+											\
 	sto_add_module(&sto_module_ ## MODULE);						\
 }
 

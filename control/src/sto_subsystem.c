@@ -35,7 +35,7 @@ sto_subsystem_find(const char *name)
 	return _subsystem_find(&g_sto_subsystems, name);
 }
 
-static const struct sto_op_table *
+static const struct sto_hashtable *
 sto_subsystem_decode(const struct sto_json_iter *iter)
 {
 	struct sto_subsystem *subsystem;
@@ -57,7 +57,7 @@ sto_subsystem_decode(const struct sto_json_iter *iter)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return subsystem->op_table;
+	return subsystem->op_map;
 }
 
 STO_CORE_REGISTER_INTERNAL_COMPONENT(subsystem, sto_subsystem_decode)

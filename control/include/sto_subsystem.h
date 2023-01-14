@@ -3,12 +3,11 @@
 
 #include <spdk/queue.h>
 
-struct sto_op_table;
+#include "sto_hashtable.h"
 
 struct sto_subsystem {
 	const char *name;
-
-	const struct sto_op_table *op_table;
+	const struct sto_hashtable *op_map;
 
 	TAILQ_ENTRY(sto_subsystem) list;
 };
@@ -20,10 +19,16 @@ void sto_add_subsystem(struct sto_subsystem *subsystem);
 #define STO_SUBSYSTEM_REGISTER(SUBSYSTEM, OP_TABLE)					\
 static struct sto_subsystem sto_subsystem_ ## SUBSYSTEM = {				\
 	.name = # SUBSYSTEM,								\
-	.op_table = OP_TABLE,								\
 };											\
 static void __attribute__((constructor)) sto_subsystem_ ## SUBSYSTEM ## _register(void)	\
 {											\
+	const struct sto_hashtable *ht;							\
+											\
+	ht = sto_ops_map_alloc((OP_TABLE));						\
+	assert(ht);									\
+											\
+	sto_subsystem_ ## SUBSYSTEM.op_map = ht;					\
+											\
 	sto_add_subsystem(&sto_subsystem_ ## SUBSYSTEM);				\
 }
 

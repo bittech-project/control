@@ -51,7 +51,7 @@ sto_core_add_component(struct sto_core_component *component)
 	TAILQ_INSERT_TAIL(&g_sto_components, component, list);
 }
 
-const struct sto_op_table *
+const struct sto_hashtable *
 sto_core_component_decode(const struct sto_json_iter *iter, bool internal_user)
 {
 	struct sto_core_component *component;

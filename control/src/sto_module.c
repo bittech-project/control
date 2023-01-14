@@ -37,7 +37,7 @@ sto_module_find(const char *name)
 	return _module_find(&g_sto_modules, name);
 }
 
-static const struct sto_op_table *
+static const struct sto_hashtable *
 sto_module_decode(const struct sto_json_iter *iter)
 {
 	struct sto_module *module;
@@ -59,7 +59,7 @@ sto_module_decode(const struct sto_json_iter *iter)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return module->op_table;
+	return module->op_map;
 }
 
 STO_CORE_REGISTER_COMPONENT(module, sto_module_decode)

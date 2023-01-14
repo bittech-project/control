@@ -4,6 +4,7 @@
 #include <spdk/string.h>
 
 #include "sto_lib.h"
+#include "sto_hashtable.h"
 #include "sto_utils.h"
 #include "sto_err.h"
 
@@ -34,22 +35,6 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_named_string(w, "msg", err->errno_msg);
 
 	spdk_json_write_object_end(w);
-}
-
-const struct sto_ops *
-sto_op_table_find(const struct sto_op_table *op_table, const char *op_name)
-{
-	size_t i;
-
-	for (i = 0; i < op_table->size; i++) {
-		const struct sto_ops *op = &op_table->ops[i];
-
-		if (!strcmp(op_name, op->name)) {
-			return op;
-		}
-	}
-
-	return NULL;
 }
 
 void *
@@ -106,4 +91,35 @@ sto_ops_decoder_params_free(const struct sto_ops_decoder *decoder, void *ops_par
 	}
 
 	free(ops_params);
+}
+
+const struct sto_hashtable *
+sto_ops_map_alloc(const struct sto_op_table *op_table)
+{
+	struct sto_hashtable *ht;
+	size_t i;
+	int rc;
+
+	ht = sto_hashtable_alloc(op_table->size);
+	if (spdk_unlikely(!ht)) {
+		SPDK_ERRLOG("Failed to alloc ops map\n");
+		return NULL;
+	}
+
+	for (i = 0; i < op_table->size; i++) {
+		const struct sto_ops *op = &op_table->ops[i];
+
+		rc = sto_hashtable_add(ht, op->name, strlen(op->name), op);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Failed to add '%s' op to ops map\n", op->name);
+			goto failed;
+		}
+	}
+
+	return ht;
+
+failed:
+	sto_hashtable_free(ht);
+
+	return NULL;
 }
