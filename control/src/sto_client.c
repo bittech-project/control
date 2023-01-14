@@ -9,6 +9,8 @@
 #define STO_CLIENT_MAX_CONNS	64
 #define STO_CLIENT_POLL_PERIOD	100
 
+struct sto_rpc_cmd;
+
 struct sto_client {
 	struct spdk_jsonrpc_client *rpc_client;
 
@@ -19,10 +21,12 @@ struct sto_client_group {
 	const char *addr;
 	int addr_family;
 
+	struct sto_client clients_array[STO_CLIENT_MAX_CONNS];
+
 	TAILQ_HEAD(, sto_client) free_clients;
 	TAILQ_HEAD(, sto_client) clients;
 
-	struct sto_client clients_array[STO_CLIENT_MAX_CONNS];
+	TAILQ_HEAD(, sto_rpc_cmd) cmd_busy_list;
 
 	struct spdk_poller *poller;
 
@@ -42,8 +46,6 @@ struct sto_rpc_cmd {
 };
 
 static TAILQ_HEAD(, sto_rpc_cmd) g_rpc_cmd_list = TAILQ_HEAD_INITIALIZER(g_rpc_cmd_list);
-static TAILQ_HEAD(, sto_rpc_cmd) g_rpc_cmd_busy_list = TAILQ_HEAD_INITIALIZER(g_rpc_cmd_busy_list);
-
 
 static struct sto_rpc_cmd *
 _get_rpc_cmd(int id)
@@ -62,16 +64,16 @@ _get_rpc_cmd(int id)
 static void sto_client_submit_cmd(struct sto_client *client, struct sto_rpc_cmd *cmd);
 
 static bool
-sto_client_check_busy_list(struct sto_client *client)
+sto_client_group_check_busy_list(struct sto_client_group *group, struct sto_client *client)
 {
 	struct sto_rpc_cmd *cmd;
 
-	if (TAILQ_EMPTY(&g_rpc_cmd_busy_list)) {
+	if (TAILQ_EMPTY(&group->cmd_busy_list)) {
 		return false;
 	}
 
-	cmd = TAILQ_FIRST(&g_rpc_cmd_busy_list);
-	TAILQ_REMOVE(&g_rpc_cmd_busy_list, cmd, list);
+	cmd = TAILQ_FIRST(&group->cmd_busy_list);
+	TAILQ_REMOVE(&group->cmd_busy_list, cmd, list);
 
 	sto_client_submit_cmd(client, cmd);
 
@@ -109,7 +111,7 @@ sto_client_response(struct spdk_jsonrpc_client_response *response)
 }
 
 static void
-sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
+sto_client_poll(struct sto_client_group *group, struct sto_client *client)
 {
 	struct spdk_jsonrpc_client_response *response;
 	int rc = 0;
@@ -134,26 +136,26 @@ sto_client_poll(struct sto_client_group *cgroup, struct sto_client *client)
 
 	spdk_jsonrpc_client_free_response(response);
 
-	if (sto_client_check_busy_list(client)) {
+	if (sto_client_group_check_busy_list(group, client)) {
 		return;
 	}
 
-	TAILQ_REMOVE(&cgroup->clients, client, list);
-	TAILQ_INSERT_HEAD(&cgroup->free_clients, client, list);
+	TAILQ_REMOVE(&group->clients, client, list);
+	TAILQ_INSERT_HEAD(&group->free_clients, client, list);
 }
 
 static int
 sto_client_group_poll(void *ctx)
 {
-	struct sto_client_group *cgroup = ctx;
+	struct sto_client_group *group = ctx;
 	struct sto_client *client, *tmp;
 
-	if (TAILQ_EMPTY(&cgroup->clients)) {
+	if (TAILQ_EMPTY(&group->clients)) {
 		return SPDK_POLLER_IDLE;
 	}
 
-	TAILQ_FOREACH_SAFE(client, &cgroup->clients, list, tmp) {
-		sto_client_poll(cgroup, client);
+	TAILQ_FOREACH_SAFE(client, &group->clients, list, tmp) {
+		sto_client_poll(group, client);
 	}
 
 	return SPDK_POLLER_BUSY;
@@ -243,7 +245,7 @@ sto_rpc_cmd_run(struct sto_rpc_cmd *cmd)
 
 	client = TAILQ_FIRST(&group->free_clients);
 	if (!client) {
-		TAILQ_INSERT_TAIL(&g_rpc_cmd_busy_list, cmd, list);
+		TAILQ_INSERT_TAIL(&group->cmd_busy_list, cmd, list);
 		return;
 	}
 
@@ -370,6 +372,8 @@ sto_client_connect(const char *addr, int addr_family)
 	}
 
 	group->addr_family = addr_family;
+
+	TAILQ_INIT(&group->cmd_busy_list);
 
 	rc = sto_client_group_connect(group);
 	if (spdk_unlikely(rc)) {
