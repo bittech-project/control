@@ -84,6 +84,7 @@ sto_hash_alloc(uint32_t size)
 		return NULL;
 	}
 
+	ht->seed = 0;
 	ht->nr_of_buckets = nr_of_buckets;
 
 	for (i = 0; i < ht->nr_of_buckets; i++) {
@@ -116,7 +117,7 @@ sto_hash_get_bucket_nr(const struct sto_hash *ht, const void *key, uint32_t key_
 {
 	uint32_t hash;
 
-	hash = rte_jhash(key, key_len, 0);
+	hash = rte_jhash(key, key_len, ht->seed);
 	return hash & (ht->nr_of_buckets - 1);
 }
 

@@ -12,6 +12,7 @@ struct sto_hash_entry {
 };
 
 struct sto_hash {
+	uint32_t seed;
 	uint32_t nr_of_buckets;
 	LIST_HEAD(, sto_hash_entry) buckets[];
 };
