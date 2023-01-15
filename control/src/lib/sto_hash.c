@@ -51,6 +51,20 @@ roundup_pow_of_two(uint32_t x)
 	return 1UL << fls(x - 1);
 }
 
+/* Number of buckets is stored in uint32_t, so cap our result to 1U << 31 */
+#define STO_HASH_MAX_BUCKETS (1U << 31)
+
+static uint32_t
+sto_hash_buckets(uint32_t size)
+{
+	uint64_t val = ((uint64_t) size * 4) / 3;
+
+	if (val >= STO_HASH_MAX_BUCKETS)
+		return STO_HASH_MAX_BUCKETS;
+
+	return roundup_pow_of_two(val);
+}
+
 struct sto_hash *
 sto_hash_alloc(uint32_t size)
 {
@@ -58,7 +72,7 @@ sto_hash_alloc(uint32_t size)
 	uint32_t nr_of_buckets, hashtable_size;
 	uint32_t i;
 
-	nr_of_buckets = roundup_pow_of_two(size);
+	nr_of_buckets = sto_hash_buckets(size);
 
 	hashtable_size = sizeof(struct sto_hash);
 	hashtable_size += nr_of_buckets * sizeof(struct sto_hash_entry *);
@@ -75,6 +89,9 @@ sto_hash_alloc(uint32_t size)
 	for (i = 0; i < ht->nr_of_buckets; i++) {
 		LIST_INIT(&ht->buckets[i]);
 	}
+
+	SPDK_NOTICELOG("Create STO hash table: size=%u, nr_of_buckets=%u\n",
+		       size, nr_of_buckets);
 
 	return ht;
 }
