@@ -8,7 +8,7 @@ struct sto_json_iter;
 struct sto_core_component {
 	const char *name;
 
-	const struct sto_hashtable *(*decode)(const struct sto_json_iter *iter);
+	const struct sto_hash *(*decode)(const struct sto_json_iter *iter);
 
 	TAILQ_ENTRY(sto_core_component) list;
 
@@ -49,7 +49,7 @@ sto_core_component_first(void)
 	     (component);					\
 	     (component) = sto_core_component_next((component)))
 
-const struct sto_hashtable *sto_core_component_decode(const struct sto_json_iter *iter,
-						      bool internal_user);
+const struct sto_hash *sto_core_component_decode(const struct sto_json_iter *iter,
+						 bool internal_user);
 
 #endif /* _STO_COMPONENT_H_ */

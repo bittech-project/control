@@ -3,7 +3,7 @@
 
 #include <rte_jhash.h>
 
-#include "sto_hashtable.h"
+#include "sto_hash.h"
 
 static struct sto_hash_entry *
 sto_hash_entry_alloc(const void *key, uint32_t key_len, const void *value)
@@ -30,7 +30,8 @@ sto_hash_entry_free(struct sto_hash_entry *e)
 	free(e);
 }
 
-static inline uint32_t fls(uint32_t x)
+static inline uint32_t
+fls(uint32_t x)
 {
 	uint32_t position;
 	uint32_t i;
@@ -44,21 +45,22 @@ static inline uint32_t fls(uint32_t x)
 	return position + 1;
 }
 
-static inline uint32_t roundup_pow_of_two(uint32_t x)
+static inline uint32_t
+roundup_pow_of_two(uint32_t x)
 {
 	return 1UL << fls(x - 1);
 }
 
-struct sto_hashtable *
-sto_hashtable_alloc(uint32_t size)
+struct sto_hash *
+sto_hash_alloc(uint32_t size)
 {
-	struct sto_hashtable *ht;
+	struct sto_hash *ht;
 	uint32_t nr_of_buckets, hashtable_size;
 	uint32_t i;
 
 	nr_of_buckets = roundup_pow_of_two(size);
 
-	hashtable_size = sizeof(struct sto_hashtable);
+	hashtable_size = sizeof(struct sto_hash);
 	hashtable_size += nr_of_buckets * sizeof(struct sto_hash_entry *);
 
 	ht = calloc(1, hashtable_size);
@@ -78,7 +80,7 @@ sto_hashtable_alloc(uint32_t size)
 }
 
 void
-sto_hashtable_free(struct sto_hashtable *ht)
+sto_hash_free(struct sto_hash *ht)
 {
 	struct sto_hash_entry *e;
 	uint32_t i;
@@ -93,7 +95,7 @@ sto_hashtable_free(struct sto_hashtable *ht)
 }
 
 static inline uint32_t
-sto_hashtable_get_bucket_nr(const struct sto_hashtable *ht, const void *key, uint32_t key_len)
+sto_hash_get_bucket_nr(const struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	uint32_t hash;
 
@@ -102,7 +104,7 @@ sto_hashtable_get_bucket_nr(const struct sto_hashtable *ht, const void *key, uin
 }
 
 int
-sto_hashtable_add(struct sto_hashtable *ht, const void *key, uint32_t key_len, const void *data)
+sto_hash_add(struct sto_hash *ht, const void *key, uint32_t key_len, const void *data)
 {
 	struct sto_hash_entry *e;
 	uint32_t b;
@@ -113,19 +115,19 @@ sto_hashtable_add(struct sto_hashtable *ht, const void *key, uint32_t key_len, c
 		return -ENOMEM;
 	}
 
-	b = sto_hashtable_get_bucket_nr(ht, key, key_len);
+	b = sto_hash_get_bucket_nr(ht, key, key_len);
 	LIST_INSERT_HEAD(&ht->buckets[b], e, list);
 
 	return 0;
 }
 
 static struct sto_hash_entry *
-__sto_hashtable_lookup(const struct sto_hashtable *ht, const void *key, uint32_t key_len)
+__sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_entry *e;
 	uint32_t b;
 
-	b = sto_hashtable_get_bucket_nr(ht, key, key_len);
+	b = sto_hash_get_bucket_nr(ht, key, key_len);
 
 	LIST_FOREACH(e, &ht->buckets[b], list) {
 		if (key_len != e->key_len) {
@@ -141,11 +143,11 @@ __sto_hashtable_lookup(const struct sto_hashtable *ht, const void *key, uint32_t
 }
 
 void *
-sto_hashtable_lookup(const struct sto_hashtable *ht, const void *key, uint32_t key_len)
+sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_entry *e;
 
-	e = __sto_hashtable_lookup(ht, key, key_len);
+	e = __sto_hash_lookup(ht, key, key_len);
 	if (!e) {
 		return NULL;
 	}
@@ -154,11 +156,11 @@ sto_hashtable_lookup(const struct sto_hashtable *ht, const void *key, uint32_t k
 }
 
 void
-sto_hashtable_del(struct sto_hashtable *ht, const void *key, uint32_t key_len)
+sto_hash_del(struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_entry *e;
 
-	e = __sto_hashtable_lookup(ht, key, key_len);
+	e = __sto_hash_lookup(ht, key, key_len);
 	assert(e);
 
 	sto_hash_entry_free(e);

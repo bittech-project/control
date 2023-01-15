@@ -35,7 +35,7 @@ sto_subsystem_find(const char *name)
 	return _subsystem_find(&g_sto_subsystems, name);
 }
 
-static const struct sto_hashtable *
+static const struct sto_hash *
 sto_subsystem_decode(const struct sto_json_iter *iter)
 {
 	struct sto_subsystem *subsystem;

@@ -4,7 +4,7 @@
 #include <spdk/string.h>
 
 #include "sto_lib.h"
-#include "sto_hashtable.h"
+#include "sto_hash.h"
 #include "sto_utils.h"
 #include "sto_err.h"
 
@@ -93,14 +93,14 @@ sto_ops_decoder_params_free(const struct sto_ops_decoder *decoder, void *ops_par
 	free(ops_params);
 }
 
-const struct sto_hashtable *
+const struct sto_hash *
 sto_ops_map_alloc(const struct sto_op_table *op_table)
 {
-	struct sto_hashtable *ht;
+	struct sto_hash *ht;
 	size_t i;
 	int rc;
 
-	ht = sto_hashtable_alloc(op_table->size);
+	ht = sto_hash_alloc(op_table->size);
 	if (spdk_unlikely(!ht)) {
 		SPDK_ERRLOG("Failed to alloc ops map\n");
 		return NULL;
@@ -109,7 +109,7 @@ sto_ops_map_alloc(const struct sto_op_table *op_table)
 	for (i = 0; i < op_table->size; i++) {
 		const struct sto_ops *op = &op_table->ops[i];
 
-		rc = sto_hashtable_add(ht, op->name, strlen(op->name), op);
+		rc = sto_hash_add(ht, op->name, strlen(op->name), op);
 		if (spdk_unlikely(rc)) {
 			SPDK_ERRLOG("Failed to add '%s' op to ops map\n", op->name);
 			goto failed;
@@ -119,7 +119,7 @@ sto_ops_map_alloc(const struct sto_op_table *op_table)
 	return ht;
 
 failed:
-	sto_hashtable_free(ht);
+	sto_hash_free(ht);
 
 	return NULL;
 }

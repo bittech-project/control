@@ -71,6 +71,6 @@ struct sto_op_table {
 		.size = SPDK_COUNTOF(_ops),	\
 	}
 
-const struct sto_hashtable *sto_ops_map_alloc(const struct sto_op_table *op_table);
+const struct sto_hash *sto_ops_map_alloc(const struct sto_op_table *op_table);
 
 #endif /* _STO_LIB_H_ */

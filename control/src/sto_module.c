@@ -37,7 +37,7 @@ sto_module_find(const char *name)
 	return _module_find(&g_sto_modules, name);
 }
 
-static const struct sto_hashtable *
+static const struct sto_hash *
 sto_module_decode(const struct sto_json_iter *iter)
 {
 	struct sto_module *module;
