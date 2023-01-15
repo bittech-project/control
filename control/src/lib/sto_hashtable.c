@@ -92,11 +92,20 @@ sto_hashtable_free(struct sto_hashtable *ht)
 	free(ht);
 }
 
+static inline uint32_t
+sto_hashtable_get_bucket_nr(const struct sto_hashtable *ht, const void *key, uint32_t key_len)
+{
+	uint32_t hash;
+
+	hash = rte_jhash(key, key_len, 0);
+	return hash & (ht->nr_of_buckets - 1);
+}
+
 int
 sto_hashtable_add(struct sto_hashtable *ht, const void *key, uint32_t key_len, const void *data)
 {
 	struct sto_hash_entry *e;
-	uint32_t hash, b;
+	uint32_t b;
 
 	e = sto_hash_entry_alloc(key, key_len, data);
 	if (spdk_unlikely(!e)) {
@@ -104,9 +113,7 @@ sto_hashtable_add(struct sto_hashtable *ht, const void *key, uint32_t key_len, c
 		return -ENOMEM;
 	}
 
-	hash = rte_jhash(key, key_len, 0);
-	b = hash & (ht->nr_of_buckets - 1);
-
+	b = sto_hashtable_get_bucket_nr(ht, key, key_len);
 	LIST_INSERT_HEAD(&ht->buckets[b], e, list);
 
 	return 0;
@@ -116,10 +123,9 @@ static struct sto_hash_entry *
 __sto_hashtable_lookup(const struct sto_hashtable *ht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_entry *e;
-	uint32_t hash, b;
+	uint32_t b;
 
-	hash = rte_jhash(key, key_len, 0);
-	b = hash & (ht->nr_of_buckets - 1);
+	b = sto_hashtable_get_bucket_nr(ht, key, key_len);
 
 	LIST_FOREACH(e, &ht->buckets[b], list) {
 		if (key_len != e->key_len) {
