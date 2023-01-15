@@ -6,6 +6,7 @@
 #include "sto_utils.h"
 #include "sto_client.h"
 #include "sto_err.h"
+#include "sto_hash.h"
 
 #define STO_CLIENT_MAX_CONNS	64
 #define STO_CLIENT_POLL_PERIOD	100
@@ -27,6 +28,7 @@ struct sto_client_group {
 	TAILQ_HEAD(, sto_client) clients;
 
 	int cmd_id;
+	struct sto_hash *cmd_map;
 	TAILQ_HEAD(, sto_rpc_cmd) cmd_busy_list;
 
 	struct spdk_poller *poller;
@@ -35,6 +37,7 @@ struct sto_client_group {
 struct sto_rpc_cmd {
 	int id;
 	TAILQ_ENTRY(sto_rpc_cmd) list;
+	struct sto_hash_elem he;
 
 	struct spdk_jsonrpc_client_request *request;
 
@@ -43,22 +46,6 @@ struct sto_rpc_cmd {
 };
 
 static struct sto_client_group *g_sto_client_group;
-
-static TAILQ_HEAD(, sto_rpc_cmd) g_rpc_cmd_list = TAILQ_HEAD_INITIALIZER(g_rpc_cmd_list);
-
-static struct sto_rpc_cmd *
-_get_rpc_cmd(int id)
-{
-	struct sto_rpc_cmd *cmd;
-
-	TAILQ_FOREACH(cmd, &g_rpc_cmd_list, list) {
-		if (cmd->id == id) {
-			return cmd;
-		}
-	}
-
-	return NULL;
-}
 
 static void sto_client_group_submit_cmd(struct sto_client_group *group, struct sto_client *client, struct sto_rpc_cmd *cmd);
 
@@ -99,10 +86,10 @@ sto_client_group_response(struct sto_client_group *group, struct spdk_jsonrpc_cl
 		rc = -EFAULT;
 	}
 
-	cmd = _get_rpc_cmd(id);
+	cmd = sto_hash_lookup(group->cmd_map, &id, sizeof(id));
 	assert(cmd);
 
-	TAILQ_REMOVE(&g_rpc_cmd_list, cmd, list);
+	sto_hash_remove_elem(&cmd->he);
 
 	cmd->response_handler(cmd->priv, response, rc);
 
@@ -204,6 +191,8 @@ sto_rpc_cmd_alloc(struct sto_client_group *group,
 
 	cmd->id = group->cmd_id++;
 
+	sto_hash_elem_init(&cmd->he, &cmd->id, sizeof(cmd->id), cmd);
+
 	cmd->request = __alloc_jsonrpc_client_request(method_name, cmd->id, params, dump_params);
 	if (spdk_unlikely(!cmd->request)) {
 		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
@@ -232,15 +221,13 @@ sto_rpc_cmd_free(struct sto_rpc_cmd *cmd)
 	if (cmd->request) {
 		spdk_jsonrpc_client_free_request(cmd->request);
 	}
-
 	free(cmd);
 }
 
 static void
 sto_client_group_submit_cmd(struct sto_client_group *group, struct sto_client *client, struct sto_rpc_cmd *cmd)
 {
-	/* TODO: use a hash table? */
-	TAILQ_INSERT_TAIL(&g_rpc_cmd_list, cmd, list);
+	sto_hash_add_elem(group->cmd_map, &cmd->he);
 
 	spdk_jsonrpc_client_send_request(client->rpc_client, cmd->request);
 	cmd->request = NULL;
@@ -357,12 +344,19 @@ sto_client_group_alloc(const char *addr, int addr_family)
 
 	group->addr_family = addr_family;
 
+	group->cmd_map = sto_hash_alloc(STO_CLIENT_MAX_CONNS);
+	if (spdk_unlikely(!group->cmd_map)) {
+		SPDK_ERRLOG("Failed to create cmd map\n");
+		rc = -ENOMEM;
+		goto free_addr;
+	}
+
 	TAILQ_INIT(&group->cmd_busy_list);
 
 	rc = sto_client_group_connect(group);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to connect client group: rc=%d\n", rc);
-		goto free_addr;
+		goto free_cmd_map;
 	}
 
 	group->poller = SPDK_POLLER_REGISTER(sto_client_group_poll, group, STO_CLIENT_POLL_PERIOD);
@@ -377,6 +371,9 @@ sto_client_group_alloc(const char *addr, int addr_family)
 close_clients:
 	sto_client_group_close(group);
 
+free_cmd_map:
+	sto_hash_free(group->cmd_map);
+
 free_addr:
 	free((char *) group->addr);
 
@@ -388,6 +385,7 @@ sto_client_group_free(struct sto_client_group *group)
 {
 	spdk_poller_unregister(&group->poller);
 	sto_client_group_close(group);
+	sto_hash_free(group->cmd_map);
 	free((char *) group->addr);
 }
 
