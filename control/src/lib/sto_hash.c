@@ -105,7 +105,7 @@ void
 sto_hash_free(struct sto_hash *ht)
 {
 	if (!sto_hash_empty(ht)) {
-		SPDK_ERRLOG("STO hashtable is not empty!!!n");
+		SPDK_ERRLOG("STO hashtable is not empty!!!\n");
 	}
 
 	free(ht);
