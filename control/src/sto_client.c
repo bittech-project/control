@@ -5,6 +5,7 @@
 
 #include "sto_utils.h"
 #include "sto_client.h"
+#include "sto_err.h"
 
 #define STO_CLIENT_MAX_CONNS	64
 #define STO_CLIENT_POLL_PERIOD	100
@@ -29,11 +30,9 @@ struct sto_client_group {
 	TAILQ_HEAD(, sto_rpc_cmd) cmd_busy_list;
 
 	struct spdk_poller *poller;
-
-	bool initialized;
 };
 
-static struct sto_client_group g_sto_client_group;
+static struct sto_client_group *g_sto_client_group;
 
 struct sto_rpc_cmd {
 	int id;
@@ -190,16 +189,6 @@ sto_client_alloc_request(const char *method_name, int id,
 	return request;
 }
 
-static void
-sto_client_submit_cmd(struct sto_client *client, struct sto_rpc_cmd *cmd)
-{
-	/* TODO: use a hash table? */
-	TAILQ_INSERT_TAIL(&g_rpc_cmd_list, cmd, list);
-
-	spdk_jsonrpc_client_send_request(client->rpc_client, cmd->request);
-	cmd->request = NULL;
-}
-
 static struct sto_rpc_cmd *
 sto_rpc_cmd_alloc(const char *method_name, void *params, sto_client_dump_params_t dump_params)
 {
@@ -247,12 +236,22 @@ sto_rpc_cmd_free(struct sto_rpc_cmd *cmd)
 }
 
 static void
+sto_client_submit_cmd(struct sto_client *client, struct sto_rpc_cmd *cmd)
+{
+	/* TODO: use a hash table? */
+	TAILQ_INSERT_TAIL(&g_rpc_cmd_list, cmd, list);
+
+	spdk_jsonrpc_client_send_request(client->rpc_client, cmd->request);
+	cmd->request = NULL;
+}
+
+static void
 sto_rpc_cmd_run(struct sto_rpc_cmd *cmd)
 {
 	struct sto_client_group *group;
 	struct sto_client *client;
 
-	group = &g_sto_client_group;
+	group = g_sto_client_group;
 
 	client = TAILQ_FIRST(&group->free_clients);
 	if (!client) {
@@ -273,19 +272,11 @@ sto_client_send(const char *method_name, void *params,
 		sto_client_dump_params_t dump_params,
 		struct sto_client_args *args)
 {
-	struct sto_client_group *group;
 	struct sto_rpc_cmd *cmd;
 
 	if (spdk_unlikely(!method_name)) {
 		SPDK_ERRLOG("Method name is not set\n");
 		return -EINVAL;
-	}
-
-	group = &g_sto_client_group;
-
-	if (spdk_unlikely(!group->initialized)) {
-		SPDK_ERRLOG("FAILED: STO client has been failed to initialize\n");
-		return -EFAULT;
 	}
 
 	cmd = sto_rpc_cmd_alloc(method_name, params, dump_params);
@@ -323,6 +314,9 @@ sto_client_group_connect(struct sto_client_group *group)
 		TAILQ_INSERT_TAIL(&group->free_clients, &group->clients_array[i], list);
 	}
 
+	SPDK_NOTICELOG("STO client group connect: addr[%s] family[%d]\n",
+		       group->addr, group->addr_family);
+
 	return 0;
 }
 
@@ -342,28 +336,23 @@ sto_client_group_close(struct sto_client_group *group)
 	}
 }
 
-int
-sto_client_connect(const char *addr, int addr_family)
+static struct sto_client_group *
+sto_client_group_alloc(const char *addr, int addr_family)
 {
 	struct sto_client_group *group;
 	int rc;
 
-	group = &g_sto_client_group;
-
-	if (group->initialized) {
-		SPDK_ERRLOG("FAILED: STO client has already been initialized\n");
-		return -EINVAL;
+	group = calloc(1, sizeof(*group));
+	if (spdk_unlikely(!group)) {
+		SPDK_ERRLOG("Failed to alloc group: addr[%s] family[%d]\n",
+			    addr, addr_family);
+		return ERR_PTR(-ENOMEM);
 	}
-
-	SPDK_NOTICELOG("STO client connect: addr[%s] family[%d]\n",
-		       addr, addr_family);
-
-	memset(group, 0, sizeof(*group));
 
 	group->addr = strdup(addr);
 	if (spdk_unlikely(!group->addr)) {
 		SPDK_ERRLOG("Cannot allocate memory for addr %s\n", addr);
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	group->addr_family = addr_family;
@@ -383,9 +372,7 @@ sto_client_connect(const char *addr, int addr_family)
 		goto close_clients;
 	}
 
-	group->initialized = true;
-
-	return 0;
+	return group;
 
 close_clients:
 	sto_client_group_close(group);
@@ -393,24 +380,47 @@ close_clients:
 free_addr:
 	free((char *) group->addr);
 
-	return rc;
+	return ERR_PTR(rc);
+}
+
+static void
+sto_client_group_free(struct sto_client_group *group)
+{
+	spdk_poller_unregister(&group->poller);
+	sto_client_group_close(group);
+	free((char *) group->addr);
+}
+
+int
+sto_client_connect(const char *addr, int addr_family)
+{
+	struct sto_client_group *group;
+
+	if (g_sto_client_group) {
+		SPDK_ERRLOG("FAILED: STO client has already been initialized\n");
+		return -EINVAL;
+	}
+
+	group = sto_client_group_alloc(addr, addr_family);
+	if (IS_ERR(group)) {
+		SPDK_ERRLOG("Failed to alloc sto client group\n");
+		return PTR_ERR(group);
+	}
+
+	g_sto_client_group = group;
+
+	return 0;
 }
 
 void
 sto_client_close(void)
 {
-	struct sto_client_group *group;
+	struct sto_client_group *group = g_sto_client_group;
 
-	group = &g_sto_client_group;
-
-	if (!group->initialized) {
+	if (!group) {
 		SPDK_ERRLOG("FAILED: STO client has not been initialized yet\n");
 		return;
 	}
 
-	spdk_poller_unregister(&group->poller);
-	sto_client_group_close(group);
-	free((char *) group->addr);
-
-	group->initialized = false;
+	sto_client_group_free(group);
 }
