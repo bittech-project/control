@@ -201,7 +201,7 @@ sto_client_submit_cmd(struct sto_client *client, struct sto_rpc_cmd *cmd)
 }
 
 static struct sto_rpc_cmd *
-sto_rpc_cmd_alloc(void)
+sto_rpc_cmd_alloc(const char *method_name, void *params, sto_client_dump_params_t dump_params)
 {
 	struct sto_rpc_cmd *cmd;
 	static int id;
@@ -214,7 +214,18 @@ sto_rpc_cmd_alloc(void)
 
 	cmd->id = ++id;
 
+	cmd->request = sto_client_alloc_request(method_name, cmd->id, params, dump_params);
+	if (spdk_unlikely(!cmd->request)) {
+		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
+		goto free_cmd;
+	}
+
 	return cmd;
+
+free_cmd:
+	free(cmd);
+
+	return NULL;
 }
 
 static void
@@ -264,7 +275,11 @@ sto_client_send(const char *method_name, void *params,
 {
 	struct sto_client_group *group;
 	struct sto_rpc_cmd *cmd;
-	int rc = 0;
+
+	if (spdk_unlikely(!method_name)) {
+		SPDK_ERRLOG("Method name is not set\n");
+		return -EINVAL;
+	}
 
 	group = &g_sto_client_group;
 
@@ -273,33 +288,16 @@ sto_client_send(const char *method_name, void *params,
 		return -EFAULT;
 	}
 
-	if (spdk_unlikely(!method_name)) {
-		SPDK_ERRLOG("Method name is not set\n");
-		return -EINVAL;
-	}
-
-	cmd = sto_rpc_cmd_alloc();
+	cmd = sto_rpc_cmd_alloc(method_name, params, dump_params);
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to alloc `%s` RPC cmd\n", method_name);
 		return -ENOMEM;
-	}
-
-	cmd->request = sto_client_alloc_request(method_name, cmd->id, params, dump_params);
-	if (spdk_unlikely(!cmd->request)) {
-		SPDK_ERRLOG("Failed to create jsonrpc client request\n");
-		rc = -ENOMEM;
-		goto free_cmd;
 	}
 
 	sto_rpc_cmd_init_cb(cmd, args->response_handler, args->priv);
 	sto_rpc_cmd_run(cmd);
 
 	return 0;
-
-free_cmd:
-	sto_rpc_cmd_free(cmd);
-
-	return rc;
 }
 
 static void sto_client_group_close(struct sto_client_group *group);
@@ -313,16 +311,15 @@ sto_client_group_connect(struct sto_client_group *group)
 	TAILQ_INIT(&group->clients);
 
 	for (i = 0; i < STO_CLIENT_MAX_CONNS; i++) {
-		struct spdk_jsonrpc_client *rpc_client;
+		struct sto_client *client = &group->clients_array[i];
 
-		rpc_client = spdk_jsonrpc_client_connect(group->addr, group->addr_family);
-		if (spdk_unlikely(!rpc_client)) {
+		client->rpc_client = spdk_jsonrpc_client_connect(group->addr, group->addr_family);
+		if (spdk_unlikely(!client->rpc_client)) {
 			SPDK_ERRLOG("spdk_jsonrpc_client_connect() failed: %s\n", spdk_strerror(errno));
 			sto_client_group_close(group);
 			return -errno;
 		}
 
-		group->clients_array[i].rpc_client = rpc_client;
 		TAILQ_INSERT_TAIL(&group->free_clients, &group->clients_array[i], list);
 	}
 
@@ -335,15 +332,13 @@ sto_client_group_close(struct sto_client_group *group)
 	int i;
 
 	for (i = 0; i < STO_CLIENT_MAX_CONNS; i++) {
-		struct spdk_jsonrpc_client *rpc_client;
+		struct sto_client *client = &group->clients_array[i];
 
-		rpc_client = group->clients_array[i].rpc_client;
-
-		if (spdk_unlikely(!rpc_client)) {
+		if (spdk_unlikely(!client->rpc_client)) {
 			break;
 		}
 
-		spdk_jsonrpc_client_close(rpc_client);
+		spdk_jsonrpc_client_close(client->rpc_client);
 	}
 }
 
