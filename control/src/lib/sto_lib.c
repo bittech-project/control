@@ -119,7 +119,7 @@ sto_ops_map_alloc(const struct sto_op_table *op_table)
 	return ht;
 
 failed:
-	sto_hash_free(ht);
+	sto_hash_clear_and_free(ht);
 
 	return NULL;
 }

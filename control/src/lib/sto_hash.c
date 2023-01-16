@@ -16,9 +16,7 @@ sto_hash_elem_alloc(const void *key, uint32_t key_len, const void *value)
 		return NULL;
 	}
 
-	he->key = key;
-	he->key_len = key_len;
-	he->value = value;
+	sto_hash_elem_init(he, key, key_len, value);
 
 	return he;
 }
@@ -26,8 +24,14 @@ sto_hash_elem_alloc(const void *key, uint32_t key_len, const void *value)
 static void
 sto_hash_elem_free(struct sto_hash_elem *he)
 {
-	LIST_REMOVE(he, list);
 	free(he);
+}
+
+static inline void
+sto_hash_remove_elem_and_free(struct sto_hash_elem *he)
+{
+	sto_hash_remove_elem(he);
+	sto_hash_elem_free(he);
 }
 
 static inline uint32_t
@@ -100,13 +104,8 @@ sto_hash_alloc(uint32_t size)
 void
 sto_hash_free(struct sto_hash *ht)
 {
-	struct sto_hash_elem *he;
-	uint32_t i;
-
-	for (i = 0; i < ht->nr_of_buckets; i++) {
-		LIST_FOREACH(he, &ht->buckets[i], list) {
-			sto_hash_elem_free(he);
-		}
+	if (!sto_hash_empty(ht)) {
+		SPDK_ERRLOG("STO hashtable is not empty!!!n");
 	}
 
 	free(ht);
@@ -121,26 +120,17 @@ sto_hash_get_bucket_nr(const struct sto_hash *ht, const void *key, uint32_t key_
 	return hash & (ht->nr_of_buckets - 1);
 }
 
-int
-sto_hash_add(struct sto_hash *ht, const void *key, uint32_t key_len, const void *data)
+void
+sto_hash_add_elem(struct sto_hash *ht, struct sto_hash_elem *he)
 {
-	struct sto_hash_elem *he;
 	uint32_t b;
 
-	he = sto_hash_elem_alloc(key, key_len, data);
-	if (spdk_unlikely(!he)) {
-		SPDK_ERRLOG("Failed to alloc hashtable entry\n");
-		return -ENOMEM;
-	}
-
-	b = sto_hash_get_bucket_nr(ht, key, key_len);
+	b = sto_hash_get_bucket_nr(ht, he->key, he->key_len);
 	LIST_INSERT_HEAD(&ht->buckets[b], he, list);
-
-	return 0;
 }
 
 static struct sto_hash_elem *
-__sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
+sto_hash_lookup_elem(const struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_elem *he;
 	uint32_t b;
@@ -160,12 +150,34 @@ __sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
 	return NULL;
 }
 
+void
+sto_hash_remove_elem(struct sto_hash_elem *he)
+{
+	LIST_REMOVE(he, list);
+}
+
+int
+sto_hash_add(struct sto_hash *ht, const void *key, uint32_t key_len, const void *data)
+{
+	struct sto_hash_elem *he;
+
+	he = sto_hash_elem_alloc(key, key_len, data);
+	if (spdk_unlikely(!he)) {
+		SPDK_ERRLOG("Failed to alloc hashtable entry\n");
+		return -ENOMEM;
+	}
+
+	sto_hash_add_elem(ht, he);
+
+	return 0;
+}
+
 void *
 sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_elem *he;
 
-	he = __sto_hash_lookup(ht, key, key_len);
+	he = sto_hash_lookup_elem(ht, key, key_len);
 	if (!he) {
 		return NULL;
 	}
@@ -174,12 +186,25 @@ sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
 }
 
 void
-sto_hash_del(struct sto_hash *ht, const void *key, uint32_t key_len)
+sto_hash_remove(struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_elem *he;
 
-	he = __sto_hash_lookup(ht, key, key_len);
+	he = sto_hash_lookup_elem(ht, key, key_len);
 	assert(he);
 
-	sto_hash_elem_free(he);
+	sto_hash_remove_elem_and_free(he);
+}
+
+void
+sto_hash_clear(struct sto_hash *ht)
+{
+	struct sto_hash_elem *he, *tmp;
+	uint32_t i;
+
+	for (i = 0; i < ht->nr_of_buckets; i++) {
+		LIST_FOREACH_SAFE(he, &ht->buckets[i], list, tmp) {
+			sto_hash_remove_elem_and_free(he);
+		}
+	}
 }
