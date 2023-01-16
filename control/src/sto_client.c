@@ -47,6 +47,12 @@ struct sto_rpc_cmd {
 
 static struct sto_client_group *g_sto_client_group;
 
+static inline int
+sto_client_group_next_cmd_id(struct sto_client_group *group)
+{
+	return group->cmd_id == INT_MAX ? 0 : group->cmd_id + 1;
+}
+
 static void sto_client_group_submit_cmd(struct sto_client_group *group, struct sto_client *client, struct sto_rpc_cmd *cmd);
 
 static bool
@@ -189,7 +195,7 @@ sto_rpc_cmd_alloc(struct sto_client_group *group,
 		return NULL;
 	}
 
-	cmd->id = group->cmd_id++;
+	cmd->id = group->cmd_id = sto_client_group_next_cmd_id(group);
 
 	sto_hash_elem_init(&cmd->he, &cmd->id, sizeof(cmd->id), cmd);
 
