@@ -74,6 +74,19 @@ sto_client_group_check_busy_list(struct sto_client_group *group, struct sto_clie
 
 static void sto_rpc_cmd_free(struct sto_rpc_cmd *cmd);
 
+static inline struct sto_rpc_cmd *
+sto_rpc_cmd_map_lookup(struct sto_hash *cmd_map, int id)
+{
+	struct sto_hash_elem *he;
+
+	he = sto_hash_lookup_elem(cmd_map, &id, sizeof(id));
+	if (!he) {
+		return NULL;
+	}
+
+	return SPDK_CONTAINEROF(he, struct sto_rpc_cmd, he);
+}
+
 static void
 sto_client_group_response(struct sto_client_group *group, struct spdk_jsonrpc_client_response *response)
 {
@@ -92,7 +105,7 @@ sto_client_group_response(struct sto_client_group *group, struct spdk_jsonrpc_cl
 		rc = -EFAULT;
 	}
 
-	cmd = sto_hash_lookup(group->cmd_map, &id, sizeof(id));
+	cmd = sto_rpc_cmd_map_lookup(group->cmd_map, id);
 	assert(cmd);
 
 	sto_hash_remove_elem(&cmd->he);
@@ -197,7 +210,7 @@ sto_rpc_cmd_alloc(struct sto_client_group *group,
 
 	cmd->id = group->cmd_id = sto_client_group_next_cmd_id(group);
 
-	sto_hash_elem_init(&cmd->he, &cmd->id, sizeof(cmd->id), cmd);
+	sto_hash_elem_init(&cmd->he, &cmd->id, sizeof(cmd->id));
 
 	cmd->request = __alloc_jsonrpc_client_request(method_name, cmd->id, params, dump_params);
 	if (spdk_unlikely(!cmd->request)) {
