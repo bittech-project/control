@@ -37,17 +37,4 @@ static void __attribute__((constructor)) sto_core_component_ ## COMPONENT ## _re
 	sto_core_add_component(&sto_core_component_ ## COMPONENT);				\
 }
 
-struct sto_core_component *sto_core_component_next(struct sto_core_component *component);
-
-static inline struct sto_core_component *
-sto_core_component_first(void)
-{
-	return sto_core_component_next(NULL);
-}
-
-#define STO_CORE_FOREACH_COMPONENT(component)			\
-	for ((component) = sto_core_component_first();		\
-	     (component);					\
-	     (component) = sto_core_component_next((component)))
-
 #endif /* _STO_COMPONENT_H_ */

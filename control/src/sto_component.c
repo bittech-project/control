@@ -27,22 +27,10 @@ _core_component_find(struct sto_component_list *list, const char *name, bool ski
 	return NULL;
 }
 
-static struct sto_core_component *
-_core_component_next(struct sto_core_component *component, struct sto_component_list *list)
-{
-	return !component ? TAILQ_FIRST(list) : TAILQ_NEXT(component, list);
-}
-
 struct sto_core_component *
 sto_core_component_find(const char *name, bool skip_internal)
 {
 	return _core_component_find(&g_sto_components, name, skip_internal);
-}
-
-struct sto_core_component *
-sto_core_component_next(struct sto_core_component *component)
-{
-	return _core_component_next(component, &g_sto_components);
 }
 
 void

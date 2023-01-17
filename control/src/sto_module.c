@@ -37,6 +37,18 @@ sto_module_find(const char *name)
 	return _module_find(&g_sto_modules, name);
 }
 
+static inline struct sto_module *
+module_next(struct sto_module *module, struct sto_module_list *list)
+{
+	return !module ? TAILQ_FIRST(list) : TAILQ_NEXT(module, list);
+}
+
+struct sto_module *
+sto_module_next(struct sto_module *module)
+{
+	return module_next(module, &g_sto_modules);
+}
+
 static const struct sto_shash *
 sto_module_get_ops(const char *object_name)
 {
