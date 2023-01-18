@@ -37,13 +37,39 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_object_end(w);
 }
 
+static void *
+ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
+			 const struct spdk_json_val *values)
+{
+	void *params;
+	int rc;
+
+	params = calloc(1, decoder->params_size);
+	if (spdk_unlikely(!params)) {
+		SPDK_ERRLOG("Failed to alloc decoder params\n");
+		return ERR_PTR(-ENOMEM);
+	}
+
+	if (spdk_json_decode_object(values, decoder->decoders, decoder->num_decoders, params)) {
+		SPDK_ERRLOG("Failed to decode params\n");
+		rc = -EINVAL;
+		goto free_params;
+	}
+
+	return params;
+
+free_params:
+	sto_ops_decoder_params_free(decoder, params);
+
+	return ERR_PTR(rc);
+}
+
 void *
 sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 			     const struct sto_json_iter *iter)
 {
 	const struct spdk_json_val *values;
-	void *params = NULL;
-	int rc = 0;
+	void *params;
 
 	values = sto_json_iter_cut_tail(iter);
 	if (IS_ERR(values)) {
@@ -55,28 +81,11 @@ sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 		return decoder->allow_empty ? NULL : ERR_PTR(-EINVAL);
 	}
 
-	params = calloc(1, decoder->params_size);
-	if (spdk_unlikely(!params)) {
-		SPDK_ERRLOG("Failed to alloc decoder params\n");
-		rc = -ENOMEM;
-		goto out;
-	}
+	params = ops_decoder_params_parse(decoder, values);
 
-	if (spdk_json_decode_object(values, decoder->decoders, decoder->num_decoders, params)) {
-		SPDK_ERRLOG("Failed to decode params\n");
-		rc = -EINVAL;
-		goto free_params;
-	}
-
-out:
 	free((struct spdk_json_val *) values);
 
-	return rc ? ERR_PTR(rc) : params;
-
-free_params:
-	sto_ops_decoder_params_free(decoder, params);
-
-	goto out;
+	return params;
 }
 
 void
