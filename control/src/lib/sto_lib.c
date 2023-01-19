@@ -38,19 +38,29 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 }
 
 static void *
-ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
-			 const struct spdk_json_val *values)
+ops_params_parse(const struct sto_ops_params_properties *properties,
+		 const struct spdk_json_val *values)
 {
+	const size_t num_decoders = properties->num_descriptors;
+	struct spdk_json_object_decoder decoders[num_decoders];
 	void *params;
-	int rc;
+	size_t i;
+	int rc = 0;
 
-	params = calloc(1, decoder->params_size);
+	for (i = 0; i < num_decoders; i++) {
+		decoders[i].name = properties->descriptors[i].name;
+		decoders[i].offset = properties->descriptors[i].offset;
+		decoders[i].decode_func = properties->descriptors[i].decode_func;
+		decoders[i].optional = properties->descriptors[i].optional;
+	}
+
+	params = calloc(1, properties->params_size);
 	if (spdk_unlikely(!params)) {
 		SPDK_ERRLOG("Failed to alloc decoder params\n");
 		return ERR_PTR(-ENOMEM);
 	}
 
-	if (spdk_json_decode_object(values, decoder->decoders, decoder->num_decoders, params)) {
+	if (spdk_json_decode_object(values, decoders, num_decoders, params)) {
 		SPDK_ERRLOG("Failed to decode params\n");
 		rc = -EINVAL;
 		goto free_params;
@@ -59,14 +69,14 @@ ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 	return params;
 
 free_params:
-	sto_ops_decoder_params_free(decoder, params);
+	sto_ops_params_free(properties, params);
 
 	return ERR_PTR(rc);
 }
 
 void *
-sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
-			     const struct sto_json_iter *iter)
+sto_ops_params_parse(const struct sto_ops_params_properties *properties,
+		     const struct sto_json_iter *iter)
 {
 	const struct spdk_json_val *values;
 	void *params;
@@ -78,10 +88,10 @@ sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 	}
 
 	if (!values) {
-		return decoder->allow_empty ? NULL : ERR_PTR(-EINVAL);
+		return properties->allow_empty ? NULL : ERR_PTR(-EINVAL);
 	}
 
-	params = ops_decoder_params_parse(decoder, values);
+	params = ops_params_parse(properties, values);
 
 	free((struct spdk_json_val *) values);
 
@@ -89,14 +99,21 @@ sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
 }
 
 void
-sto_ops_decoder_params_free(const struct sto_ops_decoder *decoder, void *ops_params)
+sto_ops_params_free(const struct sto_ops_params_properties *properties, void *ops_params)
 {
+	size_t i = 0;
+
 	if (!ops_params) {
 		return;
 	}
 
-	if (decoder->params_deinit) {
-		decoder->params_deinit(ops_params);
+	for (i = 0; i < properties->num_descriptors; i++) {
+		const struct sto_ops_param_dsc *dsc = &properties->descriptors[i];
+
+		if (dsc->deinit) {
+			void *p = (void *)(uintptr_t) (ops_params + dsc->offset);
+			dsc->deinit(p);
+		}
 	}
 
 	free(ops_params);

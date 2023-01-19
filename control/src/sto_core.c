@@ -334,7 +334,7 @@ sto_core_parse_ops(const struct sto_ops *op, const struct sto_json_iter *iter)
 		return NULL;
 	}
 
-	rc = sto_req_type_parse_params(&req->type, op->decoder, iter, op->req_params_constructor);
+	rc = sto_req_type_parse_params(&req->type, op->params_properties, iter, op->req_params_constructor);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to decode CDB for req[%p], rc=%d\n", req, rc);
 		sto_req_free(req);

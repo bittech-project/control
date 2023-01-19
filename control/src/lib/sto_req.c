@@ -74,31 +74,31 @@ sto_req_type_deinit(struct sto_req_type *type)
 }
 
 int
-sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_decoder *decoder,
+sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_params_properties *properties,
 			  const struct sto_json_iter *iter,
 			  sto_ops_req_params_constructor_t req_params_constructor)
 {
 	void *ops_params = NULL;
 	int rc = 0;
 
-	assert(!decoder || req_params_constructor);
+	assert(!properties || req_params_constructor);
 
 	if (!req_params_constructor) {
 		return 0;
 	}
 
-	if (decoder) {
-		ops_params = sto_ops_decoder_params_parse(decoder, iter);
+	if (properties) {
+		ops_params = sto_ops_params_parse(properties, iter);
 		if (IS_ERR(ops_params)) {
 			SPDK_ERRLOG("Failed to parse ops params\n");
 			return PTR_ERR(ops_params);
 		}
 	}
 
-	rc = req_params_constructor(type->params, decoder ? ops_params : (void *) iter);
+	rc = req_params_constructor(type->params, properties ? ops_params : (void *) iter);
 
-	if (decoder) {
-		sto_ops_decoder_params_free(decoder, ops_params);
+	if (properties) {
+		sto_ops_params_free(properties, ops_params);
 	}
 
 	return rc;

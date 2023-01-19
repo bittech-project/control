@@ -16,46 +16,96 @@ void sto_err(struct sto_err_context *err, int rc);
 void sto_status_ok(struct spdk_json_write_ctx *w);
 void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err);
 
-typedef void (*sto_ops_decoder_params_deinit_t)(void *params);
+struct sto_ops_param_dsc {
+	const char *name;
+	size_t offset;
+	spdk_json_decode_fn decode_func;
+	bool optional;
 
-struct sto_ops_decoder {
-	const struct spdk_json_object_decoder *decoders;
-	size_t num_decoders;
+	const char *description;
+	void (*deinit)(void *p);
+};
+
+#define STO_OPS_PARAM(MEMBER, TYPE, DECODE_FUNC, OPTIONAL, DESCRIPTION, DEINIT_FUNC)	\
+	{										\
+		.name = # MEMBER,							\
+		.offset = offsetof(TYPE, MEMBER), 					\
+		.decode_func = (DECODE_FUNC),						\
+		.optional = (OPTIONAL), 						\
+		.description = (DESCRIPTION),						\
+		.deinit = (DEINIT_FUNC),						\
+	}
+
+static inline void
+sto_ops_param_str_deinit(void *p)
+{
+	char **s = p;
+	free(*s);
+}
+
+#define __STO_OPS_PARAM_STR(MEMBER, TYPE, DESCRIPTION, OPTIONAL)	\
+	STO_OPS_PARAM(MEMBER, TYPE, spdk_json_decode_string, OPTIONAL, DESCRIPTION, sto_ops_param_str_deinit)
+
+#define STO_OPS_PARAM_STR(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_STR(MEMBER, TYPE, DESCRIPTION, false)
+#define STO_OPS_PARAM_STR_OPTIONAL(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_STR(MEMBER, TYPE, DESCRIPTION, true)
+
+#define __STO_OPS_PARAM_INT32(MEMBER, TYPE, DESCRIPTION, OPTIONAL) \
+	STO_OPS_PARAM(MEMBER, TYPE, spdk_json_decode_int32, OPTIONAL, DESCRIPTION, NULL)
+
+#define STO_OPS_PARAM_INT32(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_INT32(MEMBER, TYPE, DESCRIPTION, false)
+#define STO_OPS_PARAM_INT32_OPTIONAL(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_INT32(MEMBER, TYPE, DESCRIPTION, true)
+
+#define __STO_OPS_PARAM_UINT32(MEMBER, TYPE, DESCRIPTION, OPTIONAL)	\
+	STO_OPS_PARAM(MEMBER, TYPE, spdk_json_decode_uint32, OPTIONAL, DESCRIPTION, NULL)
+
+#define STO_OPS_PARAM_UINT32(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_UINT32(MEMBER, TYPE, DESCRIPTION, false)
+#define STO_OPS_PARAM_UINT32_OPTIONAL(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_UINT32(MEMBER, TYPE, DESCRIPTION, true)
+
+#define __STO_OPS_PARAM_BOOL(MEMBER, TYPE, DESCRIPTION, OPTIONAL)	\
+	STO_OPS_PARAM(MEMBER, TYPE, spdk_json_decode_bool, OPTIONAL, DESCRIPTION, NULL)
+
+#define STO_OPS_PARAM_BOOL(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_BOOL(MEMBER, TYPE, DESCRIPTION, false)
+#define STO_OPS_PARAM_BOOL_OPTIONAL(MEMBER, TYPE, DESCRIPTION)	\
+	__STO_OPS_PARAM_BOOL(MEMBER, TYPE, DESCRIPTION, true)
+
+struct sto_ops_params_properties {
+	const struct sto_ops_param_dsc *descriptors;
+	size_t num_descriptors;
 
 	size_t params_size;
-	sto_ops_decoder_params_deinit_t params_deinit;
-
 	bool allow_empty;
 };
 
-#define STO_OPS_DECODER_INITIALIZER(_decoders, _params_size, _params_deinit)	\
-	{									\
-		.decoders = _decoders,						\
-		.num_decoders = SPDK_COUNTOF(_decoders),			\
-		.params_size = _params_size,					\
-		.params_deinit = _params_deinit,				\
-		.allow_empty = false,						\
+#define __STO_OPS_PARAMS_INITIALIZER(DESCRIPTORS, TYPE, ALLOW_EMPTY)	\
+	{								\
+		.descriptors = (DESCRIPTORS),				\
+		.num_descriptors = SPDK_COUNTOF(DESCRIPTORS),		\
+		.params_size = sizeof(TYPE),				\
+		.allow_empty = ALLOW_EMPTY,				\
 	}
 
-#define STO_OPS_DECODER_INITIALIZER_EMPTY(_decoders, _params_size, _params_deinit)	\
-	{										\
-		.decoders = _decoders,							\
-		.num_decoders = SPDK_COUNTOF(_decoders),				\
-		.params_size = _params_size,						\
-		.params_deinit = _params_deinit,					\
-		.allow_empty = true,							\
-	}
+#define STO_OPS_PARAMS_INITIALIZER(DESCRIPTORS, TYPE)		\
+	__STO_OPS_PARAMS_INITIALIZER(DESCRIPTORS, TYPE, false)
 
-void *sto_ops_decoder_params_parse(const struct sto_ops_decoder *decoder,
-		 		   const struct sto_json_iter *iter);
-void sto_ops_decoder_params_free(const struct sto_ops_decoder *decoder,
-				 void *ops_params);
+#define STO_OPS_PARAMS_INITIALIZER_EMPTY(DESCRIPTORS, TYPE)	\
+	__STO_OPS_PARAMS_INITIALIZER(DESCRIPTORS, TYPE, true)
+
+void *sto_ops_params_parse(const struct sto_ops_params_properties *properties,
+			   const struct sto_json_iter *iter);
+void sto_ops_params_free(const struct sto_ops_params_properties *properties, void *ops_params);
 
 typedef int (*sto_ops_req_params_constructor_t)(void *arg1, const void *arg2);
 
 struct sto_ops {
 	const char *name;
-	const struct sto_ops_decoder *decoder;
+	const struct sto_ops_params_properties *params_properties;
 	const struct sto_req_properties *req_properties;
 	sto_ops_req_params_constructor_t req_params_constructor;
 };

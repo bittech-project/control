@@ -363,26 +363,14 @@ struct scst_dev_open_params {
 	char *attributes;
 };
 
-static void
-scst_dev_open_params_deinit(void *arg)
-{
-	struct scst_dev_open_params *params = arg;
-
-	free(params->name);
-	free(params->handler);
-	free(params->attributes);
-}
-
-static const struct spdk_json_object_decoder scst_dev_open_decoders[] = {
-	{"name", offsetof(struct scst_dev_open_params, name), spdk_json_decode_string},
-	{"handler", offsetof(struct scst_dev_open_params, handler), spdk_json_decode_string},
-	{"attributes", offsetof(struct scst_dev_open_params, attributes), spdk_json_decode_string, true},
+static const struct sto_ops_param_dsc scst_dev_open_params_descriptors[] = {
+	STO_OPS_PARAM_STR(name, struct scst_dev_open_params, "name desc"),
+	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "handler desc"),
+	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_dev_open_params, "attributes desc"),
 };
 
-static const struct sto_ops_decoder scst_dev_open_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_dev_open_decoders,
-				    sizeof(struct scst_dev_open_params),
-				    scst_dev_open_params_deinit);
+static const struct sto_ops_params_properties scst_dev_open_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_dev_open_params_descriptors, struct scst_dev_open_params);
 
 static int
 scst_dev_open_constructor(void *arg1, const void *arg2)
@@ -419,24 +407,13 @@ struct scst_dev_close_params {
 	char *handler;
 };
 
-static void
-scst_dev_close_params_deinit(void *arg)
-{
-	struct scst_dev_close_params *params = arg;
-
-	free(params->name);
-	free(params->handler);
-}
-
-static const struct spdk_json_object_decoder scst_dev_close_decoders[] = {
-	{"name", offsetof(struct scst_dev_close_params, name), spdk_json_decode_string},
-	{"handler", offsetof(struct scst_dev_close_params, handler), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_dev_close_params_descriptors[] = {
+	STO_OPS_PARAM_STR(name, struct scst_dev_open_params, "name desc"),
+	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "handler desc"),
 };
 
-static const struct sto_ops_decoder scst_dev_close_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_dev_close_decoders,
-				    sizeof(struct scst_dev_close_params),
-				    scst_dev_close_params_deinit);
+static const struct sto_ops_params_properties scst_dev_close_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_dev_close_params_descriptors, struct scst_dev_close_params);
 
 static int
 scst_dev_close_constructor(void *arg1, const void *arg2)
@@ -461,21 +438,12 @@ struct scst_dev_resync_params {
 	char *name;
 };
 
-static void
-scst_dev_resync_params_deinit(void *arg)
-{
-	struct scst_dev_resync_params *params = arg;
-	free(params->name);
-}
-
-static const struct spdk_json_object_decoder scst_dev_resync_decoders[] = {
-	{"name", offsetof(struct scst_dev_resync_params, name), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_dev_resync_params_descriptors[] = {
+	STO_OPS_PARAM_STR(name, struct scst_dev_resync_params, "name desc"),
 };
 
-static const struct sto_ops_decoder scst_dev_resync_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_dev_resync_decoders,
-				    sizeof(struct scst_dev_resync_params),
-				    scst_dev_resync_params_deinit);
+static const struct sto_ops_params_properties scst_dev_resync_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_dev_resync_params_descriptors, struct scst_dev_resync_params);
 
 static int
 scst_dev_resync_constructor(void *arg1, const void *arg2)
@@ -519,21 +487,12 @@ struct scst_dgrp_params {
 	char *name;
 };
 
-static void
-scst_dgrp_params_deinit(void *arg)
-{
-	struct scst_dgrp_params *params = arg;
-	free(params->name);
-}
-
-static const struct spdk_json_object_decoder scst_dgrp_decoders[] = {
-	{"name", offsetof(struct scst_dgrp_params, name), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_dgrp_params_descriptors[] = {
+	STO_OPS_PARAM_STR(name, struct scst_dgrp_params, "name desc"),
 };
 
-static const struct sto_ops_decoder scst_dgrp_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_dgrp_decoders,
-				    sizeof(struct scst_dgrp_params),
-				    scst_dgrp_params_deinit);
+static const struct sto_ops_params_properties scst_dgrp_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_dgrp_params_descriptors, struct scst_dgrp_params);
 
 static int
 scst_dgrp_add_constructor(void *arg1, const void *arg2)
@@ -598,24 +557,13 @@ struct scst_dgrp_dev_params {
 	char *dev_name;
 };
 
-static void
-scst_dgrp_dev_params_deinit(void *arg)
-{
-	struct scst_dgrp_dev_params *params = arg;
-
-	free(params->name);
-	free(params->dev_name);
-}
-
-static const struct spdk_json_object_decoder scst_dgrp_dev_decoders[] = {
-	{"name", offsetof(struct scst_dgrp_dev_params, name), spdk_json_decode_string},
-	{"dev_name", offsetof(struct scst_dgrp_dev_params, dev_name), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_dgrp_dev_params_descriptors[] = {
+	STO_OPS_PARAM_STR(name, struct scst_dgrp_dev_params, "name desc"),
+	STO_OPS_PARAM_STR(dev_name, struct scst_dgrp_dev_params, "dev_name desc"),
 };
 
-static const struct sto_ops_decoder scst_dgrp_dev_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_dgrp_dev_decoders,
-				    sizeof(struct scst_dgrp_dev_params),
-				    scst_dgrp_dev_params_deinit);
+static const struct sto_ops_params_properties scst_dgrp_dev_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_dgrp_dev_params_descriptors, struct scst_dgrp_dev_params);
 
 static int
 scst_dgrp_add_dev_constructor(void *arg1, const void *arg2)
@@ -660,24 +608,13 @@ struct scst_tgrp_params {
 	char *dgrp_name;
 };
 
-static void
-scst_tgrp_params_deinit(void *arg)
-{
-	struct scst_tgrp_params *params = arg;
-
-	free(params->name);
-	free(params->dgrp_name);
-}
-
-static const struct spdk_json_object_decoder scst_tgrp_decoders[] = {
-	{"name", offsetof(struct scst_tgrp_params, name), spdk_json_decode_string},
-	{"dgrp_name", offsetof(struct scst_tgrp_params, dgrp_name), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_tgrp_params_descriptors[] = {
+	STO_OPS_PARAM_STR(name, struct scst_tgrp_params, "name desc"),
+	STO_OPS_PARAM_STR(dgrp_name, struct scst_tgrp_params, "dgrp_name desc"),
 };
 
-static const struct sto_ops_decoder scst_tgrp_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_tgrp_decoders,
-				    sizeof(struct scst_tgrp_params),
-				    scst_tgrp_params_deinit);
+static const struct sto_ops_params_properties scst_tgrp_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_tgrp_params_descriptors, struct scst_tgrp_params);
 
 static int
 scst_tgrp_add_constructor(void *arg1, const void *arg2)
@@ -721,22 +658,12 @@ struct scst_tgrp_list_params {
 	char *dgrp;
 };
 
-static void
-scst_tgrp_list_params_deinit(void *arg)
-{
-	struct scst_tgrp_list_params *params = arg;
-
-	free(params->dgrp);
-}
-
-static const struct spdk_json_object_decoder scst_tgrp_list_decoders[] = {
-	{"dgrp", offsetof(struct scst_tgrp_list_params, dgrp), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_tgrp_list_params_descriptors[] = {
+	STO_OPS_PARAM_STR(dgrp, struct scst_tgrp_list_params, "dgrp desc"),
 };
 
-static const struct sto_ops_decoder scst_tgrp_list_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_tgrp_list_decoders,
-				    sizeof(struct scst_tgrp_list_params),
-				    scst_tgrp_list_params_deinit);
+static const struct sto_ops_params_properties scst_tgrp_list_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_tgrp_list_params_descriptors, struct scst_tgrp_list_params);
 
 static int
 scst_tgrp_list_constructor(void *arg1, const void *arg2)
@@ -766,26 +693,14 @@ struct scst_tgrp_tgt_params {
 	char *tgrp_name;
 };
 
-static void
-scst_tgrp_tgt_params_deinit(void *arg)
-{
-	struct scst_tgrp_tgt_params *params = arg;
-
-	free(params->tgt_name);
-	free(params->dgrp_name);
-	free(params->tgrp_name);
-}
-
-static const struct spdk_json_object_decoder scst_tgrp_tgt_decoders[] = {
-	{"tgt_name", offsetof(struct scst_tgrp_tgt_params, tgt_name), spdk_json_decode_string},
-	{"dgrp_name", offsetof(struct scst_tgrp_tgt_params, dgrp_name), spdk_json_decode_string},
-	{"tgrp_name", offsetof(struct scst_tgrp_tgt_params, tgrp_name), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_tgrp_tgt_params_descriptors[] = {
+	STO_OPS_PARAM_STR(tgt_name, struct scst_tgrp_tgt_params, "tgt_name desc"),
+	STO_OPS_PARAM_STR(dgrp_name, struct scst_tgrp_tgt_params, "dgrp_name desc"),
+	STO_OPS_PARAM_STR(tgrp_name, struct scst_tgrp_tgt_params, "tgrp_name desc"),
 };
 
-static const struct sto_ops_decoder scst_tgrp_tgt_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_tgrp_tgt_decoders,
-				    sizeof(struct scst_tgrp_tgt_params),
-				    scst_tgrp_tgt_params_deinit);
+static const struct sto_ops_params_properties scst_tgrp_tgt_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_tgrp_tgt_params_descriptors, struct scst_tgrp_tgt_params);
 
 static int
 scst_tgrp_add_tgt_constructor(void *arg1, const void *arg2)
@@ -832,24 +747,13 @@ struct scst_target_params {
 	char *driver;
 };
 
-static void
-scst_target_params_deinit(void *arg)
-{
-	struct scst_target_params *params = arg;
-
-	free(params->target);
-	free(params->driver);
-}
-
-static const struct spdk_json_object_decoder scst_target_decoders[] = {
-	{"target", offsetof(struct scst_target_params, target), spdk_json_decode_string},
-	{"driver", offsetof(struct scst_target_params, driver), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_target_params_descriptors[] = {
+	STO_OPS_PARAM_STR(target, struct scst_target_params, "target desc"),
+	STO_OPS_PARAM_STR(driver, struct scst_target_params, "driver desc"),
 };
 
-static const struct sto_ops_decoder scst_target_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_target_decoders,
-				    sizeof(struct scst_target_params),
-				    scst_target_params_deinit);
+static const struct sto_ops_params_properties scst_target_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_target_params_descriptors, struct scst_target_params);
 
 static int
 scst_target_add_constructor(void *arg1, const void *arg2)
@@ -893,22 +797,14 @@ struct scst_target_list_params {
 	char *driver;
 };
 
-static void
-scst_target_list_params_deinit(void *arg)
-{
-	struct scst_target_list_params *params = arg;
-
-	free(params->driver);
-}
-
-static const struct spdk_json_object_decoder scst_target_list_decoders[] = {
-	{"driver", offsetof(struct scst_target_list_params, driver), spdk_json_decode_string, true},
+static const struct sto_ops_param_dsc scst_target_list_params_descriptors[] = {
+	STO_OPS_PARAM_STR(driver, struct scst_target_list_params, "driver desc"),
 };
 
-static const struct sto_ops_decoder scst_target_list_decoder =
-	STO_OPS_DECODER_INITIALIZER_EMPTY(scst_target_list_decoders,
-					  sizeof(struct scst_target_list_params),
-					  scst_target_list_params_deinit);
+static const struct sto_ops_params_properties scst_target_list_params_properties =
+	STO_OPS_PARAMS_INITIALIZER_EMPTY(scst_target_list_params_descriptors,
+					 sizeof(struct scst_target_list_params));
+
 
 static int
 scst_target_list_constructor(void *arg1, const void *arg2)
@@ -980,26 +876,14 @@ struct scst_group_params {
 	char *target;
 };
 
-static void
-scst_group_params_deinit(void *arg)
-{
-	struct scst_group_params *params = arg;
-
-	free(params->group);
-	free(params->driver);
-	free(params->target);
-}
-
-static const struct spdk_json_object_decoder scst_group_decoders[] = {
-	{"group", offsetof(struct scst_group_params, group), spdk_json_decode_string},
-	{"driver", offsetof(struct scst_group_params, driver), spdk_json_decode_string},
-	{"target", offsetof(struct scst_group_params, target), spdk_json_decode_string},
+static const struct sto_ops_param_dsc scst_group_params_descriptors[] = {
+	STO_OPS_PARAM_STR(group, struct scst_group_params, "group desc"),
+	STO_OPS_PARAM_STR(driver, struct scst_group_params, "driver desc"),
+	STO_OPS_PARAM_STR(target, struct scst_group_params, "target desc"),
 };
 
-static const struct sto_ops_decoder scst_group_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_group_decoders,
-				    sizeof(struct scst_group_params),
-				    scst_group_params_deinit);
+static const struct sto_ops_params_properties scst_group_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_group_params_descriptors, struct scst_group_params);
 
 static int
 scst_group_add_constructor(void *arg1, const void *arg2)
@@ -1048,31 +932,17 @@ struct scst_lun_add_params {
 	char *attributes;
 };
 
-static void
-scst_lun_add_params_deinit(void *arg)
-{
-	struct scst_lun_add_params *params = arg;
-
-	free(params->driver);
-	free(params->target);
-	free(params->device);
-	free(params->group);
-	free(params->attributes);
-}
-
-static const struct spdk_json_object_decoder scst_lun_add_decoders[] = {
-	{"lun", offsetof(struct scst_lun_add_params, lun), spdk_json_decode_int32},
-	{"driver", offsetof(struct scst_lun_add_params, driver), spdk_json_decode_string},
-	{"target", offsetof(struct scst_lun_add_params, target), spdk_json_decode_string},
-	{"device", offsetof(struct scst_lun_add_params, device), spdk_json_decode_string},
-	{"group", offsetof(struct scst_lun_add_params, group), spdk_json_decode_string, true},
-	{"attributes", offsetof(struct scst_lun_add_params, attributes), spdk_json_decode_string, true},
+static const struct sto_ops_param_dsc scst_lun_add_params_descriptors[] = {
+	STO_OPS_PARAM_INT32(lun, struct scst_lun_add_params, "lun desc"),
+	STO_OPS_PARAM_STR(driver, struct scst_lun_add_params, "driver desc"),
+	STO_OPS_PARAM_STR(target, struct scst_lun_add_params, "target desc"),
+	STO_OPS_PARAM_STR(device, struct scst_lun_add_params, "device desc"),
+	STO_OPS_PARAM_STR(group, struct scst_lun_add_params, "group desc"),
+	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_lun_add_params, "attributes desc"),
 };
 
-static const struct sto_ops_decoder scst_lun_add_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_lun_add_decoders,
-				    sizeof(struct scst_lun_add_params),
-				    scst_lun_add_params_deinit);
+static const struct sto_ops_params_properties scst_lun_add_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_lun_add_params_descriptors, struct scst_lun_add_params);
 
 static int
 scst_lun_add_constructor(void *arg1, const void *arg2)
@@ -1113,27 +983,15 @@ struct scst_lun_del_params {
 	char *group;
 };
 
-static void
-scst_lun_del_params_deinit(void *arg)
-{
-	struct scst_lun_del_params *params = arg;
-
-	free(params->driver);
-	free(params->target);
-	free(params->group);
-}
-
-static const struct spdk_json_object_decoder scst_lun_del_decoders[] = {
-	{"lun", offsetof(struct scst_lun_add_params, lun), spdk_json_decode_int32},
-	{"driver", offsetof(struct scst_lun_del_params, driver), spdk_json_decode_string},
-	{"target", offsetof(struct scst_lun_del_params, target), spdk_json_decode_string},
-	{"group", offsetof(struct scst_lun_del_params, group), spdk_json_decode_string, true},
+static const struct sto_ops_param_dsc scst_lun_del_params_descriptors[] = {
+	STO_OPS_PARAM_INT32(lun, struct scst_lun_del_params, "lun desc"),
+	STO_OPS_PARAM_STR(driver, struct scst_lun_del_params, "driver desc"),
+	STO_OPS_PARAM_STR(target, struct scst_lun_del_params, "target desc"),
+	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_del_params, "group desc"),
 };
 
-static const struct sto_ops_decoder scst_lun_del_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_lun_del_decoders,
-				    sizeof(struct scst_lun_del_params),
-				    scst_lun_del_params_deinit);
+static const struct sto_ops_params_properties scst_lun_del_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_lun_del_params_descriptors, struct scst_lun_del_params);
 
 static int
 scst_lun_del_constructor(void *arg1, const void *arg2)
@@ -1193,26 +1051,14 @@ struct scst_lun_clear_params {
 	char *group;
 };
 
-static void
-scst_lun_clear_params_deinit(void *arg)
-{
-	struct scst_lun_clear_params *params = arg;
-
-	free(params->driver);
-	free(params->target);
-	free(params->group);
-}
-
-static const struct spdk_json_object_decoder scst_lun_clear_decoders[] = {
-	{"driver", offsetof(struct scst_lun_clear_params, driver), spdk_json_decode_string},
-	{"target", offsetof(struct scst_lun_clear_params, target), spdk_json_decode_string},
-	{"group", offsetof(struct scst_lun_clear_params, group), spdk_json_decode_string, true},
+static const struct sto_ops_param_dsc scst_lun_clear_params_descriptors[] = {
+	STO_OPS_PARAM_STR(driver, struct scst_lun_clear_params, "driver desc"),
+	STO_OPS_PARAM_STR(target, struct scst_lun_clear_params, "target desc"),
+	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_clear_params, "group desc"),
 };
 
-static struct sto_ops_decoder scst_lun_clear_decoder =
-	STO_OPS_DECODER_INITIALIZER(scst_lun_clear_decoders,
-				    sizeof(struct scst_lun_clear_params),
-				    scst_lun_clear_params_deinit);
+static const struct sto_ops_params_properties scst_lun_clear_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(scst_lun_clear_params_descriptors, struct scst_lun_clear_params);
 
 static int
 scst_lun_clear_constructor(void *arg1, const void *arg2)
@@ -1252,19 +1098,19 @@ static const struct sto_ops scst_ops[] = {
 	},
 	{
 		.name = "dev_open",
-		.decoder = &scst_dev_open_decoder,
+		.params_properties = &scst_dev_open_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_dev_open_constructor,
 	},
 	{
 		.name = "dev_close",
-		.decoder = &scst_dev_close_decoder,
+		.params_properties = &scst_dev_close_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_dev_close_constructor,
 	},
 	{
 		.name = "dev_resync",
-		.decoder = &scst_dev_resync_decoder,
+		.params_properties = &scst_dev_resync_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_dev_resync_constructor,
 	},
@@ -1275,13 +1121,13 @@ static const struct sto_ops scst_ops[] = {
 	},
 	{
 		.name = "dgrp_add",
-		.decoder = &scst_dgrp_decoder,
+		.params_properties = &scst_dgrp_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_dgrp_add_constructor,
 	},
 	{
 		.name = "dgrp_del",
-		.decoder = &scst_dgrp_decoder,
+		.params_properties = &scst_dgrp_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_dgrp_del_constructor,
 	},
@@ -1292,109 +1138,109 @@ static const struct sto_ops scst_ops[] = {
 	},
 	{
 		.name = "dgrp_add_dev",
-		.decoder = &scst_dgrp_dev_decoder,
+		.params_properties = &scst_dgrp_dev_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_dgrp_add_dev_constructor,
 	},
 	{
 		.name = "dgrp_del_dev",
-		.decoder = &scst_dgrp_dev_decoder,
+		.params_properties = &scst_dgrp_dev_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_dgrp_del_dev_constructor,
 	},
 	{
 		.name = "tgrp_add",
-		.decoder = &scst_tgrp_decoder,
+		.params_properties = &scst_tgrp_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_tgrp_add_constructor,
 	},
 	{
 		.name = "tgrp_del",
-		.decoder = &scst_tgrp_decoder,
+		.params_properties = &scst_tgrp_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_tgrp_del_constructor,
 	},
 	{
 		.name = "tgrp_list",
-		.decoder = &scst_tgrp_list_decoder,
+		.params_properties = &scst_tgrp_list_params_properties,
 		.req_properties = &sto_readdir_req_properties,
 		.req_params_constructor = scst_tgrp_list_constructor,
 	},
 	{
 		.name = "tgrp_add_tgt",
-		.decoder = &scst_tgrp_tgt_decoder,
+		.params_properties = &scst_tgrp_tgt_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_tgrp_add_tgt_constructor,
 	},
 	{
 		.name = "tgrp_del_tgt",
-		.decoder = &scst_tgrp_tgt_decoder,
+		.params_properties = &scst_tgrp_tgt_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_tgrp_del_tgt_constructor,
 	},
 	{
 		.name = "target_add",
-		.decoder = &scst_target_decoder,
+		.params_properties = &scst_target_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_target_add_constructor,
 	},
 	{
 		.name = "target_del",
-		.decoder = &scst_target_decoder,
+		.params_properties = &scst_target_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_target_del_constructor,
 	},
 	{
 		.name = "target_list",
-		.decoder = &scst_target_list_decoder,
+		.params_properties = &scst_target_list_params_properties,
 		.req_properties = &sto_tree_req_properties,
 		.req_params_constructor = scst_target_list_constructor,
 	},
 	{
 		.name = "target_enable",
-		.decoder = &scst_target_decoder,
+		.params_properties = &scst_target_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_target_enable_constructor,
 	},
 	{
 		.name = "target_disable",
-		.decoder = &scst_target_decoder,
+		.params_properties = &scst_target_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_target_disable_constructor,
 	},
 	{
 		.name = "group_add",
-		.decoder = &scst_group_decoder,
+		.params_properties = &scst_group_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_group_add_constructor,
 	},
 	{
 		.name = "group_del",
-		.decoder = &scst_group_decoder,
+		.params_properties = &scst_group_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_group_del_constructor,
 	},
 	{
 		.name = "lun_add",
-		.decoder = &scst_lun_add_decoder,
+		.params_properties = &scst_lun_add_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_lun_add_constructor,
 	},
 	{
 		.name = "lun_del",
-		.decoder = &scst_lun_del_decoder,
+		.params_properties = &scst_lun_del_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_lun_del_constructor,
 	},
 	{
 		.name = "lun_replace",
-		.decoder = &scst_lun_add_decoder,
+		.params_properties = &scst_lun_add_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_lun_replace_constructor,
 	},
 	{
 		.name = "lun_clear",
-		.decoder = &scst_lun_clear_decoder,
+		.params_properties = &scst_lun_clear_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_lun_clear_constructor,
 	},

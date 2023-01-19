@@ -11,24 +11,13 @@ struct sys_writefile_params {
 	char *data;
 };
 
-static void
-sys_writefile_params_deinit(void *arg)
-{
-	struct sys_writefile_params *params = arg;
-
-	free(params->filepath);
-	free(params->data);
-}
-
-static const struct spdk_json_object_decoder sys_writefile_decoders[] = {
-	{"filepath", offsetof(struct sys_writefile_params, filepath), spdk_json_decode_string},
-	{"data", offsetof(struct sys_writefile_params, data), spdk_json_decode_string},
+static const struct sto_ops_param_dsc sys_writefile_params_descriptors[] = {
+	STO_OPS_PARAM_STR(filepath, struct sys_writefile_params, "filepath desc"),
+	STO_OPS_PARAM_STR(data, struct sys_writefile_params, "data desc"),
 };
 
-static const struct sto_ops_decoder sys_writefile_decoder =
-	STO_OPS_DECODER_INITIALIZER(sys_writefile_decoders,
-				    sizeof(struct sys_writefile_params),
-				    sys_writefile_params_deinit);
+static const struct sto_ops_params_properties sys_writefile_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(sys_writefile_params_descriptors, struct sys_writefile_params);
 
 static int
 sys_writefile_constructor(void *arg1, const void *arg2)
@@ -54,22 +43,13 @@ struct sys_readfile_params {
 	uint32_t size;
 };
 
-static void
-sys_readfile_params_deinit(void *arg)
-{
-	struct sys_readfile_params *params = arg;
-	free(params->filepath);
-}
-
-static const struct spdk_json_object_decoder sys_readfile_decoders[] = {
-	{"filepath", offsetof(struct sys_readfile_params, filepath), spdk_json_decode_string},
-	{"size", offsetof(struct sys_readfile_params, size), spdk_json_decode_uint32, true},
+static const struct sto_ops_param_dsc sys_readfile_params_descriptors[] = {
+	STO_OPS_PARAM_STR(filepath, struct sys_readfile_params, "filepath desc"),
+	STO_OPS_PARAM_UINT32_OPTIONAL(size, struct sys_readfile_params, "size desc"),
 };
 
-static const struct sto_ops_decoder sys_readfile_decoder =
-	STO_OPS_DECODER_INITIALIZER(sys_readfile_decoders,
-				    sizeof(struct sys_readfile_params),
-				    sys_readfile_params_deinit);
+static const struct sto_ops_params_properties sys_readfile_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(sys_readfile_params_descriptors, struct sys_readfile_params);
 
 static int
 sys_readfile_constructor(void *arg1, const void *arg2)
@@ -91,22 +71,12 @@ struct sys_readlink_params {
 	char *filepath;
 };
 
-static void
-sys_readlink_params_deinit(void *arg)
-{
-	struct sys_readlink_params *params = arg;
-
-	free(params->filepath);
-}
-
-static const struct spdk_json_object_decoder sys_readlink_decoders[] = {
-	{"filepath", offsetof(struct sys_readlink_params, filepath), spdk_json_decode_string},
+static const struct sto_ops_param_dsc sys_readlink_params_descriptors[] = {
+	STO_OPS_PARAM_STR(filepath, struct sys_readlink_params, "filepath desc"),
 };
 
-static const struct sto_ops_decoder sys_readlink_decoder =
-	STO_OPS_DECODER_INITIALIZER(sys_readlink_decoders,
-				    sizeof(struct sys_readlink_params),
-				    sys_readlink_params_deinit);
+static const struct sto_ops_params_properties sys_readlink_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(sys_readlink_params_descriptors, struct sys_readlink_params);
 
 static int
 sys_readlink_constructor(void *arg1, const void *arg2)
@@ -126,21 +96,12 @@ struct sys_readdir_params {
 	char *dirpath;
 };
 
-static void
-sys_readdir_params_deinit(void *arg)
-{
-	struct sys_readdir_params *params = arg;
-	free(params->dirpath);
-}
-
-static const struct spdk_json_object_decoder sys_readdir_decoders[] = {
-	{"dirpath", offsetof(struct sys_readdir_params, dirpath), spdk_json_decode_string},
+static const struct sto_ops_param_dsc sys_readdir_params_descriptors[] = {
+	STO_OPS_PARAM_STR(dirpath, struct sys_readdir_params, "dirpath desc"),
 };
 
-static const struct sto_ops_decoder sys_readdir_decoder =
-	STO_OPS_DECODER_INITIALIZER(sys_readdir_decoders,
-				    sizeof(struct sys_readdir_params),
-				    sys_readdir_params_deinit);
+static const struct sto_ops_params_properties sys_readdir_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(sys_readdir_params_descriptors, struct sys_readdir_params);
 
 static int
 sys_readdir_constructor(void *arg1, const void *arg2)
@@ -164,25 +125,25 @@ sys_readdir_constructor(void *arg1, const void *arg2)
 static const struct sto_ops sys_ops[] = {
 	{
 		.name = "writefile",
-		.decoder = &sys_writefile_decoder,
+		.params_properties = &sys_writefile_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = sys_writefile_constructor,
 	},
 	{
 		.name = "readfile",
-		.decoder = &sys_readfile_decoder,
+		.params_properties = &sys_readfile_params_properties,
 		.req_properties = &sto_read_req_properties,
 		.req_params_constructor = sys_readfile_constructor,
 	},
 	{
 		.name = "readlink",
-		.decoder = &sys_readlink_decoder,
+		.params_properties = &sys_readlink_params_properties,
 		.req_properties = &sto_readlink_req_properties,
 		.req_params_constructor = sys_readlink_constructor,
 	},
 	{
 		.name = "readdir",
-		.decoder = &sys_readdir_decoder,
+		.params_properties = &sys_readdir_params_properties,
 		.req_properties = &sto_readdir_req_properties,
 		.req_params_constructor = sys_readdir_constructor,
 	},
