@@ -310,7 +310,7 @@ sto_core_decode_ops(const struct sto_hash *op_map,
 		return ERR_PTR(rc);
 	}
 
-	op = sto_hash_lookup(op_map, op_name, strlen(op_name));
+	op = sto_ops_map_find(op_map, op_name);
 	if (!op) {
 		SPDK_ERRLOG("Failed to find op %s\n", op_name);
 		free(op_name);

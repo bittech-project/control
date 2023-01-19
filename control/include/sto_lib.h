@@ -3,6 +3,8 @@
 
 #include <spdk/util.h>
 
+#include "sto_hash.h"
+
 struct spdk_json_write_ctx;
 struct sto_json_iter;
 
@@ -122,5 +124,11 @@ struct sto_op_table {
 	}
 
 const struct sto_hash *sto_ops_map_alloc(const struct sto_op_table *op_table);
+
+static inline const struct sto_ops *
+sto_ops_map_find(const struct sto_hash *op_map, const char *op_name)
+{
+	return sto_hash_lookup(op_map, op_name, strlen(op_name));
+}
 
 #endif /* _STO_LIB_H_ */
