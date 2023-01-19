@@ -78,398 +78,202 @@ const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 	}
 };
 
-static int
-scst_snapshot_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "snapshot", iter);
-}
-
-static int
-scst_handler_list_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "handler_list", iter);
-}
-
-static int
-scst_driver_list_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "driver_list", iter);
-}
-
-static int
-scst_dev_open_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dev_open", iter);
-}
-
-static int
-scst_dev_close_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dev_close", iter);
-}
-
-static int
-scst_dev_resync_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dev_resync", iter);
-}
-
-static int
-scst_dev_list_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dev_list", iter);
-}
-
-static int
-scst_dgrp_add_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dgrp_add", iter);
-}
-
-static int
-scst_dgrp_del_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dgrp_del", iter);
-}
-
-static int
-scst_dgrp_list_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dgrp_list", iter);
-}
-
-static int
-scst_dgrp_add_dev_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dgrp_add_dev", iter);
-}
-
-static int
-scst_dgrp_del_dev_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "dgrp_del_dev", iter);
-}
-
-static int
-scst_tgrp_add_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "tgrp_add", iter);
-}
-
-static int
-scst_tgrp_del_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "tgrp_del", iter);
-}
-
-static int
-scst_tgrp_list_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "tgrp_list", iter);
-}
-
-static int
-scst_tgrp_add_tgt_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "tgrp_add_tgt", iter);
-}
-
-static int
-scst_tgrp_del_tgt_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "tgrp_del_tgt", iter);
-}
-
-static int
-scst_target_add_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "target_add", iter);
-}
-
-static int
-scst_target_del_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "target_del", iter);
-}
-
-static int
-scst_target_list_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "target_list", iter);
-}
-
-static int
-scst_target_enable_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "target_enable", iter);
-}
-
-static int
-scst_target_disable_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "target_disable", iter);
-}
-
-static int
-scst_group_add_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "group_add", iter);
-}
-
-static int
-scst_group_del_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "group_del", iter);
-}
-
-static int
-scst_lun_add_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "lun_add", iter);
-}
-
-static int
-scst_lun_del_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "lun_del", iter);
-}
-
-static int
-scst_lun_replace_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "lun_replace", iter);
-}
-
-static int
-scst_lun_clear_constructor(void *arg1, const void *arg2)
-{
-	struct sto_passthrough_req_params *req_params = arg1;
-	const struct sto_json_iter *iter = arg2;
-
-	return sto_passthrough_req_params_set_subsystem(req_params, "scst", "lun_clear", iter);
-}
-
 static const struct sto_ops scst_ops[] = {
 	{
 		.name = "snapshot",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_snapshot_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "snapshot",
 	},
 	{
 		.name = "handler_list",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_handler_list_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "handler_list",
 	},
 	{
 		.name = "driver_list",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_driver_list_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "driver_list",
 	},
 	{
 		.name = "dev_open",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dev_open_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dev_open",
 	},
 	{
 		.name = "dev_close",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dev_close_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dev_close",
 	},
 	{
 		.name = "dev_resync",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dev_resync_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dev_resync",
 	},
 	{
 		.name = "dev_list",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dev_list_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dev_list",
 	},
 	{
 		.name = "dgrp_add",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dgrp_add_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dgrp_add",
 	},
 	{
 		.name = "dgrp_del",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dgrp_del_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dgrp_del",
 	},
 	{
 		.name = "dgrp_list",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dgrp_list_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dgrp_list",
 	},
 	{
 		.name = "dgrp_add_dev",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dgrp_add_dev_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dgrp_add_dev",
 	},
 	{
 		.name = "dgrp_del_dev",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_dgrp_del_dev_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dgrp_del_dev",
 	},
 	{
 		.name = "tgrp_add",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_tgrp_add_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "tgrp_add",
 	},
 	{
 		.name = "tgrp_del",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_tgrp_del_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "tgrp_del",
 	},
 	{
 		.name = "tgrp_list",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_tgrp_list_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "tgrp_list",
 	},
 	{
 		.name = "tgrp_add_tgt",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_tgrp_add_tgt_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "tgrp_add_tgt",
 	},
 	{
 		.name = "tgrp_del_tgt",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_tgrp_del_tgt_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "tgrp_del_tgt",
 	},
 	{
 		.name = "target_add",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_target_add_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "target_add",
 	},
 	{
 		.name = "target_del",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_target_del_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "target_del",
 	},
 	{
 		.name = "target_list",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_target_list_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "target_list",
 	},
 	{
 		.name = "target_enable",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_target_enable_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "target_enable",
 	},
 	{
 		.name = "target_disable",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_target_disable_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "target_disable",
 	},
 	{
 		.name = "group_add",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_group_add_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "group_add",
 	},
 	{
 		.name = "group_del",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_group_del_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "group_del",
 	},
 	{
 		.name = "lun_add",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_lun_add_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "lun_add",
 	},
 	{
 		.name = "lun_del",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_lun_del_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "lun_del",
 	},
 	{
 		.name = "lun_replace",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_lun_replace_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "lun_replace",
 	},
 	{
 		.name = "lun_clear",
-		.req_properties = &sto_passthrough_req_properties,
-		.req_params_constructor = scst_lun_clear_constructor,
+		.type = STO_OPS_TYPE_ALIAS,
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "lun_clear",
 	},
 	{
 		.name = "iscsi_init",

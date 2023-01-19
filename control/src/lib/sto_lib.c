@@ -4,6 +4,7 @@
 #include <spdk/string.h>
 
 #include "sto_lib.h"
+#include "sto_component.h"
 #include "sto_hash.h"
 #include "sto_utils.h"
 #include "sto_err.h"
@@ -150,8 +151,35 @@ failed:
 	return NULL;
 }
 
+static inline const struct sto_hash *
+get_ops_map(const char *component_name, const char *object_name)
+{
+	const struct sto_core_component *component;
+
+	component = sto_core_component_find(component_name, false);
+	if (spdk_unlikely(!component)) {
+		return NULL;
+	}
+
+	return component->get_ops_map(object_name);
+}
+
 const struct sto_ops *
 sto_ops_map_find(const struct sto_hash *ops_map, const char *op_name)
 {
-	return sto_hash_lookup(ops_map, op_name, strlen(op_name));
+	const struct sto_hash *alias_ops_map;
+	const struct sto_ops *op;
+
+	op = sto_hash_lookup(ops_map, op_name, strlen(op_name));
+
+	while (op && op->type == STO_OPS_TYPE_ALIAS) {
+		alias_ops_map = get_ops_map(op->component_name, op->object_name);
+		if (spdk_unlikely(!ops_map)) {
+			return NULL;
+		}
+
+		op = sto_hash_lookup(alias_ops_map, op->op_name, strlen(op->op_name));
+	}
+
+	return op;
 }

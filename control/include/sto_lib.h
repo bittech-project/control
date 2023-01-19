@@ -103,11 +103,29 @@ void sto_ops_params_free(const struct sto_ops_params_properties *properties, voi
 
 typedef int (*sto_ops_req_params_constructor_t)(void *arg1, const void *arg2);
 
+enum sto_ops_type {
+	STO_OPS_TYPE_PLAIN = 0,
+	STO_OPS_TYPE_ALIAS,
+	STO_OPS_TYPE_CNT,
+};
+
 struct sto_ops {
 	const char *name;
-	const struct sto_ops_params_properties *params_properties;
-	const struct sto_req_properties *req_properties;
-	sto_ops_req_params_constructor_t req_params_constructor;
+	enum sto_ops_type type;
+
+	union {
+		struct {
+			const struct sto_ops_params_properties *params_properties;
+			const struct sto_req_properties *req_properties;
+			sto_ops_req_params_constructor_t req_params_constructor;
+		};
+
+		struct {
+			const char *component_name;
+			const char *object_name;
+			const char *op_name;
+		};
+	};
 };
 
 struct sto_op_table {
