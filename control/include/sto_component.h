@@ -8,7 +8,7 @@ struct sto_json_iter;
 struct sto_core_component {
 	const char *name;
 
-	const struct sto_hash *(*get_ops_fn)(const char *object_name);
+	const struct sto_hash *(*get_ops_map)(const char *object_name);
 
 	TAILQ_ENTRY(sto_core_component) list;
 
@@ -17,16 +17,16 @@ struct sto_core_component {
 
 void sto_core_add_component(struct sto_core_component *component);
 
-#define STO_CORE_REGISTER_INTERNAL_COMPONENT(COMPONENT, GET_OPS_FN)	\
-	__STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_FN, true)
+#define STO_CORE_REGISTER_INTERNAL_COMPONENT(COMPONENT, GET_OPS_MAP_FN)	\
+	__STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_MAP_FN, true)
 
-#define STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_FN)	\
-	__STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_FN, false)
+#define STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_MAP_FN)	\
+	__STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_MAP_FN, false)
 
-#define __STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_FN, INTERNAL)				\
+#define __STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_MAP_FN, INTERNAL)			\
 static struct sto_core_component sto_core_component_ ## COMPONENT = {				\
 	.name = # COMPONENT,									\
-	.get_ops_fn = GET_OPS_FN,								\
+	.get_ops_map = GET_OPS_MAP_FN,								\
 	.internal = INTERNAL,									\
 };												\
 static void __attribute__((constructor)) sto_core_component_ ## COMPONENT ## _regsiter(void)	\

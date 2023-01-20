@@ -91,7 +91,7 @@ sto_core_component_decode(const struct sto_json_iter *iter, bool internal_user)
 		return ERR_PTR(rc);
 	}
 
-	ops_map = component->get_ops_fn(object_name);
+	ops_map = component->get_ops_map(object_name);
 
 	free(object_name);
 
