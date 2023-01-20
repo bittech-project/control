@@ -4,7 +4,6 @@
 #include <spdk/string.h>
 
 #include "sto_generic_req.h"
-#include "sto_core.h"
 #include "sto_req.h"
 #include "sto_rpc_aio.h"
 
@@ -265,97 +264,6 @@ const struct sto_req_properties sto_tree_req_properties = {
 	.response = sto_tree_req_response,
 	.steps = {
 		STO_REQ_STEP(sto_tree_req_exec, NULL),
-		STO_REQ_STEP_TERMINATOR(),
-	}
-};
-
-static void
-sto_passthrough_req_params_deinit(void *params_ptr)
-{
-	struct sto_passthrough_req_params *params = params_ptr;
-
-	free(params->component);
-	free(params->object);
-	free(params->op);
-
-	free((struct spdk_json_val *) params->params);
-}
-
-struct sto_passthrough_req_priv {
-	struct sto_core_req *core_req;
-};
-
-static void
-sto_passthrough_req_priv_deinit(void *priv_ptr)
-{
-	struct sto_passthrough_req_priv *priv = priv_ptr;
-
-	if (priv->core_req) {
-		sto_core_req_free(priv->core_req);
-	}
-}
-
-static void
-sto_passthrough_req_done(struct sto_core_req *core_req)
-{
-	struct sto_req *req = core_req->priv;
-	struct sto_passthrough_req_priv *priv = req->type.priv;
-	int rc = core_req->err_ctx.rc;
-
-	priv->core_req = core_req;
-
-	sto_req_step_next(req, rc);
-}
-
-static void
-sto_passthrough_req_dump_params(void *priv, struct spdk_json_write_ctx *w)
-{
-	struct spdk_json_val *params = priv;
-	struct spdk_json_val *it;
-
-	if (!params) {
-		return;
-	}
-
-	for (it = spdk_json_object_first(params); it; it = spdk_json_next(it)) {
-		spdk_json_write_val(w, it);
-		spdk_json_write_val(w, it + 1);
-	}
-}
-
-static int
-sto_passthrough_req(struct sto_req *req)
-{
-	struct sto_passthrough_req_params *params = req->type.params;
-	struct sto_core_args args = {
-		.priv = req,
-		.done = sto_passthrough_req_done,
-	};
-
-	return sto_core_process_raw(params->component, params->object, params->op,
-				    params->params, sto_passthrough_req_dump_params, &args);
-}
-
-static void
-sto_passthrough_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
-{
-	struct sto_passthrough_req_priv *priv = req->type.priv;
-
-	assert(priv->core_req);
-
-	sto_core_req_response(priv->core_req, w);
-}
-
-const struct sto_req_properties sto_passthrough_req_properties = {
-	.params_size = sizeof(struct sto_passthrough_req_params),
-	.params_deinit = sto_passthrough_req_params_deinit,
-
-	.priv_size = sizeof(struct sto_passthrough_req_priv),
-	.priv_deinit = sto_passthrough_req_priv_deinit,
-
-	.response = sto_passthrough_req_response,
-	.steps = {
-		STO_REQ_STEP(sto_passthrough_req, NULL),
 		STO_REQ_STEP_TERMINATOR(),
 	}
 };
