@@ -35,7 +35,7 @@ sto_subsystem_find(const char *name)
 	return _subsystem_find(&g_sto_subsystems, name);
 }
 
-static const struct sto_hash *
+static const struct sto_shash *
 sto_subsystem_get_ops(const char *object_name)
 {
 	struct sto_subsystem *subsystem;
@@ -46,7 +46,7 @@ sto_subsystem_get_ops(const char *object_name)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return subsystem->ops_map;
+	return &subsystem->ops_map;
 }
 
 STO_CORE_REGISTER_INTERNAL_COMPONENT(subsystem, sto_subsystem_get_ops)

@@ -297,7 +297,7 @@ sto_core_req_init_req_ctx(struct sto_core_req *core_req, struct sto_req_context 
 }
 
 static const struct sto_ops *
-sto_core_decode_ops(const struct sto_hash *ops_map,
+sto_core_decode_ops(const struct sto_shash *ops_map,
 		    const struct sto_json_iter *iter)
 {
 	const struct sto_ops *op;
@@ -348,7 +348,7 @@ static int
 sto_core_req_parse(struct sto_core_req *core_req)
 {
 	struct sto_json_iter iter;
-	const struct sto_hash *ops_map;
+	const struct sto_shash *ops_map;
 	const struct sto_ops *op;
 	struct sto_req_context *req_ctx;
 	int rc = 0;

@@ -6,6 +6,12 @@
 
 #include "sto_hash.h"
 
+struct sto_bucket_table {
+	uint32_t nr_of_buckets;
+
+	LIST_HEAD(, sto_hash_elem) buckets[];
+};
+
 static inline uint32_t
 fls(uint32_t x)
 {
@@ -41,46 +47,77 @@ sto_hash_buckets(uint32_t size)
 	return roundup_pow_of_two(val);
 }
 
-struct sto_hash *
-sto_hash_alloc(uint32_t size)
+static struct sto_bucket_table *
+bucket_table_alloc(uint32_t size)
 {
-	struct sto_hash *ht;
-	uint32_t nr_of_buckets, hashtable_size;
+	struct sto_bucket_table *tbl;
+	uint32_t nr_of_buckets, table_size;
 	uint32_t i;
 
 	nr_of_buckets = sto_hash_buckets(size);
 
-	hashtable_size = sizeof(struct sto_hash);
-	hashtable_size += nr_of_buckets * sizeof(struct sto_hash_elem *);
+	table_size = sizeof(struct sto_bucket_table);
+	table_size += nr_of_buckets * sizeof(struct sto_hash_elem *);
 
-	ht = calloc(1, hashtable_size);
-	if (spdk_unlikely(!ht)) {
-		SPDK_ERRLOG("Failed to allocate sto hashtable: size=%u nr_of_buckets=%u hashtable_size=%u\n",
-			    size, nr_of_buckets, hashtable_size);
+	tbl = calloc(1, table_size);
+	if (spdk_unlikely(!tbl)) {
+		SPDK_ERRLOG("Failed to allocate %u buckets: table_size=%u\n",
+			    nr_of_buckets, table_size);
 		return NULL;
 	}
 
-	ht->seed = 0;
-	ht->nr_of_buckets = nr_of_buckets;
+	tbl->nr_of_buckets = nr_of_buckets;
 
-	for (i = 0; i < ht->nr_of_buckets; i++) {
-		LIST_INIT(&ht->buckets[i]);
+	for (i = 0; i < tbl->nr_of_buckets; i++) {
+		LIST_INIT(&tbl->buckets[i]);
 	}
 
-	SPDK_NOTICELOG("Create STO hash table: size=%u, nr_of_buckets=%u\n",
-		       size, nr_of_buckets);
+	return tbl;
+}
 
-	return ht;
+static void
+bucket_table_free(struct sto_bucket_table *tbl)
+{
+	free(tbl);
+}
+
+int
+sto_hash_init(struct sto_hash *ht, uint32_t size)
+{
+	ht->seed = 0;
+
+	ht->tbl = bucket_table_alloc(size);
+	if (spdk_unlikely(!ht->tbl)) {
+		SPDK_ERRLOG("Failed to allocate bucket table for size=%u\n", size);
+		return -ENOMEM;
+	}
+
+	return 0;
 }
 
 void
-sto_hash_free(struct sto_hash *ht)
+sto_hash_destroy(struct sto_hash *ht)
 {
 	if (!sto_hash_empty(ht)) {
 		SPDK_ERRLOG("STO hashtable is not empty!!!\n");
 	}
 
-	free(ht);
+	bucket_table_free(ht->tbl);
+}
+
+bool
+sto_hash_empty(struct sto_hash *ht)
+{
+	struct sto_bucket_table *tbl = ht->tbl;
+	uint32_t i;
+
+	for (i = 0; i < tbl->nr_of_buckets; i++) {
+		if (!LIST_EMPTY(&tbl->buckets[i])) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 static inline uint32_t
@@ -89,7 +126,7 @@ sto_hash_get_bucket_nr(const struct sto_hash *ht, const void *key, uint32_t key_
 	uint32_t hash;
 
 	hash = rte_jhash(key, key_len, ht->seed);
-	return hash & (ht->nr_of_buckets - 1);
+	return hash & (ht->tbl->nr_of_buckets - 1);
 }
 
 void
@@ -98,18 +135,19 @@ sto_hash_add_elem(struct sto_hash *ht, struct sto_hash_elem *he)
 	uint32_t b;
 
 	b = sto_hash_get_bucket_nr(ht, he->key, he->key_len);
-	LIST_INSERT_HEAD(&ht->buckets[b], he, list);
+	LIST_INSERT_HEAD(&ht->tbl->buckets[b], he, list);
 }
 
 struct sto_hash_elem *
 sto_hash_lookup_elem(const struct sto_hash *ht, const void *key, uint32_t key_len)
 {
+	struct sto_bucket_table *tbl = ht->tbl;
 	struct sto_hash_elem *he;
 	uint32_t b;
 
 	b = sto_hash_get_bucket_nr(ht, key, key_len);
 
-	LIST_FOREACH(he, &ht->buckets[b], list) {
+	LIST_FOREACH(he, &tbl->buckets[b], list) {
 		if (key_len != he->key_len) {
 			continue;
 		}
@@ -122,24 +160,18 @@ sto_hash_lookup_elem(const struct sto_hash *ht, const void *key, uint32_t key_le
 	return NULL;
 }
 
-void
-sto_hash_remove_elem(struct sto_hash_elem *he)
-{
-	LIST_REMOVE(he, list);
-}
-
-struct sto_hash_entry {
+struct sto_shash_entry {
 	const void *value;
 	struct sto_hash_elem he;
 };
 
 #define STO_HASH_ENTRY(x) \
-	SPDK_CONTAINEROF((x), struct sto_hash_entry, he)
+	SPDK_CONTAINEROF((x), struct sto_shash_entry, he)
 
 static inline int
-sto_hash_add_entry(struct sto_hash *ht, const void *key, uint32_t key_len, const void *value)
+sto_shash_add_entry(struct sto_shash *sht, const void *key, uint32_t key_len, const void *value)
 {
-	struct sto_hash_entry *entry;
+	struct sto_shash_entry *entry;
 
 	entry = calloc(1, sizeof(*entry));
 	if (spdk_unlikely(!entry)) {
@@ -150,24 +182,24 @@ sto_hash_add_entry(struct sto_hash *ht, const void *key, uint32_t key_len, const
 	sto_hash_elem_init(&entry->he, key, key_len);
 	entry->value = value;
 
-	sto_hash_add_elem(ht, &entry->he);
+	sto_hash_add_elem(&sht->ht, &entry->he);
 
 	return 0;
 }
 
 static inline void
-sto_hash_remove_entry(struct sto_hash_entry *entry)
+sto_shash_remove_entry(struct sto_shash_entry *entry)
 {
-	sto_hash_remove_elem(&entry->he);
+	sto_hash_elem_del(&entry->he);
 	free(entry);
 }
 
-static inline struct sto_hash_entry *
-sto_hash_lookup_entry(const struct sto_hash *ht, const void *key, uint32_t key_len)
+static inline struct sto_shash_entry *
+sto_shash_lookup_entry(const struct sto_shash *sht, const void *key, uint32_t key_len)
 {
 	struct sto_hash_elem *he;
 
-	he = sto_hash_lookup_elem(ht, key, key_len);
+	he = sto_hash_lookup_elem(&sht->ht, key, key_len);
 	if (!he) {
 		return NULL;
 	}
@@ -176,17 +208,17 @@ sto_hash_lookup_entry(const struct sto_hash *ht, const void *key, uint32_t key_l
 }
 
 int
-sto_hash_add(struct sto_hash *ht, const void *key, uint32_t key_len, const void *value)
+sto_shash_add(struct sto_shash *sht, const void *key, uint32_t key_len, const void *value)
 {
-	return sto_hash_add_entry(ht, key, key_len, value);
+	return sto_shash_add_entry(sht, key, key_len, value);
 }
 
 void *
-sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
+sto_shash_lookup(const struct sto_shash *sht, const void *key, uint32_t key_len)
 {
-	struct sto_hash_entry *entry;
+	struct sto_shash_entry *entry;
 
-	entry = sto_hash_lookup_entry(ht, key, key_len);
+	entry = sto_shash_lookup_entry(sht, key, key_len);
 	if (!entry) {
 		return NULL;
 	}
@@ -195,25 +227,26 @@ sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
 }
 
 void
-sto_hash_remove(struct sto_hash *ht, const void *key, uint32_t key_len)
+sto_shash_remove(struct sto_shash *sht, const void *key, uint32_t key_len)
 {
-	struct sto_hash_entry *entry;
+	struct sto_shash_entry *entry;
 
-	entry = sto_hash_lookup_entry(ht, key, key_len);
+	entry = sto_shash_lookup_entry(sht, key, key_len);
 	assert(entry);
 
-	sto_hash_remove_entry(entry);
+	sto_shash_remove_entry(entry);
 }
 
 void
-sto_hash_clear(struct sto_hash *ht)
+sto_shash_clear(struct sto_shash *sht)
 {
+	struct sto_bucket_table *tbl = sht->ht.tbl;
 	struct sto_hash_elem *he, *tmp;
 	uint32_t i;
 
-	for (i = 0; i < ht->nr_of_buckets; i++) {
-		LIST_FOREACH_SAFE(he, &ht->buckets[i], list, tmp) {
-			sto_hash_remove_entry(STO_HASH_ENTRY(he));
+	for (i = 0; i < tbl->nr_of_buckets; i++) {
+		LIST_FOREACH_SAFE(he, &tbl->buckets[i], list, tmp) {
+			sto_shash_remove_entry(STO_HASH_ENTRY(he));
 		}
 	}
 }

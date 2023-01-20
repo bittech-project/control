@@ -120,38 +120,37 @@ sto_ops_params_free(const struct sto_ops_params_properties *properties, void *op
 	free(ops_params);
 }
 
-const struct sto_hash *
-sto_ops_map_alloc(const struct sto_op_table *op_table)
+int
+sto_ops_map_init(const struct sto_shash *ops_map, const struct sto_op_table *op_table)
 {
-	struct sto_hash *ht;
 	size_t i;
 	int rc;
 
-	ht = sto_hash_alloc(op_table->size);
-	if (spdk_unlikely(!ht)) {
-		SPDK_ERRLOG("Failed to alloc ops map\n");
-		return NULL;
+	rc = sto_shash_init((struct sto_shash *) ops_map, op_table->size);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to init ops map, rc=%d\n", rc);
+		return rc;
 	}
 
 	for (i = 0; i < op_table->size; i++) {
 		const struct sto_ops *op = &op_table->ops[i];
 
-		rc = sto_hash_add(ht, op->name, strlen(op->name), op);
+		rc = sto_shash_add((struct sto_shash *) ops_map, op->name, strlen(op->name), op);
 		if (spdk_unlikely(rc)) {
 			SPDK_ERRLOG("Failed to add '%s' op to ops map\n", op->name);
 			goto failed;
 		}
 	}
 
-	return ht;
+	return 0;
 
 failed:
-	sto_hash_clear_and_free(ht);
+	sto_shash_destroy((struct sto_shash *) ops_map);
 
-	return NULL;
+	return rc;
 }
 
-static inline const struct sto_hash *
+static inline const struct sto_shash *
 get_ops_map(const char *component_name, const char *object_name)
 {
 	const struct sto_core_component *component;
@@ -165,12 +164,12 @@ get_ops_map(const char *component_name, const char *object_name)
 }
 
 const struct sto_ops *
-sto_ops_map_find(const struct sto_hash *ops_map, const char *op_name)
+sto_ops_map_find(const struct sto_shash *ops_map, const char *op_name)
 {
-	const struct sto_hash *alias_ops_map;
+	const struct sto_shash *alias_ops_map;
 	const struct sto_ops *op;
 
-	op = sto_hash_lookup(ops_map, op_name, strlen(op_name));
+	op = sto_shash_lookup(ops_map, op_name, strlen(op_name));
 
 	while (op && op->type == STO_OPS_TYPE_ALIAS) {
 		alias_ops_map = get_ops_map(op->component_name, op->object_name);
@@ -178,7 +177,7 @@ sto_ops_map_find(const struct sto_hash *ops_map, const char *op_name)
 			return NULL;
 		}
 
-		op = sto_hash_lookup(alias_ops_map, op->op_name, strlen(op->op_name));
+		op = sto_shash_lookup(alias_ops_map, op->op_name, strlen(op->op_name));
 	}
 
 	return op;

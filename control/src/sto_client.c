@@ -28,7 +28,7 @@ struct sto_jsonrpc_client {
 	TAILQ_HEAD(, sto_jsonrpc_client_entry) entries;
 
 	int req_id;
-	struct sto_hash *req_map;
+	struct sto_hash req_map;
 
 	TAILQ_HEAD(, sto_jsonrpc_client_req) req_busy_list;
 
@@ -60,7 +60,7 @@ __jsonrpc_client_send_req(struct sto_jsonrpc_client *client,
 			  struct sto_jsonrpc_client_entry *entry,
 			  struct sto_jsonrpc_client_req *req)
 {
-	sto_hash_add_elem(client->req_map, &req->he);
+	sto_hash_add_elem(&client->req_map, &req->he);
 
 	spdk_jsonrpc_client_send_request(entry->rpc_client, req->request);
 	req->request = NULL;
@@ -91,7 +91,7 @@ jsonrpc_client_get_req(struct sto_jsonrpc_client *client, int id)
 {
 	struct sto_hash_elem *he;
 
-	he = sto_hash_lookup_elem(client->req_map, &id, sizeof(id));
+	he = sto_hash_lookup_elem(&client->req_map, &id, sizeof(id));
 	if (!he) {
 		return NULL;
 	}
@@ -121,7 +121,7 @@ jsonrpc_client_response(struct sto_jsonrpc_client *client,
 	req = jsonrpc_client_get_req(client, id);
 	assert(req);
 
-	sto_hash_remove_elem(&req->he);
+	sto_hash_elem_del(&req->he);
 
 	req->response_handler(req->priv, response, rc);
 
@@ -362,8 +362,8 @@ sto_jsonrpc_client_connect(const char *addr, int addr_family)
 
 	client->addr_family = addr_family;
 
-	client->req_map = sto_hash_alloc(STO_JSONRPC_CLIENT_MAX_CONNS);
-	if (spdk_unlikely(!client->req_map)) {
+	rc = sto_hash_init(&client->req_map, STO_JSONRPC_CLIENT_MAX_CONNS);
+	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to create cmd map\n");
 		rc = -ENOMEM;
 		goto free_addr;
@@ -393,7 +393,7 @@ close_client:
 	jsonrpc_client_close(client);
 
 free_req_map:
-	sto_hash_free(client->req_map);
+	sto_hash_destroy(&client->req_map);
 
 free_addr:
 	free((char *) client->addr);
@@ -406,7 +406,7 @@ sto_jsonrpc_client_close(struct sto_jsonrpc_client *client)
 {
 	spdk_poller_unregister(&client->poller);
 	jsonrpc_client_close(client);
-	sto_hash_free(client->req_map);
+	sto_hash_destroy(&client->req_map);
 	free((char *) client->addr);
 	free(client);
 }

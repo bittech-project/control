@@ -37,7 +37,7 @@ sto_module_find(const char *name)
 	return _module_find(&g_sto_modules, name);
 }
 
-static const struct sto_hash *
+static const struct sto_shash *
 sto_module_get_ops(const char *object_name)
 {
 	struct sto_module *module;
@@ -48,7 +48,7 @@ sto_module_get_ops(const char *object_name)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return module->ops_map;
+	return &module->ops_map;
 }
 
 STO_CORE_REGISTER_COMPONENT(module, sto_module_get_ops)

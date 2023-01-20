@@ -71,10 +71,10 @@ core_component_parse(const struct sto_json_iter *iter, bool internal_user)
 	return component;
 }
 
-const struct sto_hash *
+const struct sto_shash *
 sto_core_component_decode(const struct sto_json_iter *iter, bool internal_user)
 {
-	const struct sto_hash *ops_map;
+	const struct sto_shash *ops_map;
 	const struct sto_core_component *component;
 	char *object_name = NULL;
 	int rc = 0;

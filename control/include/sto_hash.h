@@ -11,30 +11,6 @@ struct sto_hash_elem {
 	uint32_t key_len;
 };
 
-struct sto_hash {
-	uint32_t seed;
-	uint32_t nr_of_buckets;
-
-	LIST_HEAD(, sto_hash_elem) buckets[];
-};
-
-struct sto_hash *sto_hash_alloc(uint32_t size);
-void sto_hash_free(struct sto_hash *ht);
-
-static inline bool
-sto_hash_empty(struct sto_hash *ht)
-{
-	uint32_t i;
-
-	for (i = 0; i < ht->nr_of_buckets; i++) {
-		if (!LIST_EMPTY(&ht->buckets[i])) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
 static inline void
 sto_hash_elem_init(struct sto_hash_elem *he, const void *key, uint32_t key_len)
 {
@@ -42,20 +18,47 @@ sto_hash_elem_init(struct sto_hash_elem *he, const void *key, uint32_t key_len)
 	he->key_len = key_len;
 }
 
+static inline void
+sto_hash_elem_del(struct sto_hash_elem *he)
+{
+	LIST_REMOVE(he, list);
+}
+
+struct sto_bucket_table;
+
+struct sto_hash {
+	uint32_t seed;
+	struct sto_bucket_table *tbl;
+};
+
+struct sto_shash {
+	struct sto_hash ht;
+};
+
+int sto_hash_init(struct sto_hash *ht, uint32_t size);
+void sto_hash_destroy(struct sto_hash *ht);
+bool sto_hash_empty(struct sto_hash *ht);
+
 void sto_hash_add_elem(struct sto_hash *ht, struct sto_hash_elem *he);
 struct sto_hash_elem *sto_hash_lookup_elem(const struct sto_hash *ht, const void *key, uint32_t key_len);
-void sto_hash_remove_elem(struct sto_hash_elem *he);
 
-int sto_hash_add(struct sto_hash *ht, const void *key, uint32_t key_len, const void *data);
-void *sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len);
-void sto_hash_remove(struct sto_hash *ht, const void *key, uint32_t key_len);
-void sto_hash_clear(struct sto_hash *ht);
+static inline int
+sto_shash_init(struct sto_shash *sht, uint32_t size)
+{
+	return sto_hash_init(&sht->ht, size);
+}
+
+void sto_shash_clear(struct sto_shash *sht);
 
 static inline void
-sto_hash_clear_and_free(struct sto_hash *ht)
+sto_shash_destroy(struct sto_shash *sht)
 {
-	sto_hash_clear(ht);
-	sto_hash_free(ht);
+	sto_shash_clear(sht);
+	sto_hash_destroy(&sht->ht);
 }
+
+int sto_shash_add(struct sto_shash *sht, const void *key, uint32_t key_len, const void *data);
+void *sto_shash_lookup(const struct sto_shash *sht, const void *key, uint32_t key_len);
+void sto_shash_remove(struct sto_shash *sht, const void *key, uint32_t key_len);
 
 #endif /* _STO_HASH_H_ */

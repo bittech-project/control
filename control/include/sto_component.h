@@ -8,14 +8,17 @@ struct sto_json_iter;
 struct sto_core_component {
 	const char *name;
 
-	const struct sto_hash *(*get_ops_map)(const char *object_name);
+	const struct sto_shash *(*get_ops_map)(const char *object_name);
 
 	TAILQ_ENTRY(sto_core_component) list;
 
 	bool internal;
 };
 
+struct sto_core_component *sto_core_component_find(const char *name, bool skip_internal);
 void sto_core_add_component(struct sto_core_component *component);
+const struct sto_shash *sto_core_component_decode(const struct sto_json_iter *iter,
+						  bool internal_user);
 
 #define STO_CORE_REGISTER_INTERNAL_COMPONENT(COMPONENT, GET_OPS_MAP_FN)	\
 	__STO_CORE_REGISTER_COMPONENT(COMPONENT, GET_OPS_MAP_FN, true)
@@ -34,8 +37,6 @@ static void __attribute__((constructor)) sto_core_component_ ## COMPONENT ## _re
 	sto_core_add_component(&sto_core_component_ ## COMPONENT);				\
 }
 
-struct sto_core_component *sto_core_component_find(const char *name, bool skip_internal);
-
 struct sto_core_component *sto_core_component_next(struct sto_core_component *component);
 
 static inline struct sto_core_component *
@@ -48,8 +49,5 @@ sto_core_component_first(void)
 	for ((component) = sto_core_component_first();		\
 	     (component);					\
 	     (component) = sto_core_component_next((component)))
-
-const struct sto_hash *sto_core_component_decode(const struct sto_json_iter *iter,
-						 bool internal_user);
 
 #endif /* _STO_COMPONENT_H_ */

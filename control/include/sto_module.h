@@ -7,7 +7,7 @@
 
 struct sto_module {
 	const char *name;
-	const struct sto_hash *ops_map;
+	const struct sto_shash ops_map;
 
 	TAILQ_ENTRY(sto_module) list;
 };
@@ -22,13 +22,7 @@ static struct sto_module sto_module_ ## MODULE = {					\
 };											\
 static void __attribute__((constructor)) sto_module_ ## MODULE ## _register(void)	\
 {											\
-	const struct sto_hash *ht;							\
-											\
-	ht = sto_ops_map_alloc((OP_TABLE));						\
-	assert(ht);									\
-											\
-	sto_module_ ## MODULE.ops_map = ht;						\
-											\
+	assert(!sto_ops_map_init(&sto_module_ ## MODULE.ops_map, (OP_TABLE)));		\
 	sto_add_module(&sto_module_ ## MODULE);						\
 }
 
