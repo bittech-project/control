@@ -38,28 +38,17 @@ sto_module_find(const char *name)
 }
 
 static const struct sto_hash *
-sto_module_decode(const struct sto_json_iter *iter)
+sto_module_get_ops(const char *object_name)
 {
 	struct sto_module *module;
-	char *module_name = NULL;
-	int rc = 0;
 
-	rc = sto_json_iter_decode_str(iter, "module", &module_name);
-	if (rc) {
-		SPDK_ERRLOG("Failed to decode module for rc=%d\n", rc);
-		return ERR_PTR(rc);
-	}
-
-	module = sto_module_find(module_name);
-
-	free(module_name);
-
+	module = sto_module_find(object_name);
 	if (spdk_unlikely(!module)) {
-		SPDK_ERRLOG("Failed to find module\n");
+		SPDK_ERRLOG("Failed to find module %s\n", object_name);
 		return ERR_PTR(-EINVAL);
 	}
 
 	return module->op_map;
 }
 
-STO_CORE_REGISTER_COMPONENT(module, sto_module_decode)
+STO_CORE_REGISTER_COMPONENT(module, sto_module_get_ops)

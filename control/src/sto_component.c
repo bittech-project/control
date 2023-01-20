@@ -51,12 +51,12 @@ sto_core_add_component(struct sto_core_component *component)
 	TAILQ_INSERT_TAIL(&g_sto_components, component, list);
 }
 
-const struct sto_hash *
-sto_core_component_decode(const struct sto_json_iter *iter, bool internal_user)
+static const struct sto_core_component *
+core_component_parse(const struct sto_json_iter *iter, bool internal_user)
 {
 	struct sto_core_component *component;
 	char *component_name = NULL;
-	int rc = 0;
+	int rc;
 
 	rc = sto_json_iter_decode_name(iter, &component_name);
 	if (spdk_unlikely(rc)) {
@@ -68,10 +68,32 @@ sto_core_component_decode(const struct sto_json_iter *iter, bool internal_user)
 
 	free(component_name);
 
+	return component;
+}
+
+const struct sto_hash *
+sto_core_component_decode(const struct sto_json_iter *iter, bool internal_user)
+{
+	const struct sto_hash *ops_map;
+	const struct sto_core_component *component;
+	char *object_name = NULL;
+	int rc = 0;
+
+	component = core_component_parse(iter, internal_user);
 	if (spdk_unlikely(!component)) {
 		SPDK_ERRLOG("Failed to find component\n");
 		return ERR_PTR(-EINVAL);
 	}
 
-	return component->decode(iter);
+	rc = sto_json_iter_decode_str(iter, component->name, &object_name);
+	if (rc) {
+		SPDK_ERRLOG("Failed to decode subsystem for rc=%d\n", rc);
+		return ERR_PTR(rc);
+	}
+
+	ops_map = component->get_ops_fn(object_name);
+
+	free(object_name);
+
+	return ops_map;
 }

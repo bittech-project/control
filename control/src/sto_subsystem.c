@@ -36,28 +36,17 @@ sto_subsystem_find(const char *name)
 }
 
 static const struct sto_hash *
-sto_subsystem_decode(const struct sto_json_iter *iter)
+sto_subsystem_get_ops(const char *object_name)
 {
 	struct sto_subsystem *subsystem;
-	char *subsystem_name = NULL;
-	int rc = 0;
 
-	rc = sto_json_iter_decode_str(iter, "subsystem", &subsystem_name);
-	if (rc) {
-		SPDK_ERRLOG("Failed to decode subsystem for rc=%d\n", rc);
-		return ERR_PTR(rc);
-	}
-
-	subsystem = sto_subsystem_find(subsystem_name);
-
-	free(subsystem_name);
-
+	subsystem = sto_subsystem_find(object_name);
 	if (spdk_unlikely(!subsystem)) {
-		SPDK_ERRLOG("Failed to find subsystem\n");
+		SPDK_ERRLOG("Failed to find subsystem %s\n", object_name);
 		return ERR_PTR(-EINVAL);
 	}
 
 	return subsystem->op_map;
 }
 
-STO_CORE_REGISTER_INTERNAL_COMPONENT(subsystem, sto_subsystem_decode)
+STO_CORE_REGISTER_INTERNAL_COMPONENT(subsystem, sto_subsystem_get_ops)
