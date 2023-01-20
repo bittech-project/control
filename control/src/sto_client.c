@@ -60,7 +60,7 @@ __jsonrpc_client_send_req(struct sto_jsonrpc_client *client,
 			  struct sto_jsonrpc_client_entry *entry,
 			  struct sto_jsonrpc_client_req *req)
 {
-	sto_hash_add_elem(&client->req_map, &req->he);
+	sto_hash_add(&client->req_map, &req->he);
 
 	spdk_jsonrpc_client_send_request(entry->rpc_client, req->request);
 	req->request = NULL;
@@ -91,7 +91,7 @@ jsonrpc_client_get_req(struct sto_jsonrpc_client *client, int id)
 {
 	struct sto_hash_elem *he;
 
-	he = sto_hash_lookup_elem(&client->req_map, &id, sizeof(id));
+	he = sto_hash_lookup(&client->req_map, &id, sizeof(id));
 	if (!he) {
 		return NULL;
 	}

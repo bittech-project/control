@@ -133,7 +133,7 @@ sto_hash_get_bucket_nr(const struct sto_hash *ht, const void *key, uint32_t key_
 }
 
 void
-sto_hash_add_elem(struct sto_hash *ht, struct sto_hash_elem *he)
+sto_hash_add(struct sto_hash *ht, struct sto_hash_elem *he)
 {
 	uint32_t b;
 
@@ -142,7 +142,7 @@ sto_hash_add_elem(struct sto_hash *ht, struct sto_hash_elem *he)
 }
 
 struct sto_hash_elem *
-sto_hash_lookup_elem(const struct sto_hash *ht, const void *key, uint32_t key_len)
+sto_hash_lookup(const struct sto_hash *ht, const void *key, uint32_t key_len)
 {
 	struct sto_bucket_table *tbl = ht->tbl;
 	struct sto_hash_elem *he;
@@ -163,12 +163,28 @@ sto_hash_lookup_elem(const struct sto_hash *ht, const void *key, uint32_t key_le
 	return NULL;
 }
 
+struct sto_hash_elem *
+sto_hash_iter_next(struct sto_hash_iter *iter)
+{
+	struct sto_bucket_table *tbl = iter->tbl;
+	struct sto_hash_elem *he = iter->he;
+
+	for (; iter->slot < tbl->nr_of_buckets; iter->slot++) {
+		he = !he ? LIST_FIRST(&tbl->buckets[iter->slot]) : LIST_NEXT(he, list);
+		if (he) {
+			return iter->he = he;
+		}
+	}
+
+	return NULL;
+}
+
 struct sto_shash_entry {
 	const void *value;
 	struct sto_hash_elem he;
 };
 
-#define STO_HASH_ENTRY(x) \
+#define STO_SHASH_ENTRY(x) \
 	SPDK_CONTAINEROF((x), struct sto_shash_entry, he)
 
 static inline int
@@ -185,7 +201,7 @@ sto_shash_add_entry(struct sto_shash *sht, const void *key, uint32_t key_len, co
 	sto_hash_elem_init(&entry->he, key, key_len);
 	entry->value = value;
 
-	sto_hash_add_elem(&sht->ht, &entry->he);
+	sto_hash_add(&sht->ht, &entry->he);
 
 	return 0;
 }
@@ -202,12 +218,25 @@ sto_shash_lookup_entry(const struct sto_shash *sht, const void *key, uint32_t ke
 {
 	struct sto_hash_elem *he;
 
-	he = sto_hash_lookup_elem(&sht->ht, key, key_len);
+	he = sto_hash_lookup(&sht->ht, key, key_len);
 	if (!he) {
 		return NULL;
 	}
 
-	return STO_HASH_ENTRY(he);
+	return STO_SHASH_ENTRY(he);
+}
+
+static inline struct sto_shash_entry *
+sto_shash_next_entry(struct sto_shash_iter *iter)
+{
+	struct sto_hash_elem *he;
+
+	he = sto_hash_iter_next(&iter->iter);
+	if (!he) {
+		return NULL;
+	}
+
+	return STO_SHASH_ENTRY(he);
 }
 
 int
@@ -249,7 +278,20 @@ sto_shash_clear(struct sto_shash *sht)
 
 	for (i = 0; i < tbl->nr_of_buckets; i++) {
 		LIST_FOREACH_SAFE(he, &tbl->buckets[i], list, tmp) {
-			sto_shash_remove_entry(STO_HASH_ENTRY(he));
+			sto_shash_remove_entry(STO_SHASH_ENTRY(he));
 		}
 	}
+}
+
+void *
+sto_shash_iter_next(struct sto_shash_iter *iter)
+{
+	struct sto_shash_entry *entry;
+
+	entry = sto_shash_next_entry(iter);
+	if (!entry) {
+		return NULL;
+	}
+
+	return (void *) entry->value;
 }
