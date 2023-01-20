@@ -46,7 +46,7 @@ sto_subsystem_get_ops(const char *object_name)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return subsystem->op_map;
+	return subsystem->ops_map;
 }
 
 STO_CORE_REGISTER_INTERNAL_COMPONENT(subsystem, sto_subsystem_get_ops)

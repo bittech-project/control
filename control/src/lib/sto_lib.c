@@ -149,3 +149,9 @@ failed:
 
 	return NULL;
 }
+
+const struct sto_ops *
+sto_ops_map_find(const struct sto_hash *ops_map, const char *op_name)
+{
+	return sto_hash_lookup(ops_map, op_name, strlen(op_name));
+}

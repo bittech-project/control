@@ -297,7 +297,7 @@ sto_core_req_init_req_ctx(struct sto_core_req *core_req, struct sto_req_context 
 }
 
 static const struct sto_ops *
-sto_core_decode_ops(const struct sto_hash *op_map,
+sto_core_decode_ops(const struct sto_hash *ops_map,
 		    const struct sto_json_iter *iter)
 {
 	const struct sto_ops *op;
@@ -310,7 +310,7 @@ sto_core_decode_ops(const struct sto_hash *op_map,
 		return ERR_PTR(rc);
 	}
 
-	op = sto_ops_map_find(op_map, op_name);
+	op = sto_ops_map_find(ops_map, op_name);
 	if (!op) {
 		SPDK_ERRLOG("Failed to find op %s\n", op_name);
 		free(op_name);
@@ -348,7 +348,7 @@ static int
 sto_core_req_parse(struct sto_core_req *core_req)
 {
 	struct sto_json_iter iter;
-	const struct sto_hash *op_map;
+	const struct sto_hash *ops_map;
 	const struct sto_ops *op;
 	struct sto_req_context *req_ctx;
 	int rc = 0;
@@ -359,8 +359,8 @@ sto_core_req_parse(struct sto_core_req *core_req)
 
 	sto_json_iter_init(&iter, core_req->params);
 
-	op_map = sto_core_component_decode(&iter, core_req->internal);
-	if (IS_ERR_OR_NULL(op_map)) {
+	ops_map = sto_core_component_decode(&iter, core_req->internal);
+	if (IS_ERR_OR_NULL(ops_map)) {
 		SPDK_ERRLOG("Failed to decode component: req[%p]\n", core_req);
 		return IS_ERR(op) ? (int) PTR_ERR(op) : -ENOENT;
 	}
@@ -371,7 +371,7 @@ sto_core_req_parse(struct sto_core_req *core_req)
 		return rc;
 	}
 
-	op = sto_core_decode_ops(op_map, &iter);
+	op = sto_core_decode_ops(ops_map, &iter);
 	if (IS_ERR(op)) {
 		SPDK_ERRLOG("Failed to decode ops: req[%p]\n", core_req);
 		return PTR_ERR(op);

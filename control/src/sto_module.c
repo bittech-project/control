@@ -48,7 +48,7 @@ sto_module_get_ops(const char *object_name)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return module->op_map;
+	return module->ops_map;
 }
 
 STO_CORE_REGISTER_COMPONENT(module, sto_module_get_ops)
