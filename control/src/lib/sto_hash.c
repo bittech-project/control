@@ -18,11 +18,13 @@ fls(uint32_t x)
 	uint32_t position;
 	uint32_t i;
 
-	if (x == 0)
+	if (x == 0) {
 		return 0;
+	}
 
-	for (i = (x >> 1), position = 0; i != 0; ++position)
+	for (i = (x >> 1), position = 0; i != 0; ++position) {
 		i >>= 1;
+	}
 
 	return position + 1;
 }
@@ -41,8 +43,9 @@ sto_hash_buckets(uint32_t size)
 {
 	uint64_t val = ((uint64_t) size * 4) / 3;
 
-	if (val >= STO_HASH_MAX_BUCKETS)
+	if (val >= STO_HASH_MAX_BUCKETS) {
 		return STO_HASH_MAX_BUCKETS;
+	}
 
 	return roundup_pow_of_two(val);
 }

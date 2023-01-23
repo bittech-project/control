@@ -29,9 +29,9 @@ struct sto_ops_param_dsc {
 #define STO_OPS_PARAM(MEMBER, TYPE, DECODE_FUNC, OPTIONAL, DESCRIPTION, DEINIT_FUNC)	\
 	{										\
 		.name = # MEMBER,							\
-		.offset = offsetof(TYPE, MEMBER), 					\
+		.offset = offsetof(TYPE, MEMBER),					\
 		.decode_func = (DECODE_FUNC),						\
-		.optional = (OPTIONAL), 						\
+		.optional = (OPTIONAL),							\
 		.description = (DESCRIPTION),						\
 		.deinit = (DEINIT_FUNC),						\
 	}
