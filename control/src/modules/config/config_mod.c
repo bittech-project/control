@@ -77,6 +77,19 @@ config_module_ops_json_info(const struct sto_module *module, struct spdk_json_wr
 }
 
 static void
+config_op_description_json_info(const struct sto_ops_param_dsc *dsc, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_name(w, dsc->name);
+
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_string(w, "description", dsc->description);
+	spdk_json_write_named_bool(w, "optional", dsc->optional);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
 config_op_params_json_info(const struct sto_ops_params_properties *properties, struct spdk_json_write_ctx *w)
 {
 	size_t i;
@@ -85,17 +98,17 @@ config_op_params_json_info(const struct sto_ops_params_properties *properties, s
 		return;
 	}
 
-	spdk_json_write_name(w, "params");
-
-	spdk_json_write_object_begin(w);
+	spdk_json_write_named_array_begin(w, "params");
 
 	for (i = 0; i < properties->num_descriptors; i++) {
-		const struct sto_ops_param_dsc *dsc = &properties->descriptors[i];
+		spdk_json_write_object_begin(w);
 
-		spdk_json_write_named_string(w, dsc->name, dsc->description);
+		config_op_description_json_info(&properties->descriptors[i], w);
+
+		spdk_json_write_object_end(w);
 	}
 
-	spdk_json_write_object_end(w);
+	spdk_json_write_array_end(w);
 }
 
 static void
@@ -104,6 +117,9 @@ config_op_json_info(const struct sto_ops *op, struct spdk_json_write_ctx *w)
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_string(w, "name", op->name);
+	if (op->description) {
+		spdk_json_write_named_string(w, "description", op->description);
+	}
 	config_op_params_json_info(op->params_properties, w);
 
 	spdk_json_write_object_end(w);
