@@ -84,6 +84,7 @@ config_op_description_json_info(const struct sto_ops_param_dsc *dsc, struct spdk
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_string(w, "description", dsc->description);
+	spdk_json_write_named_string(w, "type", sto_ops_param_type_name(dsc->type));
 	spdk_json_write_named_bool(w, "optional", dsc->optional);
 
 	spdk_json_write_object_end(w);

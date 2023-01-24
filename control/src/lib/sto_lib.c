@@ -38,6 +38,19 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_object_end(w);
 }
 
+static const char *const ops_param_type_name[] = {
+	[STO_OPS_PARAM_TYPE_STR]	= "string",
+	[STO_OPS_PARAM_TYPE_BOOL]	= "bool",
+	[STO_OPS_PARAM_TYPE_INT32]	= "int32",
+	[STO_OPS_PARAM_TYPE_UINT32]	= "uint32",
+};
+
+const char *
+sto_ops_param_type_name(enum sto_ops_param_type type)
+{
+	return (type < STO_OPS_PARAM_TYPE_CNT) ? ops_param_type_name[type] : "Unknown";
+}
+
 static void *
 ops_params_parse(const struct sto_ops_params_properties *properties,
 		 const struct spdk_json_val *values)
