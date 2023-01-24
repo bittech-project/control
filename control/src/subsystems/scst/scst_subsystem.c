@@ -358,15 +358,15 @@ scst_driver_list_constructor(void *arg1, const void *arg2)
 }
 
 struct scst_dev_open_params {
-	char *name;
+	char *device;
 	char *handler;
 	char *attributes;
 };
 
 static const struct sto_ops_param_dsc scst_dev_open_params_descriptors[] = {
-	STO_OPS_PARAM_STR(name, struct scst_dev_open_params, "name desc"),
-	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "handler desc"),
-	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_dev_open_params, "attributes desc"),
+	STO_OPS_PARAM_STR(device, struct scst_dev_open_params, "SCST device name"),
+	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "SCST handler name"),
+	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_dev_open_params, "SCST device attributes <p=v,...>"),
 };
 
 static const struct sto_ops_params_properties scst_dev_open_params_properties =
@@ -384,7 +384,7 @@ scst_dev_open_constructor(void *arg1, const void *arg2)
 		return -ENOMEM;
 	}
 
-	data = spdk_sprintf_alloc("add_device %s", ops_params->name);
+	data = spdk_sprintf_alloc("add_device %s", ops_params->device);
 	if (spdk_unlikely(!data)) {
 		return -ENOMEM;
 	}
@@ -403,13 +403,13 @@ scst_dev_open_constructor(void *arg1, const void *arg2)
 }
 
 struct scst_dev_close_params {
-	char *name;
+	char *device;
 	char *handler;
 };
 
 static const struct sto_ops_param_dsc scst_dev_close_params_descriptors[] = {
-	STO_OPS_PARAM_STR(name, struct scst_dev_open_params, "name desc"),
-	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "handler desc"),
+	STO_OPS_PARAM_STR(device, struct scst_dev_open_params, "SCST device name"),
+	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "SCST handler name"),
 };
 
 static const struct sto_ops_params_properties scst_dev_close_params_properties =
@@ -426,7 +426,7 @@ scst_dev_close_constructor(void *arg1, const void *arg2)
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("del_device %s", ops_params->name);
+	req_params->data = spdk_sprintf_alloc("del_device %s", ops_params->device);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -435,11 +435,11 @@ scst_dev_close_constructor(void *arg1, const void *arg2)
 }
 
 struct scst_dev_resync_params {
-	char *name;
+	char *device;
 };
 
 static const struct sto_ops_param_dsc scst_dev_resync_params_descriptors[] = {
-	STO_OPS_PARAM_STR(name, struct scst_dev_resync_params, "name desc"),
+	STO_OPS_PARAM_STR(device, struct scst_dev_resync_params, "SCST device name"),
 };
 
 static const struct sto_ops_params_properties scst_dev_resync_params_properties =
@@ -452,7 +452,7 @@ scst_dev_resync_constructor(void *arg1, const void *arg2)
 	const struct scst_dev_resync_params *ops_params = arg2;
 
 	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_DEVICES,
-					      ops_params->name, "resync_size");
+					      ops_params->device, "resync_size");
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -484,11 +484,11 @@ scst_dev_list_constructor(void *arg1, const void *arg2)
 }
 
 struct scst_dgrp_params {
-	char *name;
+	char *dgrp;
 };
 
 static const struct sto_ops_param_dsc scst_dgrp_params_descriptors[] = {
-	STO_OPS_PARAM_STR(name, struct scst_dgrp_params, "name desc"),
+	STO_OPS_PARAM_STR(dgrp, struct scst_dgrp_params, "SCST device group name"),
 };
 
 static const struct sto_ops_params_properties scst_dgrp_params_properties =
@@ -505,7 +505,7 @@ scst_dgrp_add_constructor(void *arg1, const void *arg2)
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("create %s", ops_params->name);
+	req_params->data = spdk_sprintf_alloc("create %s", ops_params->dgrp);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -524,7 +524,7 @@ scst_dgrp_del_constructor(void *arg1, const void *arg2)
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("del %s", ops_params->name);
+	req_params->data = spdk_sprintf_alloc("del %s", ops_params->dgrp);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -553,13 +553,13 @@ scst_dgrp_list_constructor(void *arg1, const void *arg2)
 }
 
 struct scst_dgrp_dev_params {
-	char *name;
-	char *dev_name;
+	char *dgrp;
+	char *device;
 };
 
 static const struct sto_ops_param_dsc scst_dgrp_dev_params_descriptors[] = {
-	STO_OPS_PARAM_STR(name, struct scst_dgrp_dev_params, "name desc"),
-	STO_OPS_PARAM_STR(dev_name, struct scst_dgrp_dev_params, "dev_name desc"),
+	STO_OPS_PARAM_STR(dgrp, struct scst_dgrp_dev_params, "SCST device group name"),
+	STO_OPS_PARAM_STR(device, struct scst_dgrp_dev_params, "SCST device name"),
 };
 
 static const struct sto_ops_params_properties scst_dgrp_dev_params_properties =
@@ -571,12 +571,12 @@ scst_dgrp_add_dev_constructor(void *arg1, const void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	const struct scst_dgrp_dev_params *ops_params = arg2;
 
-	req_params->file = scst_dev_group_devices_mgmt(ops_params->name);
+	req_params->file = scst_dev_group_devices_mgmt(ops_params->dgrp);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("add %s", ops_params->dev_name);
+	req_params->data = spdk_sprintf_alloc("add %s", ops_params->device);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -590,12 +590,12 @@ scst_dgrp_del_dev_constructor(void *arg1, const void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	const struct scst_dgrp_dev_params *ops_params = arg2;
 
-	req_params->file = scst_dev_group_devices_mgmt(ops_params->name);
+	req_params->file = scst_dev_group_devices_mgmt(ops_params->dgrp);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("del %s", ops_params->dev_name);
+	req_params->data = spdk_sprintf_alloc("del %s", ops_params->device);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -604,13 +604,13 @@ scst_dgrp_del_dev_constructor(void *arg1, const void *arg2)
 }
 
 struct scst_tgrp_params {
-	char *name;
-	char *dgrp_name;
+	char *tgrp;
+	char *dgrp;
 };
 
 static const struct sto_ops_param_dsc scst_tgrp_params_descriptors[] = {
-	STO_OPS_PARAM_STR(name, struct scst_tgrp_params, "name desc"),
-	STO_OPS_PARAM_STR(dgrp_name, struct scst_tgrp_params, "dgrp_name desc"),
+	STO_OPS_PARAM_STR(tgrp, struct scst_tgrp_params, "SCST target group name"),
+	STO_OPS_PARAM_STR(dgrp, struct scst_tgrp_params, "SCST device group name"),
 };
 
 static const struct sto_ops_params_properties scst_tgrp_params_properties =
@@ -622,12 +622,12 @@ scst_tgrp_add_constructor(void *arg1, const void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	const struct scst_tgrp_params *ops_params = arg2;
 
-	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->name);
+	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->dgrp);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("add %s", ops_params->name);
+	req_params->data = spdk_sprintf_alloc("add %s", ops_params->tgrp);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -641,12 +641,12 @@ scst_tgrp_del_constructor(void *arg1, const void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	const struct scst_tgrp_params *ops_params = arg2;
 
-	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->name);
+	req_params->file = scst_dev_group_target_groups_mgmt(ops_params->dgrp);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("del %s", ops_params->name);
+	req_params->data = spdk_sprintf_alloc("del %s", ops_params->tgrp);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -659,7 +659,7 @@ struct scst_tgrp_list_params {
 };
 
 static const struct sto_ops_param_dsc scst_tgrp_list_params_descriptors[] = {
-	STO_OPS_PARAM_STR(dgrp, struct scst_tgrp_list_params, "dgrp desc"),
+	STO_OPS_PARAM_STR(dgrp, struct scst_tgrp_list_params, "SCST device group name"),
 };
 
 static const struct sto_ops_params_properties scst_tgrp_list_params_properties =
@@ -688,15 +688,15 @@ scst_tgrp_list_constructor(void *arg1, const void *arg2)
 }
 
 struct scst_tgrp_tgt_params {
-	char *tgt_name;
-	char *dgrp_name;
-	char *tgrp_name;
+	char *target;
+	char *dgrp;
+	char *tgrp;
 };
 
 static const struct sto_ops_param_dsc scst_tgrp_tgt_params_descriptors[] = {
-	STO_OPS_PARAM_STR(tgt_name, struct scst_tgrp_tgt_params, "tgt_name desc"),
-	STO_OPS_PARAM_STR(dgrp_name, struct scst_tgrp_tgt_params, "dgrp_name desc"),
-	STO_OPS_PARAM_STR(tgrp_name, struct scst_tgrp_tgt_params, "tgrp_name desc"),
+	STO_OPS_PARAM_STR(target, struct scst_tgrp_tgt_params, "SCST target name"),
+	STO_OPS_PARAM_STR(dgrp, struct scst_tgrp_tgt_params, "SCST device group name"),
+	STO_OPS_PARAM_STR(tgrp, struct scst_tgrp_tgt_params, "SCST target group name"),
 };
 
 static const struct sto_ops_params_properties scst_tgrp_tgt_params_properties =
@@ -708,13 +708,13 @@ scst_tgrp_add_tgt_constructor(void *arg1, const void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	const struct scst_tgrp_tgt_params *ops_params = arg2;
 
-	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp_name,
-							    ops_params->tgrp_name);
+	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp,
+							    ops_params->tgrp);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("add %s", ops_params->tgt_name);
+	req_params->data = spdk_sprintf_alloc("add %s", ops_params->target);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -728,13 +728,13 @@ scst_tgrp_del_tgt_constructor(void *arg1, const void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	const struct scst_tgrp_tgt_params *ops_params = arg2;
 
-	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp_name,
-							    ops_params->tgrp_name);
+	req_params->file = scst_dev_group_target_group_mgmt(ops_params->dgrp,
+							    ops_params->tgrp);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("del %s", ops_params->tgt_name);
+	req_params->data = spdk_sprintf_alloc("del %s", ops_params->target);
 	if (spdk_unlikely(!req_params->data)) {
 		return -ENOMEM;
 	}
@@ -748,8 +748,8 @@ struct scst_target_params {
 };
 
 static const struct sto_ops_param_dsc scst_target_params_descriptors[] = {
-	STO_OPS_PARAM_STR(target, struct scst_target_params, "target desc"),
-	STO_OPS_PARAM_STR(driver, struct scst_target_params, "driver desc"),
+	STO_OPS_PARAM_STR(target, struct scst_target_params, "SCST target name"),
+	STO_OPS_PARAM_STR(driver, struct scst_target_params, "SCST target driver name"),
 };
 
 static const struct sto_ops_params_properties scst_target_params_properties =
@@ -798,7 +798,7 @@ struct scst_target_list_params {
 };
 
 static const struct sto_ops_param_dsc scst_target_list_params_descriptors[] = {
-	STO_OPS_PARAM_STR(driver, struct scst_target_list_params, "driver desc"),
+	STO_OPS_PARAM_STR(driver, struct scst_target_list_params, "SCST target driver name"),
 };
 
 static const struct sto_ops_params_properties scst_target_list_params_properties =
@@ -877,9 +877,9 @@ struct scst_group_params {
 };
 
 static const struct sto_ops_param_dsc scst_group_params_descriptors[] = {
-	STO_OPS_PARAM_STR(group, struct scst_group_params, "group desc"),
-	STO_OPS_PARAM_STR(driver, struct scst_group_params, "driver desc"),
-	STO_OPS_PARAM_STR(target, struct scst_group_params, "target desc"),
+	STO_OPS_PARAM_STR(group, struct scst_group_params, "SCST group name"),
+	STO_OPS_PARAM_STR(driver, struct scst_group_params, "SCST target driver name"),
+	STO_OPS_PARAM_STR(target, struct scst_group_params, "SCST target name"),
 };
 
 static const struct sto_ops_params_properties scst_group_params_properties =
@@ -933,12 +933,12 @@ struct scst_lun_add_params {
 };
 
 static const struct sto_ops_param_dsc scst_lun_add_params_descriptors[] = {
-	STO_OPS_PARAM_INT32(lun, struct scst_lun_add_params, "lun desc"),
-	STO_OPS_PARAM_STR(driver, struct scst_lun_add_params, "driver desc"),
-	STO_OPS_PARAM_STR(target, struct scst_lun_add_params, "target desc"),
-	STO_OPS_PARAM_STR(device, struct scst_lun_add_params, "device desc"),
-	STO_OPS_PARAM_STR(group, struct scst_lun_add_params, "group desc"),
-	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_lun_add_params, "attributes desc"),
+	STO_OPS_PARAM_INT32(lun, struct scst_lun_add_params, "LUN number"),
+	STO_OPS_PARAM_STR(driver, struct scst_lun_add_params, "SCST target driver name"),
+	STO_OPS_PARAM_STR(target, struct scst_lun_add_params, "SCST target name"),
+	STO_OPS_PARAM_STR(device, struct scst_lun_add_params, "SCST device name"),
+	STO_OPS_PARAM_STR(group, struct scst_lun_add_params, "SCST group name"),
+	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_lun_add_params, "SCST device attributes <p=v,...>"),
 };
 
 static const struct sto_ops_params_properties scst_lun_add_params_properties =
@@ -984,10 +984,10 @@ struct scst_lun_del_params {
 };
 
 static const struct sto_ops_param_dsc scst_lun_del_params_descriptors[] = {
-	STO_OPS_PARAM_INT32(lun, struct scst_lun_del_params, "lun desc"),
-	STO_OPS_PARAM_STR(driver, struct scst_lun_del_params, "driver desc"),
-	STO_OPS_PARAM_STR(target, struct scst_lun_del_params, "target desc"),
-	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_del_params, "group desc"),
+	STO_OPS_PARAM_INT32(lun, struct scst_lun_del_params, "LUN number"),
+	STO_OPS_PARAM_STR(driver, struct scst_lun_del_params, "SCST target driver name"),
+	STO_OPS_PARAM_STR(target, struct scst_lun_del_params, "SCST target name"),
+	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_del_params, "SCST group name"),
 };
 
 static const struct sto_ops_params_properties scst_lun_del_params_properties =
@@ -1052,9 +1052,9 @@ struct scst_lun_clear_params {
 };
 
 static const struct sto_ops_param_dsc scst_lun_clear_params_descriptors[] = {
-	STO_OPS_PARAM_STR(driver, struct scst_lun_clear_params, "driver desc"),
-	STO_OPS_PARAM_STR(target, struct scst_lun_clear_params, "target desc"),
-	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_clear_params, "group desc"),
+	STO_OPS_PARAM_STR(driver, struct scst_lun_clear_params, "SCST target driver name"),
+	STO_OPS_PARAM_STR(target, struct scst_lun_clear_params, "SCST target name"),
+	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_clear_params, "SCST group name"),
 };
 
 static const struct sto_ops_params_properties scst_lun_clear_params_properties =
