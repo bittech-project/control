@@ -177,7 +177,7 @@ sto_ops_map_find(const struct sto_shash *ops_map, const char *op_name)
 			return NULL;
 		}
 
-		op = sto_shash_lookup(alias_ops_map, op->op_name, strlen(op->op_name));
+		op = sto_shash_lookup(alias_ops_map, op->name, strlen(op->name));
 	}
 
 	return op;

@@ -147,7 +147,7 @@ struct config_info_params {
 };
 
 static const struct sto_ops_param_dsc config_info_params_descriptors[] = {
-	STO_OPS_PARAM_STR_OPTIONAL(object, struct config_info_params, "object desc"),
+	STO_OPS_PARAM_STR_OPTIONAL(object, struct config_info_params, "'module name'/'ops name'"),
 };
 
 static const struct sto_ops_params_properties config_info_params_properties =

@@ -96,9 +96,7 @@ if __name__ == "__main__":
                    help="Set a number of key-value pairs "
                    "(do not put spaces before or after the = sign). "
                    "If a value contains spaces, you should define "
-                   "it with double quotes: "
-                   'foo="this is a sentence". Note that '
-                   "values are always treated as strings.",
+                   "it with double quotes: 'foo=\"this is a sentence\"'",
                    required=False)
     p.set_defaults(func=control_module)
 

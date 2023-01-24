@@ -115,6 +115,7 @@ struct sto_ops {
 
 	union {
 		struct {
+			const char *description;
 			const struct sto_ops_params_properties *params_properties;
 			const struct sto_req_properties *req_properties;
 			sto_ops_req_params_constructor_t req_params_constructor;
@@ -123,7 +124,6 @@ struct sto_ops {
 		struct {
 			const char *component_name;
 			const char *object_name;
-			const char *op_name;
 		};
 	};
 };
