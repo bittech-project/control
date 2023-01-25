@@ -3,7 +3,6 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include "sto_utils.h"
 #include "sto_version.h"
 #include "sto_module.h"
 #include "sto_req.h"
@@ -175,27 +174,22 @@ config_info_constructor(void *arg1, const void *arg2)
 {
 	struct config_info_req_params *req_params = arg1;
 	const struct config_info_params *ops_params = arg2;
-	char *tmp_buf;
-#define CONFIG_INFO_MAX_OBJECTS 2
-	char *objects[CONFIG_INFO_MAX_OBJECTS] = {};
+	char **objects;
 	const struct sto_module *module;
-	int ret, rc = 0;
+	int count, rc = 0;
 
 	if (!ops_params) {
 		req_params->type = CONFIG_INFO_TYPE_COMPONENT;
 		return 0;
 	}
 
-	tmp_buf = strdup(ops_params->object);
-	if (spdk_unlikely(!tmp_buf)) {
+	objects = spdk_strarray_from_string(ops_params->object, "/");
+	if (spdk_unlikely(!objects)) {
 		return -ENOMEM;
 	}
 
-	ret = sto_strsplit(tmp_buf, strlen(tmp_buf), objects, SPDK_COUNTOF(objects), '/');
-	if (spdk_unlikely(ret <= 0)) {
-		rc = -EINVAL;
-		goto out;
-	}
+	for (count = 0; objects[count] != NULL; count++)
+		;
 
 	module = sto_module_find(objects[0]);
 	if (spdk_unlikely(!module)) {
@@ -203,7 +197,7 @@ config_info_constructor(void *arg1, const void *arg2)
 		goto out;
 	}
 
-	switch (ret) {
+	switch (count) {
 	case 1:
 		req_params->type = CONFIG_INFO_TYPE_MODULE;
 		req_params->module = module;
@@ -223,10 +217,13 @@ config_info_constructor(void *arg1, const void *arg2)
 
 		break;
 	}
+	default:
+		SPDK_ERRLOG("Too many arguments!\n");
+		rc = -EINVAL;
 	}
 
 out:
-	free(tmp_buf);
+	spdk_strarray_free(objects);
 
 	return rc;
 }

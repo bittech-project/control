@@ -3,7 +3,6 @@
 #include <spdk/string.h>
 
 #include "sto_client.h"
-#include "sto_utils.h"
 #include "sto_rpc_subprocess.h"
 
 struct sto_rpc_subprocess_info {
@@ -25,7 +24,6 @@ static const struct spdk_json_object_decoder sto_rpc_subprocess_info_decoders[] 
 };
 
 struct sto_rpc_subprocess_params {
-	int numargs;
 	const char *const *argv;
 	bool capture_output;
 };
@@ -100,7 +98,7 @@ sto_rpc_subprocess_info_json(void *priv, struct spdk_json_write_ctx *w)
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_array_begin(w, "cmd");
-	for (i = 0; i < params->numargs; i++) {
+	for (i = 0; params->argv[i] != NULL; i++) {
 		spdk_json_write_string(w, params->argv[i]);
 	}
 	spdk_json_write_array_end(w);
@@ -122,18 +120,16 @@ sto_rpc_subprocess_cmd_run(struct sto_rpc_subprocess_cmd *cmd, struct sto_rpc_su
 }
 
 int
-sto_rpc_subprocess(const char *const *argv, int numargs,
-		   struct sto_rpc_subprocess_args *args)
+sto_rpc_subprocess(const char *const *argv, struct sto_rpc_subprocess_args *args)
 {
 	struct sto_rpc_subprocess_cmd *cmd;
 	struct sto_rpc_subprocess_params params = {
-		.numargs = numargs,
 		.argv = argv,
 		.capture_output = args->output != NULL,
 	};
 	int rc = 0;
 
-	assert(numargs);
+	assert(argv[0] != NULL);
 
 	cmd = sto_rpc_subprocess_cmd_alloc();
 	if (spdk_unlikely(!cmd)) {
@@ -163,9 +159,9 @@ int
 sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ...)
 {
 	va_list fmt_args;
-#define STO_SUBPROCESS_MAX_ARGS 128
-	char *argv_s, *argv[STO_SUBPROCESS_MAX_ARGS] = {};
-	int ret, rc = 0;
+	char *argv_s;
+	const char * const *argv;
+	int rc = 0;
 
 	assert(fmt && fmt[0] != '\0');
 
@@ -178,17 +174,18 @@ sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ..
 		return -ENOMEM;
 	}
 
-	ret = sto_strsplit(argv_s, strlen(argv_s), argv, SPDK_COUNTOF(argv), ' ');
-	if (spdk_unlikely(ret <= 0)) {
-		SPDK_ERRLOG("Failed to split subprocess arguments string, ret=%d\n", ret);
-		rc = -EINVAL;
-		goto out;
+	argv = (const char * const *) spdk_strarray_from_string(argv_s, " ");
+
+	free(argv_s);
+
+	if (spdk_unlikely(!argv)) {
+		SPDK_ERRLOG("Failed to split subprocess arguments string\n");
+		return -EINVAL;
 	}
 
-	rc = sto_rpc_subprocess((const char * const *) argv, ret, args);
+	rc = sto_rpc_subprocess((const char * const *) argv, args);
 
-out:
-	free(argv_s);
+	spdk_strarray_free((char **) argv);
 
 	return rc;
 }

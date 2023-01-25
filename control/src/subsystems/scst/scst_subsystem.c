@@ -131,29 +131,17 @@ out:
 static char *
 scst_attr(const char *buf, bool nonkey)
 {
-	char *tmp_buf, *attr = NULL;
-#define SCST_ATTR_MAX_LINES 3
-	char *lines[SCST_ATTR_MAX_LINES] = {};
-	int ret;
+	char *attr = NULL;
+	char **lines;
 
 	if (spdk_unlikely(!buf)) {
 		return NULL;
 	}
 
-	tmp_buf = strdup(buf);
-	if (spdk_unlikely(!tmp_buf)) {
-		SPDK_ERRLOG("Failed to alloc buf for SCST attr\n");
-		return NULL;
-	}
-
-	ret = sto_strsplit(tmp_buf, strlen(tmp_buf), lines, SPDK_COUNTOF(lines), '\n');
-	if (spdk_unlikely(ret == -1)) {
+	lines = spdk_strarray_from_string(buf, "\n");
+	if (spdk_unlikely(!lines)) {
 		SPDK_ERRLOG("Failed to split scst attr\n");
-		goto out;
-	}
-
-	if (!ret) {
-		goto out;
+		return NULL;
 	}
 
 	if (!nonkey && (!lines[1] || strcmp(lines[1], "[key]"))) {
@@ -163,7 +151,7 @@ scst_attr(const char *buf, bool nonkey)
 	attr = strdup(lines[0]);
 
 out:
-	free(tmp_buf);
+	spdk_strarray_free(lines);
 
 	return attr;
 }
@@ -179,12 +167,11 @@ scst_serialize_attr(struct sto_inode *attr_inode, struct spdk_json_write_ctx *w)
 
 	attr = scst_attr(sto_file_inode_buf(attr_inode), false);
 	if (!attr) {
-		goto out;
+		return;
 	}
 
 	spdk_json_write_named_string(w, attr_inode->name, attr);
 
-out:
 	free(attr);
 }
 

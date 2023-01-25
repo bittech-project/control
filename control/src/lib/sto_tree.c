@@ -5,7 +5,6 @@
 #include <spdk/string.h>
 
 #include "sto_tree.h"
-#include "sto_utils.h"
 #include "sto_inode.h"
 
 struct sto_tree_cmd {
@@ -189,26 +188,18 @@ struct sto_tree_node *
 sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
 {
 	struct sto_tree_node *node = NULL;
-#define STO_LNK_MAX_TOKENS 16
-	char *buf, *tokens[STO_LNK_MAX_TOKENS] = {};
-	int ret, i;
+	char **tokens;
+	int i;
 
-	buf = strdup(sto_file_inode_buf(lnk_node->inode));
-	if (spdk_unlikely(!buf)) {
-		SPDK_ERRLOG("Failed to alloc buf for link %s\n",
-			    lnk_node->inode->name);
-		return NULL;
-	}
-
-	ret = sto_strsplit(buf, strlen(buf), tokens, SPDK_COUNTOF(tokens), '/');
-	if (spdk_unlikely(ret <= 0)) {
+	tokens = spdk_strarray_from_string(sto_file_inode_buf(lnk_node->inode), "/");
+	if (spdk_unlikely(!tokens)) {
 		SPDK_ERRLOG("Failed to split link\n");
-		goto out;
+		return NULL;
 	}
 
 	node = lnk_node->parent;
 
-	for (i = 0; i < STO_LNK_MAX_TOKENS && tokens[i] && node; i++) {
+	for (i = 0; tokens[i] != NULL && node; i++) {
 		SPDK_ERRLOG("GLEB: node[%s], token[%s]\n", node->inode->name, tokens[i]);
 
 		if (!strcmp(tokens[i], "..")) {
@@ -219,8 +210,7 @@ sto_tree_node_resolv_lnk(struct sto_tree_node *lnk_node)
 		node = sto_tree_node_find(node, tokens[i]);
 	}
 
-out:
-	free(buf);
+	spdk_strarray_free(tokens);
 
 	return node;
 }
