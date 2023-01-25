@@ -88,7 +88,7 @@ sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_params
 	}
 
 	if (properties) {
-		ops_params = sto_ops_params_parse(properties, iter);
+		ops_params = sto_ops_params_decode(properties, iter);
 		if (IS_ERR(ops_params)) {
 			SPDK_ERRLOG("Failed to parse ops params\n");
 			return PTR_ERR(ops_params);

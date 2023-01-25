@@ -2,6 +2,7 @@
 #define _STO_LIB_H_
 
 #include <spdk/util.h>
+#include <spdk/string.h>
 
 struct spdk_json_write_ctx;
 struct sto_json_iter;
@@ -15,6 +16,10 @@ void sto_err(struct sto_err_context *err, int rc);
 
 void sto_status_ok(struct spdk_json_write_ctx *w);
 void sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err);
+
+int sto_decode_strtoint32(const struct spdk_json_val *val, void *out);
+int sto_decode_strtouint32(const struct spdk_json_val *val, void *out);
+int sto_decode_strtobool(const struct spdk_json_val *val, void *out);
 
 enum sto_ops_param_type {
 	STO_OPS_PARAM_TYPE_STR,
@@ -66,7 +71,7 @@ sto_ops_param_str_deinit(void *p)
 
 #define __STO_OPS_PARAM_INT32(MEMBER, STRUCT, DESCRIPTION, OPTIONAL)	\
 	STO_OPS_PARAM(MEMBER, STRUCT, DESCRIPTION, OPTIONAL,		\
-		      STO_OPS_PARAM_TYPE_INT32, spdk_json_decode_int32, NULL)
+		      STO_OPS_PARAM_TYPE_INT32, sto_decode_strtoint32, NULL)
 
 #define STO_OPS_PARAM_INT32(MEMBER, STRUCT, DESCRIPTION)		\
 	__STO_OPS_PARAM_INT32(MEMBER, STRUCT, DESCRIPTION, false)
@@ -75,7 +80,7 @@ sto_ops_param_str_deinit(void *p)
 
 #define __STO_OPS_PARAM_UINT32(MEMBER, STRUCT, DESCRIPTION, OPTIONAL)	\
 	STO_OPS_PARAM(MEMBER, STRUCT, DESCRIPTION, OPTIONAL,		\
-		      STO_OPS_PARAM_TYPE_UINT32, spdk_json_decode_uint32, NULL)
+		      STO_OPS_PARAM_TYPE_UINT32, sto_decode_strtouint32, NULL)
 
 #define STO_OPS_PARAM_UINT32(MEMBER, STRUCT, DESCRIPTION)		\
 	__STO_OPS_PARAM_UINT32(MEMBER, STRUCT, DESCRIPTION, false)
@@ -84,7 +89,7 @@ sto_ops_param_str_deinit(void *p)
 
 #define __STO_OPS_PARAM_BOOL(MEMBER, STRUCT, DESCRIPTION, OPTIONAL)	\
 	STO_OPS_PARAM(MEMBER, STRUCT, DESCRIPTION, OPTIONAL,		\
-		      STO_OPS_PARAM_TYPE_BOOL, spdk_json_decode_bool, NULL)
+		      STO_OPS_PARAM_TYPE_BOOL, sto_decode_strtobool, NULL)
 
 #define STO_OPS_PARAM_BOOL(MEMBER, STRUCT, DESCRIPTION)			\
 	__STO_OPS_PARAM_BOOL(MEMBER, STRUCT, DESCRIPTION, false)
@@ -113,8 +118,8 @@ struct sto_ops_params_properties {
 #define STO_OPS_PARAMS_INITIALIZER_EMPTY(DESCRIPTORS, STRUCT)	\
 	__STO_OPS_PARAMS_INITIALIZER(DESCRIPTORS, STRUCT, true)
 
-void *sto_ops_params_parse(const struct sto_ops_params_properties *properties,
-			   const struct sto_json_iter *iter);
+void *sto_ops_params_decode(const struct sto_ops_params_properties *properties,
+			    const struct sto_json_iter *iter);
 void sto_ops_params_free(const struct sto_ops_params_properties *properties, void *ops_params);
 
 typedef int (*sto_ops_req_params_constructor_t)(void *arg1, const void *arg2);

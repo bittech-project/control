@@ -38,6 +38,135 @@ sto_status_failed(struct spdk_json_write_ctx *w, struct sto_err_context *err)
 	spdk_json_write_object_end(w);
 }
 
+int
+sto_decode_strtoint32(const struct spdk_json_val *val, void *out)
+{
+	int32_t *i = out;
+	char *s = NULL;
+	long long int res;
+	int rc = 0;
+
+	if (spdk_json_decode_string(val, &s)) {
+		return -ENOMEM;
+	}
+
+	if (s[0] == '-') {
+		res = spdk_strtoll(s + 1, 10);
+		if (res < 0) {
+			rc = res;
+			goto out;
+		}
+
+		if ((int32_t) -res > 0) {
+			rc = -ERANGE;
+			goto out;
+		}
+
+		*i = (int32_t) -res;
+	} else {
+		res = spdk_strtoll(s, 10);
+		if (res < 0) {
+			rc = res;
+			goto out;
+		}
+
+		if ((int32_t) res < 0) {
+			rc = -ERANGE;
+			goto out;
+		}
+
+		*i = (int32_t) res;
+	}
+
+out:
+	free(s);
+
+	return rc;
+}
+
+int
+sto_decode_strtouint32(const struct spdk_json_val *val, void *out)
+{
+	uint32_t *i = out;
+	char *s = NULL;
+	long long int res;
+	int rc = 0;
+
+	if (spdk_json_decode_string(val, &s)) {
+		return -ENOMEM;
+	}
+
+	res = spdk_strtoll(s, 10);
+	if (res < 0) {
+		rc = res;
+		goto out;
+	}
+
+	if (res != (uint32_t) res) {
+		rc = -ERANGE;
+		goto out;
+	}
+
+	*i = (uint32_t) res;
+
+out:
+	free(s);
+
+	return rc;
+}
+
+int
+sto_decode_strtobool(const struct spdk_json_val *val, void *out)
+{
+	bool *i = out;
+	char *s = NULL;
+	int rc = 0;
+
+	if (spdk_json_decode_string(val, &s)) {
+		return -ENOMEM;
+	}
+
+	switch (s[0]) {
+	case 'y':
+	case 'Y':
+	case 't':
+	case 'T':
+	case '1':
+		*i = true;
+		break;
+	case 'n':
+	case 'N':
+	case 'f':
+	case 'F':
+	case '0':
+		*i = false;
+		break;
+	case 'o':
+	case 'O':
+		switch (s[1]) {
+		case 'n':
+		case 'N':
+			*i = true;
+			break;
+		case 'f':
+		case 'F':
+			*i = false;
+			break;
+		default:
+			rc = -EINVAL;
+			break;
+		}
+		break;
+	default:
+		rc = -EINVAL;
+		break;
+	}
+
+	free(s);
+
+	return rc;
+}
+
 static const char *const ops_param_type_name[] = {
 	[STO_OPS_PARAM_TYPE_STR]	= "string",
 	[STO_OPS_PARAM_TYPE_BOOL]	= "bool",
@@ -52,8 +181,8 @@ sto_ops_param_type_name(enum sto_ops_param_type type)
 }
 
 static void *
-ops_params_parse(const struct sto_ops_params_properties *properties,
-		 const struct spdk_json_val *values)
+ops_params_decode(const struct sto_ops_params_properties *properties,
+		  const struct spdk_json_val *values)
 {
 	const size_t num_decoders = properties->num_descriptors;
 	struct spdk_json_object_decoder decoders[num_decoders];
@@ -89,7 +218,7 @@ free_params:
 }
 
 void *
-sto_ops_params_parse(const struct sto_ops_params_properties *properties,
+sto_ops_params_decode(const struct sto_ops_params_properties *properties,
 		     const struct sto_json_iter *iter)
 {
 	const struct spdk_json_val *values;
@@ -105,7 +234,7 @@ sto_ops_params_parse(const struct sto_ops_params_properties *properties,
 		return properties->allow_empty ? NULL : ERR_PTR(-EINVAL);
 	}
 
-	params = ops_params_parse(properties, values);
+	params = ops_params_decode(properties, values);
 
 	free((struct spdk_json_val *) values);
 
