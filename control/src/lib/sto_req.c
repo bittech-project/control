@@ -412,15 +412,15 @@ sto_req_core_done(struct sto_core_req *core_req)
 
 int
 sto_req_core_submit(struct sto_req *req, sto_core_req_done_t done,
-		    const char *component, const char *object, const char *op_name,
-		    void *params, sto_core_dump_params_t dump_params)
+		    const struct sto_json_head_raw *head,
+		    const struct sto_json_param_raw params[])
 {
 	struct sto_core_args args = {
 		.priv = req,
 		.done = done ?: sto_req_core_done,
 	};
 
-	return sto_core_process_raw(component, object, op_name, params, dump_params, &args);
+	return sto_core_process_raw(head, params, &args);
 }
 
 int

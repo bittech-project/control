@@ -185,9 +185,9 @@ sto_core_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 static void sto_core_ctx_free(struct sto_core_ctx *ctx);
 
 static struct sto_core_ctx *
-sto_core_ctx_alloc(const char *component, const char *object, const char *op_name,
-			     void *params, sto_core_dump_params_t dump_params,
-			     struct sto_core_args *args)
+sto_core_ctx_alloc(const struct sto_json_head_raw *head,
+		   const struct sto_json_param_raw params[],
+		   struct sto_core_args *args)
 {
 	struct sto_core_ctx *ctx;
 	struct spdk_json_write_ctx *w;
@@ -206,11 +206,11 @@ sto_core_ctx_alloc(const char *component, const char *object, const char *op_nam
 	}
 
 	spdk_json_write_object_begin(w);
-	spdk_json_write_named_string(w, component, object);
-	spdk_json_write_named_string(w, "op", op_name);
 
-	if (dump_params) {
-		dump_params(params, w);
+	sto_json_head_raw_dump(head, w);
+
+	if (params) {
+		sto_json_param_raw_dump(params, w);
 	}
 
 	spdk_json_write_object_end(w);
@@ -253,15 +253,15 @@ sto_core_process_raw_done(struct sto_core_req *core_req)
 }
 
 int
-sto_core_process_raw(const char *component, const char *object, const char *op_name,
-		     void *params, sto_core_dump_params_t dump_params,
+sto_core_process_raw(const struct sto_json_head_raw *head,
+		     const struct sto_json_param_raw params[],
 		     struct sto_core_args *args)
 {
 	struct sto_core_ctx *ctx;
 	struct sto_core_args __args = {};
 	int rc = 0;
 
-	ctx = sto_core_ctx_alloc(component, object, op_name, params, dump_params, args);
+	ctx = sto_core_ctx_alloc(head, params, args);
 	if (spdk_unlikely(!ctx)) {
 		SPDK_ERRLOG("Failed to alloc component context\n");
 		return -ENOMEM;

@@ -78,6 +78,33 @@ const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 	}
 };
 
+static int
+scst_dev_open(struct sto_req *req)
+{
+	const struct sto_json_head_raw head = {
+		.component_name = "subsystem",
+		.object_name = "scst",
+		.op_name = "dev_open",
+	};
+
+	const struct sto_json_param_raw params[] = {
+		STO_JSON_PARAM_RAW_STR("device", &(char *) {"gleb"}),
+		STO_JSON_PARAM_RAW_STR("handler", &(char *) {"vdisk_blockio"}),
+		STO_JSON_PARAM_RAW_STR("attributes", &(char *) {"filename=/dev/ram0"}),
+		STO_JSON_PARAM_RAW_TERMINATOR(),
+	};
+
+	return sto_req_core_submit(req, NULL, &head, params);
+}
+
+const struct sto_req_properties scst_dev_over_iscsi_req_properties = {
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_REQ_STEP(scst_dev_open, NULL),
+		STO_REQ_STEP_TERMINATOR(),
+	}
+};
+
 static const struct sto_ops scst_ops[] = {
 	{
 		.name = "snapshot",
@@ -254,6 +281,10 @@ static const struct sto_ops scst_ops[] = {
 	{
 		.name = "iscsi_deinit",
 		.req_properties = &sto_iscsi_deinit_req_properties,
+	},
+	{
+		.name = "dev_over_iscsi",
+		.req_properties = &scst_dev_over_iscsi_req_properties,
 	},
 };
 

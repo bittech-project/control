@@ -23,33 +23,82 @@ int sto_decode_strtobool(const struct spdk_json_val *val, void *out);
 
 enum sto_ops_param_type {
 	STO_OPS_PARAM_TYPE_STR,
-	STO_OPS_PARAM_TYPE_BOOL,
 	STO_OPS_PARAM_TYPE_INT32,
 	STO_OPS_PARAM_TYPE_UINT32,
+	STO_OPS_PARAM_TYPE_BOOL,
 	STO_OPS_PARAM_TYPE_CNT,
 };
 
 const char *sto_ops_param_type_name(enum sto_ops_param_type type);
 
+struct sto_json_head_raw {
+	const char *component_name;
+	const char *object_name;
+	const char *op_name;
+};
+
+struct sto_json_param_raw {
+	const char *name;
+	enum sto_ops_param_type type;
+	void *value;
+};
+
+#define STO_JSON_PARAM_RAW_STR(NAME, VALUE)		\
+	{						\
+		.name = (NAME),				\
+		.type = STO_OPS_PARAM_TYPE_STR,		\
+		.value = (VALUE),			\
+	}
+
+#define STO_JSON_PARAM_RAW_INT32(NAME, VALUE)		\
+	{						\
+		.name = (NAME),				\
+		.type = STO_OPS_PARAM_TYPE_INT32,	\
+		.value = (VALUE),			\
+	}
+
+#define STO_JSON_PARAM_RAW_UINT32(NAME, VALUE)		\
+	{						\
+		.name = (NAME),				\
+		.type = STO_OPS_PARAM_TYPE_UINT32,	\
+		.value = (VALUE),			\
+	}
+
+#define STO_JSON_PARAM_RAW_BOOL(NAME, VALUE)		\
+	{						\
+		.name = (NAME),				\
+		.type = STO_OPS_PARAM_TYPE_BOOL,	\
+		.value = (VALUE),			\
+	}
+
+#define STO_JSON_PARAM_RAW_TERMINATOR()			\
+	{						\
+		.type = STO_OPS_PARAM_TYPE_CNT,		\
+	}
+
+int sto_json_head_raw_dump(const struct sto_json_head_raw *head, struct spdk_json_write_ctx *w);
+int sto_json_param_raw_dump(const struct sto_json_param_raw params[], struct spdk_json_write_ctx *w);
+
 struct sto_ops_param_dsc {
 	const char *name;
-	size_t offset;
-	spdk_json_decode_fn decode_func;
+	const char *description;
+	enum sto_ops_param_type type;
 	bool optional;
 
-	enum sto_ops_param_type type;
-	const char *description;
+	size_t offset;
+
+	spdk_json_decode_fn decode;
 	void (*deinit)(void *p);
 };
 
 #define STO_OPS_PARAM(MEMBER, STRUCT, DESCRIPTION, OPTIONAL, TYPE, DECODE_FUNC, DEINIT_FUNC)	\
 	{											\
 		.name = # MEMBER,								\
-		.offset = offsetof(STRUCT, MEMBER),						\
-		.decode_func = (DECODE_FUNC),							\
-		.optional = (OPTIONAL),								\
-		.type = (TYPE),									\
 		.description = (DESCRIPTION),							\
+		.type = (TYPE),									\
+		.optional = (OPTIONAL),								\
+		.offset = offsetof(STRUCT, MEMBER),						\
+		.decode = (DECODE_FUNC),							\
 		.deinit = (DEINIT_FUNC),							\
 	}
 

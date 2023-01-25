@@ -169,15 +169,57 @@ sto_decode_strtobool(const struct spdk_json_val *val, void *out)
 
 static const char *const ops_param_type_name[] = {
 	[STO_OPS_PARAM_TYPE_STR]	= "string",
-	[STO_OPS_PARAM_TYPE_BOOL]	= "bool",
 	[STO_OPS_PARAM_TYPE_INT32]	= "int32",
 	[STO_OPS_PARAM_TYPE_UINT32]	= "uint32",
+	[STO_OPS_PARAM_TYPE_BOOL]	= "bool",
 };
 
 const char *
 sto_ops_param_type_name(enum sto_ops_param_type type)
 {
 	return (type < STO_OPS_PARAM_TYPE_CNT) ? ops_param_type_name[type] : "Unknown";
+}
+
+int
+sto_json_head_raw_dump(const struct sto_json_head_raw *head,
+		       struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_named_string(w, head->component_name, head->object_name);
+	spdk_json_write_named_string(w, "op", head->op_name);
+
+	return 0;
+}
+
+int
+sto_json_param_raw_dump(const struct sto_json_param_raw params[],
+		        struct spdk_json_write_ctx *w)
+{
+	int i;
+
+	for (i = 0; params[i].type != STO_OPS_PARAM_TYPE_CNT; i++) {
+		const struct sto_json_param_raw *param = &params[i];
+
+		spdk_json_write_name(w, param->name);
+
+		switch (param->type) {
+		case STO_OPS_PARAM_TYPE_STR:
+			spdk_json_write_string_fmt(w, "%s", *(char **) param->value);
+			break;
+		case STO_OPS_PARAM_TYPE_BOOL:
+		case STO_OPS_PARAM_TYPE_INT32:
+			spdk_json_write_string_fmt(w, "%d", *(int32_t *) param->value);
+			break;
+		case STO_OPS_PARAM_TYPE_UINT32:
+			spdk_json_write_string_fmt(w, "%u", *(uint32_t *) param->value);
+			break;
+		default:
+			SPDK_ERRLOG("Unkown ops param type %d\n", param->type);
+			assert(0);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
 }
 
 static void *
@@ -193,7 +235,7 @@ ops_params_decode(const struct sto_ops_params_properties *properties,
 	for (i = 0; i < num_decoders; i++) {
 		decoders[i].name = properties->descriptors[i].name;
 		decoders[i].offset = properties->descriptors[i].offset;
-		decoders[i].decode_func = properties->descriptors[i].decode_func;
+		decoders[i].decode_func = properties->descriptors[i].decode;
 		decoders[i].optional = properties->descriptors[i].optional;
 	}
 

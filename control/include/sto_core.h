@@ -48,11 +48,8 @@ struct sto_core_args {
 };
 
 int sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args);
-
-typedef void (*sto_core_dump_params_t)(void *priv, struct spdk_json_write_ctx *w);
-
-int sto_core_process_raw(const char *component, const char *object, const char *op_name,
-			 void *params, sto_core_dump_params_t dump_params,
+int sto_core_process_raw(const struct sto_json_head_raw *head,
+			 const struct sto_json_param_raw params[],
 			 struct sto_core_args *args);
 
 static inline void
