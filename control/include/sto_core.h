@@ -49,7 +49,6 @@ struct sto_core_args {
 
 int sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args);
 int sto_core_process_raw(const struct sto_json_head_raw *head,
-			 const struct sto_json_param_raw params[],
 			 struct sto_core_args *args);
 
 static inline void

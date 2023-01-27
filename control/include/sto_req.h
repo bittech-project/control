@@ -149,6 +149,5 @@ int sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_pa
 void sto_req_free(struct sto_req *req);
 
 int sto_req_core_submit(struct sto_req *req, sto_core_req_done_t done,
-			const struct sto_json_head_raw *head,
-			const struct sto_json_param_raw params[]);
+			const struct sto_json_head_raw *head);
 #endif /* _STO_REQ_H_ */

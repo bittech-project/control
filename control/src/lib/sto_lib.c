@@ -180,25 +180,66 @@ sto_ops_param_type_name(enum sto_ops_param_type type)
 	return (type < STO_OPS_PARAM_TYPE_CNT) ? ops_param_type_name[type] : "Unknown";
 }
 
+static struct sto_json_head_raw g_json_head_raw;
+static struct sto_json_head_raw g_json_module_head_raw;
+static struct sto_json_head_raw g_json_subsystem_head_raw;
+
+static void
+json_head_raw_init(struct sto_json_head_raw *head,
+		   const char *component_name, const char *object_name, const char *op_name)
+{
+	memset(head, 0, sizeof(struct sto_json_head_raw));
+
+	head->component_name = component_name;
+	head->object_name = object_name;
+	head->op_name = op_name;
+}
+
+struct sto_json_head_raw *
+sto_json_head_raw(const char *component_name, const char *object_name, const char *op_name)
+{
+	json_head_raw_init(&g_json_head_raw, component_name, object_name, op_name);
+
+	return &g_json_head_raw;
+}
+
+struct sto_json_head_raw *
+sto_json_module_head_raw(const char *object_name, const char *op_name)
+{
+	json_head_raw_init(&g_json_module_head_raw, "module", object_name, op_name);
+
+	return &g_json_module_head_raw;
+}
+
+struct sto_json_head_raw *
+sto_json_subsystem_head_raw(const char *object_name, const char *op_name)
+{
+	json_head_raw_init(&g_json_subsystem_head_raw, "subsystem", object_name, op_name);
+
+	return &g_json_subsystem_head_raw;
+}
+
+void
+sto_json_head_raw_add(struct sto_json_head_raw *head,
+		      struct sto_json_param_raw params[], int params_num)
+{
+	int i;
+
+	for (i = 0; i < params_num; i++) {
+		LIST_INSERT_HEAD(&head->params, &params[i], list);
+	}
+}
+
 int
 sto_json_head_raw_dump(const struct sto_json_head_raw *head,
 		       struct spdk_json_write_ctx *w)
 {
+	const struct sto_json_param_raw *param;
+
 	spdk_json_write_named_string(w, head->component_name, head->object_name);
 	spdk_json_write_named_string(w, "op", head->op_name);
 
-	return 0;
-}
-
-int
-sto_json_param_raw_dump(const struct sto_json_param_raw params[],
-		        struct spdk_json_write_ctx *w)
-{
-	int i;
-
-	for (i = 0; params[i].type != STO_OPS_PARAM_TYPE_CNT; i++) {
-		const struct sto_json_param_raw *param = &params[i];
-
+	LIST_FOREACH(param, &head->params, list) {
 		spdk_json_write_name(w, param->name);
 
 		switch (param->type) {

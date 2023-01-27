@@ -81,20 +81,13 @@ const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 static int
 scst_dev_open(struct sto_req *req)
 {
-	const struct sto_json_head_raw head = {
-		.component_name = "subsystem",
-		.object_name = "scst",
-		.op_name = "dev_open",
-	};
+	struct sto_json_head_raw *head = sto_json_subsystem_head_raw("scst", "dev_open");
 
-	const struct sto_json_param_raw params[] = {
-		STO_JSON_PARAM_RAW_STR("device", &(char *) {"gleb"}),
-		STO_JSON_PARAM_RAW_STR("handler", &(char *) {"vdisk_blockio"}),
-		STO_JSON_PARAM_RAW_STR("attributes", &(char *) {"filename=/dev/ram0"}),
-		STO_JSON_PARAM_RAW_TERMINATOR(),
-	};
+	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("device", &(char *) {"gleb"}));
+	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("handler", &(char *) {"vdisk_blockio"}));
+	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("attributes", &(char *) {"filename=/dev/ram0"}));
 
-	return sto_req_core_submit(req, NULL, &head, params);
+	return sto_req_core_submit(req, NULL, head);
 }
 
 const struct sto_req_properties scst_dev_over_iscsi_req_properties = {

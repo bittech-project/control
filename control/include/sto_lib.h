@@ -1,6 +1,7 @@
 #ifndef _STO_LIB_H_
 #define _STO_LIB_H_
 
+#include <spdk/queue.h>
 #include <spdk/util.h>
 #include <spdk/string.h>
 
@@ -31,16 +32,20 @@ enum sto_ops_param_type {
 
 const char *sto_ops_param_type_name(enum sto_ops_param_type type);
 
-struct sto_json_head_raw {
-	const char *component_name;
-	const char *object_name;
-	const char *op_name;
-};
-
 struct sto_json_param_raw {
 	const char *name;
 	enum sto_ops_param_type type;
 	void *value;
+
+	LIST_ENTRY(sto_json_param_raw) list;
+};
+
+struct sto_json_head_raw {
+	const char *component_name;
+	const char *object_name;
+	const char *op_name;
+
+	LIST_HEAD(, sto_json_param_raw) params;
 };
 
 #define STO_JSON_PARAM_RAW_STR(NAME, VALUE)		\
@@ -76,8 +81,19 @@ struct sto_json_param_raw {
 		.type = STO_OPS_PARAM_TYPE_CNT,		\
 	}
 
+struct sto_json_head_raw *sto_json_head_raw(const char *component_name, const char *object_name, const char *op_name);
+struct sto_json_head_raw *sto_json_module_head_raw(const char *object_name, const char *op_name);
+struct sto_json_head_raw *sto_json_subsystem_head_raw(const char *object_name, const char *op_name);
+
+void sto_json_head_raw_add(struct sto_json_head_raw *head,
+			   struct sto_json_param_raw params[], int params_num);
+#define STO_JSON_HEAD_RAW_ADD(HEAD, PARAMS) \
+	sto_json_head_raw_add((HEAD), (PARAMS), SPDK_COUNTOF(PARAMS))
+
+#define STO_JSON_HEAD_RAW_ADD_SINGLE(HEAD, PARAM) \
+	sto_json_head_raw_add((HEAD), &(struct sto_json_param_raw) PARAM, 1)
+
 int sto_json_head_raw_dump(const struct sto_json_head_raw *head, struct spdk_json_write_ctx *w);
-int sto_json_param_raw_dump(const struct sto_json_param_raw params[], struct spdk_json_write_ctx *w);
 
 struct sto_ops_param_dsc {
 	const char *name;
