@@ -35,7 +35,11 @@ const char *sto_ops_param_type_name(enum sto_ops_param_type type);
 struct sto_json_param_raw {
 	const char *name;
 	enum sto_ops_param_type type;
-	void *value;
+	union {
+		char *str;
+		int32_t i32;
+		uint32_t u32;
+	} val;
 
 	LIST_ENTRY(sto_json_param_raw) list;
 };
@@ -48,37 +52,37 @@ struct sto_json_head_raw {
 	LIST_HEAD(, sto_json_param_raw) params;
 };
 
-#define STO_JSON_PARAM_RAW_STR(NAME, VALUE)		\
-	{						\
-		.name = (NAME),				\
-		.type = STO_OPS_PARAM_TYPE_STR,		\
-		.value = (VALUE),			\
+#define STO_JSON_PARAM_RAW_STR(_name, _str) 		\
+	{ 						\
+		.name = _name, 				\
+		.type = STO_OPS_PARAM_TYPE_STR, 	\
+		.val.str = _str, 			\
 	}
 
-#define STO_JSON_PARAM_RAW_INT32(NAME, VALUE)		\
-	{						\
-		.name = (NAME),				\
-		.type = STO_OPS_PARAM_TYPE_INT32,	\
-		.value = (VALUE),			\
+#define STO_JSON_PARAM_RAW_INT32(_name, _i32) 		\
+	{ 						\
+		.name = _name, 				\
+		.type = STO_OPS_PARAM_TYPE_INT32, 	\
+		.val.i32 = _i32, 			\
 	}
 
-#define STO_JSON_PARAM_RAW_UINT32(NAME, VALUE)		\
-	{						\
-		.name = (NAME),				\
-		.type = STO_OPS_PARAM_TYPE_UINT32,	\
-		.value = (VALUE),			\
+#define STO_JSON_PARAM_RAW_UINT32(_name, _u32) 		\
+	{ 						\
+		.name = _name, 				\
+		.type = STO_OPS_PARAM_TYPE_UINT32, 	\
+		.val.u32 = _u32, 			\
 	}
 
-#define STO_JSON_PARAM_RAW_BOOL(NAME, VALUE)		\
-	{						\
-		.name = (NAME),				\
-		.type = STO_OPS_PARAM_TYPE_BOOL,	\
-		.value = (VALUE),			\
+#define STO_JSON_PARAM_RAW_BOOL(_name, _bool) 		\
+	{ 						\
+		.name = _name, 				\
+		.type = STO_OPS_PARAM_TYPE_BOOL, 	\
+		.val.i32 = _bool, 			\
 	}
 
-#define STO_JSON_PARAM_RAW_TERMINATOR()			\
-	{						\
-		.type = STO_OPS_PARAM_TYPE_CNT,		\
+#define STO_JSON_PARAM_RAW_TERMINATOR() 		\
+	{ 						\
+		.type = STO_OPS_PARAM_TYPE_CNT, 	\
 	}
 
 struct sto_json_head_raw *sto_json_head_raw(const char *component_name, const char *object_name, const char *op_name);

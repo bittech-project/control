@@ -83,9 +83,9 @@ scst_dev_open(struct sto_req *req)
 {
 	struct sto_json_head_raw *head = sto_json_subsystem_head_raw("scst", "dev_open");
 
-	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("device", &(char *) {"gleb"}));
-	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("handler", &(char *) {"vdisk_blockio"}));
-	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("attributes", &(char *) {"filename=/dev/ram0"}));
+	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("device", "gleb"));
+	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("handler", "vdisk_blockio"));
+	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("attributes", "filename=/dev/ram0"));
 
 	return sto_req_core_submit(req, NULL, head);
 }

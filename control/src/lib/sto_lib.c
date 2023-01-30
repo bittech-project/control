@@ -244,14 +244,14 @@ sto_json_head_raw_dump(const struct sto_json_head_raw *head,
 
 		switch (param->type) {
 		case STO_OPS_PARAM_TYPE_STR:
-			spdk_json_write_string_fmt(w, "%s", *(char **) param->value);
+			spdk_json_write_string_fmt(w, "%s", param->val.str);
 			break;
 		case STO_OPS_PARAM_TYPE_BOOL:
 		case STO_OPS_PARAM_TYPE_INT32:
-			spdk_json_write_string_fmt(w, "%d", *(int32_t *) param->value);
+			spdk_json_write_string_fmt(w, "%d", param->val.i32);
 			break;
 		case STO_OPS_PARAM_TYPE_UINT32:
-			spdk_json_write_string_fmt(w, "%u", *(uint32_t *) param->value);
+			spdk_json_write_string_fmt(w, "%u", param->val.u32);
 			break;
 		default:
 			SPDK_ERRLOG("Unkown ops param type %d\n", param->type);
