@@ -6,11 +6,23 @@
 
 struct spdk_json_val;
 
+typedef int (*sto_json_ctx_dump_t)(void *priv, struct spdk_json_write_ctx *w);
+
+struct sto_json_ctx {
+	void *buf;
+	size_t size;
+
+	const struct spdk_json_val *values;
+};
+
 struct sto_json_iter {
 	const struct spdk_json_val *values;
 	int offset;
 	int len;
 };
+
+int sto_json_ctx_dump(struct sto_json_ctx *ctx, void *priv, sto_json_ctx_dump_t dump);
+void sto_json_ctx_destroy(struct sto_json_ctx *ctx);
 
 static inline void
 sto_json_iter_init(struct sto_json_iter *iter, const struct spdk_json_val *values)

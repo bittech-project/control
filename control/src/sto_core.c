@@ -123,73 +123,34 @@ sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args)
 }
 
 struct sto_core_ctx {
-	void *buf;
-	size_t size;
-
-	const struct spdk_json_val *values;
+	struct sto_json_ctx json_ctx;
 
 	void *user_priv;
 	sto_core_req_done_t user_done;
 };
 
-static int
-sto_core_ctx_parse_buf(struct sto_core_ctx *ctx)
-{
-	void *end;
-	size_t values_cnt;
-	ssize_t rc;
-
-	rc = spdk_json_parse(ctx->buf, ctx->size, NULL, 0, &end, 0);
-	if (spdk_unlikely(rc < 0)) {
-		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
-		return rc;
-	}
-
-	values_cnt = rc;
-
-	ctx->values = calloc(values_cnt, sizeof(struct spdk_json_val));
-	if (spdk_unlikely(!ctx->values)) {
-		SPDK_ERRLOG("Failed to alloc json values: cnt=%zu\n",
-			    values_cnt);
-		return -ENOMEM;
-	}
-
-	rc = spdk_json_parse(ctx->buf, ctx->size, (struct spdk_json_val *) ctx->values,
-			     values_cnt, &end, 0);
-	if (rc != (ssize_t) values_cnt) {
-		SPDK_ERRLOG("Parsing JSON failed (%zd)\n", rc);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int
-sto_core_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
-{
-	struct sto_core_ctx *ctx = cb_ctx;
-
-	ctx->buf = calloc(1, size);
-	if (spdk_unlikely(!ctx->buf)) {
-		SPDK_ERRLOG("Failed to alloc buf: size=%zu\n", size);
-		return -ENOMEM;
-	}
-
-	ctx->size = size;
-
-	memcpy(ctx->buf, data, size);
-
-	return sto_core_ctx_parse_buf(ctx);
-}
-
 static void sto_core_ctx_free(struct sto_core_ctx *ctx);
+
+static int
+core_ctx_dump_head(void *priv, struct spdk_json_write_ctx *w)
+{
+	const struct sto_json_head_raw *head = priv;
+	int rc = 0;
+
+	spdk_json_write_object_begin(w);
+
+	rc = sto_json_head_raw_dump(head, w);
+
+	spdk_json_write_object_end(w);
+
+	return rc;
+}
 
 static struct sto_core_ctx *
 sto_core_ctx_alloc(const struct sto_json_head_raw *head,
 		   struct sto_core_args *args)
 {
 	struct sto_core_ctx *ctx;
-	struct spdk_json_write_ctx *w;
 	int rc;
 
 	ctx = calloc(1, sizeof(*ctx));
@@ -198,21 +159,9 @@ sto_core_ctx_alloc(const struct sto_json_head_raw *head,
 		return NULL;
 	}
 
-	w = spdk_json_write_begin(sto_core_ctx_write_cb, ctx, 0);
-	if (spdk_unlikely(!w)) {
-		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
-		goto free_ctx;
-	}
-
-	spdk_json_write_object_begin(w);
-
-	sto_json_head_raw_dump(head, w);
-
-	spdk_json_write_object_end(w);
-
-	rc = spdk_json_write_end(w);
+	rc = sto_json_ctx_dump(&ctx->json_ctx, (void *) head, core_ctx_dump_head);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to write json context\n");
+		SPDK_ERRLOG("Failed to dump STO JSON head\n");
 		goto free_ctx;
 	}
 
@@ -222,7 +171,7 @@ sto_core_ctx_alloc(const struct sto_json_head_raw *head,
 	return ctx;
 
 free_ctx:
-	sto_core_ctx_free(ctx);
+	free(ctx);
 
 	return NULL;
 }
@@ -230,9 +179,7 @@ free_ctx:
 static void
 sto_core_ctx_free(struct sto_core_ctx *ctx)
 {
-	free((struct spdk_json_val *) ctx->values);
-	free(ctx->buf);
-
+	sto_json_ctx_destroy(&ctx->json_ctx);
 	free(ctx);
 }
 
@@ -264,7 +211,7 @@ sto_core_process_raw(const struct sto_json_head_raw *head,
 	__args.priv = ctx;
 	__args.done = sto_core_process_raw_done;
 
-	rc = __sto_core_process(ctx->values, &__args, true);
+	rc = __sto_core_process(ctx->json_ctx.values, &__args, true);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to core process json\n");
 		goto free_ctx;

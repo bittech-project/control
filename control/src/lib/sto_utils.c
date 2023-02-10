@@ -169,3 +169,92 @@ sto_find_match_str(const char *key, const char *strings[])
 
 	return false;
 }
+
+static int
+json_ctx_parse_buf(struct sto_json_ctx *ctx)
+{
+	void *end;
+	size_t values_cnt;
+	ssize_t rc;
+
+	rc = spdk_json_parse(ctx->buf, ctx->size, NULL, 0, &end, 0);
+	if (spdk_unlikely(rc < 0)) {
+		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
+		return rc;
+	}
+
+	values_cnt = rc;
+
+	ctx->values = calloc(values_cnt, sizeof(struct spdk_json_val));
+	if (spdk_unlikely(!ctx->values)) {
+		SPDK_ERRLOG("Failed to alloc json values: cnt=%zu\n",
+			    values_cnt);
+		return -ENOMEM;
+	}
+
+	rc = spdk_json_parse(ctx->buf, ctx->size, (struct spdk_json_val *) ctx->values,
+			     values_cnt, &end, 0);
+	if (rc != (ssize_t) values_cnt) {
+		SPDK_ERRLOG("Parsing JSON failed (%zd)\n", rc);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int
+json_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
+{
+	struct sto_json_ctx *ctx = cb_ctx;
+
+	ctx->buf = calloc(1, size);
+	if (spdk_unlikely(!ctx->buf)) {
+		SPDK_ERRLOG("Failed to alloc buf: size=%zu\n", size);
+		return -ENOMEM;
+	}
+
+	ctx->size = size;
+
+	memcpy(ctx->buf, data, size);
+
+	return json_ctx_parse_buf(ctx);
+}
+
+int
+sto_json_ctx_dump(struct sto_json_ctx *ctx, void *priv, sto_json_ctx_dump_t dump)
+{
+	struct spdk_json_write_ctx *w;
+	int rc = 0;
+
+	w = spdk_json_write_begin(json_ctx_write_cb, ctx, 0);
+	if (spdk_unlikely(!w)) {
+		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
+		return -ENOMEM;
+	}
+
+	rc = dump(priv, w);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to dump user info to JSON ctx\n");
+		goto free_ctx;
+	}
+
+	rc = spdk_json_write_end(w);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to write json context\n");
+		goto free_ctx;
+	}
+
+	return 0;
+
+free_ctx:
+	sto_json_ctx_destroy(ctx);
+
+	return rc;
+}
+
+void
+sto_json_ctx_destroy(struct sto_json_ctx *ctx)
+{
+	free((struct spdk_json_val *) ctx->values);
+	free(ctx->buf);
+}
