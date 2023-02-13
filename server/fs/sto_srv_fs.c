@@ -262,11 +262,11 @@ sto_read_file(const char *filepath, void *data, size_t size)
 }
 
 int
-sto_write_file(const char *filepath, void *data, size_t size)
+sto_write_file(const char *filepath, int oflag, void *data, size_t size)
 {
 	int fd, rc;
 
-	fd = open(filepath, O_WRONLY);
+	fd = open(filepath, O_WRONLY | oflag);
 	if (spdk_unlikely(fd == -1)) {
 		printf("Failed to open %s file\n", filepath);
 		return -errno;

@@ -15,6 +15,7 @@ static const struct spdk_json_object_decoder sto_rpc_writefile_info_decoders[] =
 
 struct sto_rpc_writefile_params {
 	const char *filepath;
+	int oflag;
 	char *buf;
 };
 
@@ -83,6 +84,7 @@ sto_rpc_writefile_info_json(void *priv, struct spdk_json_write_ctx *w)
 	spdk_json_write_object_begin(w);
 
 	spdk_json_write_named_string(w, "filepath", params->filepath);
+	spdk_json_write_named_int32(w, "oflag", params->oflag);
 	spdk_json_write_named_string(w, "buf", params->buf);
 
 	spdk_json_write_object_end(w);
@@ -100,11 +102,12 @@ sto_rpc_writefile_cmd_run(struct sto_rpc_writefile_cmd *cmd, struct sto_rpc_writ
 }
 
 int
-sto_rpc_writefile(const char *filepath, char *buf, struct sto_rpc_writefile_args *args)
+sto_rpc_writefile(const char *filepath, int oflag, char *buf, struct sto_rpc_writefile_args *args)
 {
 	struct sto_rpc_writefile_cmd *cmd;
 	struct sto_rpc_writefile_params params = {
 		.filepath = filepath,
+		.oflag = oflag,
 		.buf = buf,
 	};
 	int rc;

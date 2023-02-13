@@ -12,7 +12,7 @@ struct sto_rpc_writefile_args {
 	sto_rpc_writefile_done_t done;
 };
 
-int sto_rpc_writefile(const char *filepath, char *buf,
+int sto_rpc_writefile(const char *filepath, int oflag, char *buf,
 		      struct sto_rpc_writefile_args *args);
 
 typedef void (*sto_rpc_readfile_done_t)(void *priv, int rc);

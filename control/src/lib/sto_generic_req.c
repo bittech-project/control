@@ -25,7 +25,7 @@ sto_write_req_exec(struct sto_req *req)
 		.done = sto_req_step_done,
 	};
 
-	return sto_rpc_writefile(params->file, params->data, &args);
+	return sto_rpc_writefile(params->file, 0, params->data, &args);
 }
 
 const struct sto_req_properties sto_write_req_properties = {

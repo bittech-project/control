@@ -26,7 +26,7 @@ void sto_choker_off(void);
 int sto_write(int fd, void *data, size_t size);
 int sto_read(int fd, void *data, size_t size);
 
-int sto_write_file(const char *filepath, void *data, size_t size);
+int sto_write_file(const char *filepath, int oflag, void *data, size_t size);
 int sto_read_file(const char *filepath, void *data, size_t size);
 
 struct sto_srv_dirent *sto_srv_dirent_alloc(const char *name);

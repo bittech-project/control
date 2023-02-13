@@ -8,6 +8,7 @@
 
 struct sto_srv_writefile_params {
 	char *filepath;
+	int oflag;
 	char *buf;
 };
 
@@ -20,6 +21,7 @@ sto_srv_writefile_params_free(struct sto_srv_writefile_params *params)
 
 static const struct spdk_json_object_decoder sto_srv_writefile_decoders[] = {
 	{"filepath", offsetof(struct sto_srv_writefile_params, filepath), spdk_json_decode_string},
+	{"oflag", offsetof(struct sto_srv_writefile_params, oflag), spdk_json_decode_int32},
 	{"buf", offsetof(struct sto_srv_writefile_params, buf), spdk_json_decode_string},
 };
 
@@ -95,7 +97,7 @@ sto_srv_writefile_exec(void *arg)
 	struct sto_srv_writefile_req *req = arg;
 	struct sto_srv_writefile_params *params = &req->params;
 
-	return sto_write_file(params->filepath, params->buf, strlen(params->buf));
+	return sto_write_file(params->filepath, params->oflag, params->buf, strlen(params->buf));
 }
 
 static void
