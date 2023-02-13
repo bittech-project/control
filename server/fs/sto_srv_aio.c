@@ -12,13 +12,6 @@ struct sto_srv_writefile_params {
 	char *buf;
 };
 
-static void
-sto_srv_writefile_params_free(struct sto_srv_writefile_params *params)
-{
-	free(params->filepath);
-	free(params->buf);
-}
-
 static const struct spdk_json_object_decoder sto_srv_writefile_decoders[] = {
 	{"filepath", offsetof(struct sto_srv_writefile_params, filepath), spdk_json_decode_string},
 	{"oflag", offsetof(struct sto_srv_writefile_params, oflag), spdk_json_decode_int32},
@@ -81,7 +74,8 @@ sto_srv_writefile_req_init_cb(struct sto_srv_writefile_req *req,
 static void
 sto_srv_writefile_req_free(struct sto_srv_writefile_req *req)
 {
-	sto_srv_writefile_params_free(&req->params);
+	spdk_json_free_object(sto_srv_writefile_decoders,
+			      SPDK_COUNTOF(sto_srv_writefile_decoders), &req->params);
 	free(req);
 }
 
@@ -142,12 +136,6 @@ struct sto_srv_readfile_params {
 	char *filepath;
 	uint32_t size;
 };
-
-static void
-sto_srv_readfile_params_free(struct sto_srv_readfile_params *params)
-{
-	free(params->filepath);
-}
 
 static const struct spdk_json_object_decoder sto_srv_readfile_decoders[] = {
 	{"filepath", offsetof(struct sto_srv_readfile_params, filepath), spdk_json_decode_string},
@@ -211,7 +199,8 @@ sto_srv_readfile_req_init_cb(struct sto_srv_readfile_req *req,
 static void
 sto_srv_readfile_req_free(struct sto_srv_readfile_req *req)
 {
-	sto_srv_readfile_params_free(&req->params);
+	spdk_json_free_object(sto_srv_readfile_decoders,
+			      SPDK_COUNTOF(sto_srv_readfile_decoders), &req->params);
 	free(req->buf);
 	free(req);
 }
@@ -292,12 +281,6 @@ struct sto_srv_readlink_params {
 	char *filepath;
 };
 
-static void
-sto_srv_readlink_params_free(struct sto_srv_readlink_params *params)
-{
-	free(params->filepath);
-}
-
 static const struct spdk_json_object_decoder sto_srv_readlink_decoders[] = {
 	{"filepath", offsetof(struct sto_srv_readlink_params, filepath), spdk_json_decode_string},
 };
@@ -359,7 +342,8 @@ sto_srv_readlink_req_init_cb(struct sto_srv_readlink_req *req,
 static void
 sto_srv_readlink_req_free(struct sto_srv_readlink_req *req)
 {
-	sto_srv_readlink_params_free(&req->params);
+	spdk_json_free_object(sto_srv_readlink_decoders,
+			      SPDK_COUNTOF(sto_srv_readlink_decoders), &req->params);
 	free(req->buf);
 	free(req);
 }

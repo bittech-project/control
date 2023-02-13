@@ -21,12 +21,6 @@ struct sto_srv_readdir_params {
 	bool skip_hidden;
 };
 
-static void
-sto_srv_readdir_params_free(struct sto_srv_readdir_params *params)
-{
-	free(params->dirpath);
-}
-
 static const struct spdk_json_object_decoder sto_srv_readdir_decoders[] = {
 	{"dirpath", offsetof(struct sto_srv_readdir_params, dirpath), spdk_json_decode_string},
 	{"skip_hidden", offsetof(struct sto_srv_readdir_params, skip_hidden), spdk_json_decode_bool},
@@ -145,8 +139,9 @@ sto_srv_readdir_req_init_cb(struct sto_srv_readdir_req *req,
 static void
 sto_srv_readdir_req_free(struct sto_srv_readdir_req *req)
 {
+	spdk_json_free_object(sto_srv_readdir_decoders,
+			      SPDK_COUNTOF(sto_srv_readdir_decoders), &req->params);
 	sto_srv_dirents_free(&req->dirents);
-	sto_srv_readdir_params_free(&req->params);
 	free(req);
 }
 
