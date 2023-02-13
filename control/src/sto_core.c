@@ -159,7 +159,7 @@ sto_core_ctx_alloc(const struct sto_json_head_raw *head,
 		return NULL;
 	}
 
-	rc = sto_json_ctx_dump(&ctx->json_ctx, (void *) head, core_ctx_dump_head);
+	rc = sto_json_ctx_dump(&ctx->json_ctx, false, (void *) head, core_ctx_dump_head);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to dump STO JSON head\n");
 		goto free_ctx;

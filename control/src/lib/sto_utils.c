@@ -221,12 +221,13 @@ json_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 }
 
 int
-sto_json_ctx_dump(struct sto_json_ctx *ctx, void *priv, sto_json_ctx_dump_t dump)
+sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted, void *priv, sto_json_ctx_dump_t dump)
 {
 	struct spdk_json_write_ctx *w;
+	uint32_t flags = formatted ? SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE : 0;
 	int rc = 0;
 
-	w = spdk_json_write_begin(json_ctx_write_cb, ctx, 0);
+	w = spdk_json_write_begin(json_ctx_write_cb, ctx, flags);
 	if (spdk_unlikely(!w)) {
 		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
 		return -ENOMEM;

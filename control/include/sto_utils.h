@@ -21,7 +21,7 @@ struct sto_json_iter {
 	int len;
 };
 
-int sto_json_ctx_dump(struct sto_json_ctx *ctx, void *priv, sto_json_ctx_dump_t dump);
+int sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted, void *priv, sto_json_ctx_dump_t dump);
 void sto_json_ctx_destroy(struct sto_json_ctx *ctx);
 
 static inline void
