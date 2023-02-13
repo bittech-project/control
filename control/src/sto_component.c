@@ -2,7 +2,7 @@
 #include <spdk/likely.h>
 
 #include "sto_component.h"
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_err.h"
 
 static TAILQ_HEAD(sto_component_list, sto_core_component) g_sto_components =

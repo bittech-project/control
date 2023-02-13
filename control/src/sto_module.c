@@ -3,7 +3,7 @@
 #include <spdk/log.h>
 
 #include "sto_module.h"
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_component.h"
 #include "sto_err.h"
 

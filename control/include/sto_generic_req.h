@@ -4,7 +4,7 @@
 #include <spdk/likely.h>
 
 #include "sto_req.h"
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_tree.h"
 #include "sto_err.h"
 

@@ -6,7 +6,7 @@
 #include <spdk/string.h>
 
 #include "sto_core.h"
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_component.h"
 #include "sto_req.h"
 #include "sto_hash.h"

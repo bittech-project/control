@@ -3,7 +3,7 @@
 #include <spdk/json.h>
 #include <spdk/string.h>
 
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_err.h"
 
 int

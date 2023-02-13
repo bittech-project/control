@@ -2,7 +2,7 @@
 #include <spdk/likely.h>
 #include <spdk/util.h>
 
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_lib.h"
 #include "sto_client.h"
 #include "sto_rpc_readdir.h"

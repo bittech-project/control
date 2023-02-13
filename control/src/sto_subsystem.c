@@ -3,7 +3,7 @@
 
 #include "sto_subsystem.h"
 #include "sto_component.h"
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_err.h"
 
 static TAILQ_HEAD(sto_subsystem_list, sto_subsystem) g_sto_subsystems =

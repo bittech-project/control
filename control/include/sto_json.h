@@ -1,10 +1,8 @@
-#ifndef _STO_UTILS_H_
-#define _STO_UTILS_H_
+#ifndef _STO_JSON_H_
+#define _STO_JSON_H_
 
 #include <spdk/stdinc.h>
 #include <spdk/json.h>
-
-struct spdk_json_val;
 
 typedef int (*sto_json_ctx_dump_t)(void *priv, struct spdk_json_write_ctx *w);
 
@@ -48,4 +46,4 @@ void sto_json_print(const struct spdk_json_val *values);
 
 bool sto_find_match_str(const char *key, const char *strings[]);
 
-#endif /* _STO_UTILS_H_ */
+#endif /* _STO_JSON_H_ */
