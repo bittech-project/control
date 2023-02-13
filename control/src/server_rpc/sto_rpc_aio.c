@@ -21,7 +21,7 @@ struct sto_rpc_writefile_params {
 
 struct sto_rpc_writefile_cmd {
 	void *priv;
-	sto_rpc_writefile_done_t done;
+	sto_async_done_t done;
 };
 
 static struct sto_rpc_writefile_cmd *
@@ -40,7 +40,7 @@ sto_rpc_writefile_cmd_alloc(void)
 
 static void
 sto_rpc_writefile_cmd_init_cb(struct sto_rpc_writefile_cmd *cmd,
-			      sto_rpc_writefile_done_t done, void *priv)
+			      sto_async_done_t done, void *priv)
 {
 	cmd->done = done;
 	cmd->priv = priv;
@@ -159,7 +159,7 @@ struct sto_rpc_readfile_params {
 
 struct sto_rpc_readfile_cmd {
 	void *priv;
-	sto_rpc_readfile_done_t done;
+	sto_async_done_t done;
 
 	char **buf;
 };
@@ -180,7 +180,7 @@ sto_rpc_readfile_cmd_alloc(void)
 
 static void
 sto_rpc_readfile_cmd_init_cb(struct sto_rpc_readfile_cmd *cmd,
-			     sto_rpc_readfile_done_t done, void *priv)
+			     sto_async_done_t done, void *priv)
 {
 	cmd->done = done;
 	cmd->priv = priv;
@@ -300,7 +300,7 @@ struct sto_rpc_readlink_params {
 
 struct sto_rpc_readlink_cmd {
 	void *priv;
-	sto_rpc_readlink_done_t done;
+	sto_async_done_t done;
 
 	char **buf;
 };
@@ -321,7 +321,7 @@ sto_rpc_readlink_cmd_alloc(void)
 
 static void
 sto_rpc_readlink_cmd_init_cb(struct sto_rpc_readlink_cmd *cmd,
-			     sto_rpc_readlink_done_t done, void *priv)
+			     sto_async_done_t done, void *priv)
 {
 	cmd->done = done;
 	cmd->priv = priv;

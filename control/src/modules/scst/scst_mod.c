@@ -4,7 +4,7 @@
 #include <spdk/string.h>
 
 #include "sto_module.h"
-#include "sto_utils.h"
+#include "sto_json.h"
 #include "sto_generic_req.h"
 #include "sto_rpc_subprocess.h"
 #include "sto_err.h"

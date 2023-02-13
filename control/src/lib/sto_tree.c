@@ -16,7 +16,7 @@ struct sto_tree_cmd {
 	uint32_t refcnt;
 
 	void *priv;
-	sto_tree_done_t done;
+	sto_async_done_t done;
 };
 
 static struct sto_tree_cmd *
@@ -37,7 +37,7 @@ sto_tree_cmd_alloc(struct sto_tree_node *tree_root)
 }
 
 static void
-sto_tree_cmd_init_cb(struct sto_tree_cmd *cmd, sto_tree_done_t done, void *priv)
+sto_tree_cmd_init_cb(struct sto_tree_cmd *cmd, sto_async_done_t done, void *priv)
 {
 	cmd->done = done;
 	cmd->priv = priv;

@@ -1,6 +1,8 @@
 #ifndef _STO_RPC_READDIR_H_
 #define _STO_RPC_READDIR_H_
 
+#include "sto_async.h"
+
 struct spdk_json_write_ctx;
 
 struct sto_dirent {
@@ -21,11 +23,9 @@ struct sto_dirents_json_cfg {
 	uint32_t type;
 };
 
-typedef void (*sto_rpc_readdir_done_t)(void *priv, int rc);
-
 struct sto_rpc_readdir_args {
 	void *priv;
-	sto_rpc_readdir_done_t done;
+	sto_async_done_t done;
 
 	struct sto_dirents *dirents;
 };

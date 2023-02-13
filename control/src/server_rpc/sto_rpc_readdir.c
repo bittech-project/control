@@ -71,7 +71,7 @@ struct sto_rpc_readdir_cmd {
 	struct sto_dirents *dirents;
 
 	void *priv;
-	sto_rpc_readdir_done_t done;
+	sto_async_done_t done;
 };
 
 static struct sto_rpc_readdir_cmd *
@@ -89,7 +89,7 @@ sto_rpc_readdir_cmd_alloc(void)
 }
 
 static void
-sto_rpc_readdir_cmd_init_cb(struct sto_rpc_readdir_cmd *cmd, sto_rpc_readdir_done_t done, void *priv)
+sto_rpc_readdir_cmd_init_cb(struct sto_rpc_readdir_cmd *cmd, sto_async_done_t done, void *priv)
 {
 	cmd->done = done;
 	cmd->priv = priv;

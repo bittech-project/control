@@ -137,9 +137,9 @@ sto_req_step_done(void *priv, int rc)
 static inline void
 sto_req_done(struct sto_req *req)
 {
-	struct sto_req_context *ctx = &req->ctx;
+	struct sto_req_context *req_ctx = &req->ctx;
 
-	ctx->done(ctx->priv);
+	req_ctx->done(req_ctx->priv);
 }
 
 struct sto_req *sto_req_alloc(const struct sto_req_properties *properties);

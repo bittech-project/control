@@ -3,6 +3,7 @@
 
 #include <spdk/queue.h>
 
+#include "sto_async.h"
 #include "sto_inode.h"
 
 struct sto_tree_node;
@@ -23,8 +24,6 @@ struct sto_tree_node {
 	TAILQ_HEAD(, sto_tree_node) childs;
 };
 
-typedef void (*sto_tree_done_t)(void *priv, int rc);
-
 struct sto_tree_params {
 	uint32_t depth;
 	bool only_dirs;
@@ -32,7 +31,7 @@ struct sto_tree_params {
 
 struct sto_tree_args {
 	void *priv;
-	sto_tree_done_t done;
+	sto_async_done_t done;
 
 	struct sto_tree_node *tree_root;
 };

@@ -3,11 +3,11 @@
 
 #include <spdk/util.h>
 
-typedef void (*sto_rpc_subprocess_done_t)(void *priv, int rc);
+#include "sto_async.h"
 
 struct sto_rpc_subprocess_args {
 	void *priv;
-	sto_rpc_subprocess_done_t done;
+	sto_async_done_t done;
 
 	char **output;
 };

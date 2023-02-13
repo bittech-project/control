@@ -30,7 +30,7 @@ struct sto_rpc_subprocess_params {
 
 struct sto_rpc_subprocess_cmd {
 	void *priv;
-	sto_rpc_subprocess_done_t done;
+	sto_async_done_t done;
 
 	char **output;
 };
@@ -50,8 +50,7 @@ sto_rpc_subprocess_cmd_alloc(void)
 }
 
 static void
-sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd,
-			       sto_rpc_subprocess_done_t done, void *priv)
+sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd, sto_async_done_t done, void *priv)
 {
 	cmd->done = done;
 	cmd->priv = priv;
