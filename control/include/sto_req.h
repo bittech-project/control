@@ -19,9 +19,14 @@ struct sto_req;
 
 typedef int (*sto_req_action_t)(struct sto_req *req);
 
+#define STO_REQ_CONSTRUCTOR_FINISHED INT_MAX
+
 enum sto_req_action_type {
 	STO_REQ_ACTION_NORMAL,
 	STO_REQ_ACTION_ROLLBACK,
+	STO_REQ_ACTION_CONSTRUCTOR,
+	STO_REQ_ACTION_DESTRUCTOR,
+	STO_REQ_ACTION_CNT,
 };
 
 struct sto_req_action {
@@ -71,7 +76,9 @@ struct sto_req {
 
 enum sto_req_step_type {
 	STO_REQ_STEP_SINGLE,
+	STO_REQ_STEP_CONSTRUCTOR,
 	STO_REQ_STEP_TERMINATOR,
+	STO_REQ_STEP_CNT,
 };
 
 struct sto_req_step {
@@ -81,16 +88,23 @@ struct sto_req_step {
 	sto_req_action_t rollback_fn;
 };
 
-#define STO_REQ_STEP(_action_fn, _rollback_fn)	\
-	{						\
-		.type = STO_REQ_STEP_SINGLE,		\
-		.action_fn = _action_fn,		\
-		.rollback_fn = _rollback_fn,		\
+#define STO_REQ_STEP(_action_fn, _rollback_fn) 		\
+	{ 						\
+		.type = STO_REQ_STEP_SINGLE, 		\
+		.action_fn = _action_fn, 		\
+		.rollback_fn = _rollback_fn, 		\
 	}
 
-#define STO_REQ_STEP_TERMINATOR()			\
-	{						\
-		.type = STO_REQ_STEP_TERMINATOR,	\
+#define STO_REQ_STEP_CONSTRUCTOR(_constructor_fn, _destructor_fn) 	\
+	{ 								\
+		.type = STO_REQ_STEP_CONSTRUCTOR, 			\
+		.action_fn = _constructor_fn, 				\
+		.rollback_fn = _destructor_fn, 				\
+	}
+
+#define STO_REQ_STEP_TERMINATOR() 			\
+	{ 						\
+		.type = STO_REQ_STEP_TERMINATOR, 	\
 	}
 
 struct sto_req_properties {
@@ -121,7 +135,15 @@ int sto_req_add_action(struct sto_req *req, enum sto_req_action_type type,
 static inline int
 sto_req_add_step(struct sto_req *req, const struct sto_req_step *step)
 {
-	return sto_req_add_action(req, STO_REQ_ACTION_NORMAL, step->action_fn, step->rollback_fn);
+	enum sto_req_action_type action_map[STO_REQ_STEP_CNT] = {
+		[STO_REQ_STEP_SINGLE] = STO_REQ_ACTION_NORMAL,
+		[STO_REQ_STEP_CONSTRUCTOR] = STO_REQ_ACTION_CONSTRUCTOR,
+		[STO_REQ_STEP_TERMINATOR] = STO_REQ_ACTION_CNT,
+	};
+
+	assert(step->type <= SPDK_COUNTOF(action_map));
+
+	return sto_req_add_action(req, action_map[step->type], step->action_fn, step->rollback_fn);
 }
 
 int sto_req_add_steps(struct sto_req *req, const struct sto_req_step *steps);

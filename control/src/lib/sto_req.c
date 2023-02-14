@@ -196,6 +196,70 @@ sto_req_rollback_execute(struct sto_req_action *action, struct sto_req *req)
 	return rc;
 }
 
+static int
+req_constructor_execute(struct sto_req_action *constructor, struct sto_req *req)
+{
+	int rc = 0;
+
+	if (req->cur_rollback) {
+		TAILQ_INSERT_HEAD(&req->rollback_stack, req->cur_rollback, list);
+		req->cur_rollback = NULL;
+	}
+
+	if (constructor->priv) {
+		req->cur_rollback = constructor->priv;
+		constructor->priv = NULL;
+	}
+
+	rc = constructor->fn(req);
+
+	switch (rc) {
+	case 0:
+		TAILQ_INSERT_HEAD(&req->action_queue, constructor, list);
+		break;
+	case STO_REQ_CONSTRUCTOR_FINISHED:
+		sto_req_step_next(req, 0);
+		rc = 0;
+		/* fallthrough */
+	default:
+		sto_req_action_free(constructor);
+		break;
+	};
+
+	return rc;
+}
+
+static void
+req_constructor_priv_free(void *priv)
+{
+	struct sto_req_action *destructor = priv;
+
+	sto_req_action_free(destructor);
+}
+
+static int
+req_destructor_execute(struct sto_req_action *destructor, struct sto_req *req)
+{
+	int rc = 0;
+
+	rc = destructor->fn(req);
+
+	switch (rc) {
+	case 0:
+		TAILQ_INSERT_HEAD(&req->action_queue, destructor, list);
+		break;
+	case STO_REQ_CONSTRUCTOR_FINISHED:
+		sto_req_step_next(req, 0);
+		rc = 0;
+		/* fallthrough */
+	default:
+		sto_req_action_free(destructor);
+		break;
+	};
+
+	return rc;
+}
+
 static struct sto_req_action *
 sto_req_action_alloc(enum sto_req_action_type type,
 		     sto_req_action_t action_fn, sto_req_action_t rollback_fn)
@@ -231,6 +295,25 @@ sto_req_action_alloc(enum sto_req_action_type type,
 		break;
 	case STO_REQ_ACTION_ROLLBACK:
 		action->execute = sto_req_rollback_execute;
+		break;
+	case STO_REQ_ACTION_CONSTRUCTOR:
+		action->execute = req_constructor_execute;
+
+		if (!rollback_fn) {
+			break;
+		}
+
+		action->priv = sto_req_action_alloc(STO_REQ_ACTION_DESTRUCTOR, rollback_fn, NULL);
+		if (spdk_unlikely(!action->priv)) {
+			SPDK_ERRLOG("Failed to alloc priv for constructor\n");
+			goto free_action;
+		}
+
+		action->priv_free = req_constructor_priv_free;
+
+		break;
+	case STO_REQ_ACTION_DESTRUCTOR:
+		action->execute = req_destructor_execute;
 		break;
 	default:
 		SPDK_ERRLOG("Unknown action type %d\n", type);
