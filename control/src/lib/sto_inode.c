@@ -64,7 +64,7 @@ sto_inode_create(const char *name, const char *path, uint32_t mode, ...)
 	enum sto_inode_type type = sto_inode_type(mode);
 	va_list args;
 
-	switch(type) {
+	switch (type) {
 	case STO_INODE_TYPE_FILE:
 		inode = sto_file_inode_create();
 		break;

@@ -8,7 +8,8 @@
 
 struct sto_tree_node;
 
-typedef void (*sto_tree_info_json_t)(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w);
+typedef void (*sto_tree_info_json_t)(struct sto_tree_node *tree_root,
+				     struct spdk_json_write_ctx *w);
 
 struct sto_tree_node {
 	void *priv;
@@ -63,7 +64,8 @@ sto_tree_node_first_child(struct sto_tree_node *parent)
 }
 
 static inline struct sto_tree_node *
-sto_tree_node_next_child_type(struct sto_tree_node *child, struct sto_tree_node *parent, enum sto_inode_type type)
+sto_tree_node_next_child_type(struct sto_tree_node *child,
+			      struct sto_tree_node *parent, enum sto_inode_type type)
 {
 	struct sto_tree_node *node;
 

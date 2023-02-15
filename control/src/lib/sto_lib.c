@@ -302,7 +302,7 @@ free_params:
 
 void *
 sto_ops_params_decode(const struct sto_ops_params_properties *properties,
-		     const struct sto_json_iter *iter)
+		      const struct sto_json_iter *iter)
 {
 	const struct spdk_json_val *values;
 	void *params;

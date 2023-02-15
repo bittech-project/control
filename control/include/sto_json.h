@@ -24,7 +24,8 @@ struct sto_json_str_field {
 	char *value;
 };
 
-int sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted, void *priv, sto_json_ctx_dump_t dump);
+int sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted,
+		      void *priv, sto_json_ctx_dump_t dump);
 void sto_json_ctx_destroy(struct sto_json_ctx *ctx);
 
 static inline void
@@ -43,10 +44,10 @@ sto_json_iter_ptr(const struct sto_json_iter *iter)
 
 bool sto_json_iter_next(struct sto_json_iter *iter);
 
-#define STO_JSON_FOREACH(val, values, iter) 						\
-	for (sto_json_iter_init((iter), (values)), 					\
-	     (val) = sto_json_iter_ptr((iter)); 					\
-	     (val) != NULL; 								\
+#define STO_JSON_FOREACH(val, values, iter)						\
+	for (sto_json_iter_init((iter), (values)),					\
+	     (val) = sto_json_iter_ptr((iter));						\
+	     (val) != NULL;								\
 	     (val) = sto_json_iter_next((iter)) ? sto_json_iter_ptr((iter)) : NULL)
 
 const struct spdk_json_val *sto_json_iter_cut_tail(const struct sto_json_iter *iter);
@@ -54,7 +55,8 @@ const struct spdk_json_val *sto_json_iter_cut_tail(const struct sto_json_iter *i
 int sto_json_iter_decode_name(const struct sto_json_iter *iter, char **value);
 int sto_json_iter_decode_str(const struct sto_json_iter *iter, const char *name, char **value);
 
-int sto_json_iter_decode_str_field(const struct sto_json_iter *iter, struct sto_json_str_field *field);
+int sto_json_iter_decode_str_field(const struct sto_json_iter *iter,
+				   struct sto_json_str_field *field);
 
 static inline void
 sto_json_str_field_destroy(struct sto_json_str_field *field)

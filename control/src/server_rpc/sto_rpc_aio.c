@@ -91,7 +91,8 @@ sto_rpc_writefile_info_json(void *priv, struct spdk_json_write_ctx *w)
 }
 
 static int
-sto_rpc_writefile_cmd_run(struct sto_rpc_writefile_cmd *cmd, struct sto_rpc_writefile_params *params)
+sto_rpc_writefile_cmd_run(struct sto_rpc_writefile_cmd *cmd,
+			  struct sto_rpc_writefile_params *params)
 {
 	struct sto_client_args args = {
 		.priv = cmd,

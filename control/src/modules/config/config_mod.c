@@ -90,7 +90,8 @@ config_op_description_json_info(const struct sto_ops_param_dsc *dsc, struct spdk
 }
 
 static void
-config_op_params_json_info(const struct sto_ops_params_properties *properties, struct spdk_json_write_ctx *w)
+config_op_params_json_info(const struct sto_ops_params_properties *properties,
+			   struct spdk_json_write_ctx *w)
 {
 	size_t i;
 

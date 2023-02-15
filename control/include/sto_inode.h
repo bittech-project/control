@@ -78,7 +78,8 @@ sto_dir_inode(struct sto_inode *inode)
 	return SPDK_CONTAINEROF(inode, struct sto_dir_inode, inode);
 }
 
-struct sto_inode *sto_inode_create(const char *name, const char *path, enum sto_inode_type type, ...);
+struct sto_inode *sto_inode_create(const char *name, const char *path,
+				   enum sto_inode_type type, ...);
 void sto_inode_read(struct sto_inode *inode);
 
 #endif /* _STO_INODE_H_ */

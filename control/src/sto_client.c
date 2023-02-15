@@ -129,7 +129,8 @@ jsonrpc_client_response(struct sto_jsonrpc_client *client,
 }
 
 static void
-jsonrpc_client_check_response(struct sto_jsonrpc_client *client, struct sto_jsonrpc_client_entry *entry)
+jsonrpc_client_check_response(struct sto_jsonrpc_client *client,
+			      struct sto_jsonrpc_client_entry *entry)
 {
 	struct spdk_jsonrpc_client_response *response;
 	int rc = 0;

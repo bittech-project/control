@@ -50,7 +50,8 @@ sto_rpc_subprocess_cmd_alloc(void)
 }
 
 static void
-sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd, sto_async_done_t done, void *priv)
+sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd,
+			       sto_async_done_t done, void *priv)
 {
 	cmd->done = done;
 	cmd->priv = priv;
@@ -108,7 +109,8 @@ sto_rpc_subprocess_info_json(void *priv, struct spdk_json_write_ctx *w)
 }
 
 static int
-sto_rpc_subprocess_cmd_run(struct sto_rpc_subprocess_cmd *cmd, struct sto_rpc_subprocess_params *params)
+sto_rpc_subprocess_cmd_run(struct sto_rpc_subprocess_cmd *cmd,
+			   struct sto_rpc_subprocess_params *params)
 {
 	struct sto_client_args args = {
 		.priv = cmd,

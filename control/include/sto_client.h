@@ -7,7 +7,9 @@
 #define STO_LOCAL_SERVER_ADDR "/var/tmp/sto_server.sock"
 
 typedef void (*sto_client_dump_params_t)(void *priv, struct spdk_json_write_ctx *w);
-typedef void (*sto_client_response_handler_t)(void *priv, struct spdk_jsonrpc_client_response *resp, int rc);
+typedef void (*sto_client_response_handler_t)(void *priv,
+					      struct spdk_jsonrpc_client_response *resp,
+					      int rc);
 
 struct sto_client_args {
 	void *priv;

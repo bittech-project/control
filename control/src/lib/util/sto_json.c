@@ -57,7 +57,8 @@ sto_json_iter_decode_str(const struct sto_json_iter *iter, const char *name, cha
 }
 
 int
-sto_json_iter_decode_str_field(const struct sto_json_iter *iter, struct sto_json_str_field *field)
+sto_json_iter_decode_str_field(const struct sto_json_iter *iter,
+			       struct sto_json_str_field *field)
 {
 	char *name = NULL, *value = NULL;
 	int rc;
@@ -245,7 +246,8 @@ json_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 }
 
 int
-sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted, void *priv, sto_json_ctx_dump_t dump)
+sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted,
+		  void *priv, sto_json_ctx_dump_t dump)
 {
 	struct spdk_json_write_ctx *w;
 	uint32_t flags = formatted ? SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE : 0;

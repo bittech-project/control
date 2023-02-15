@@ -74,7 +74,8 @@ sto_req_type_deinit(struct sto_req_type *type)
 }
 
 int
-sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_params_properties *properties,
+sto_req_type_parse_params(struct sto_req_type *type,
+			  const struct sto_ops_params_properties *properties,
 			  const struct sto_json_iter *iter,
 			  sto_ops_req_params_constructor_t req_params_constructor)
 {
@@ -508,7 +509,8 @@ sto_req_core_submit(struct sto_req *req, sto_core_req_done_t done,
 int
 sto_req_lib_init(void)
 {
-	g_sto_req_action_poller = SPDK_POLLER_REGISTER(sto_req_action_poll, NULL, STO_REQ_ACTION_POLL_PERIOD);
+	g_sto_req_action_poller = SPDK_POLLER_REGISTER(sto_req_action_poll,
+						       NULL, STO_REQ_ACTION_POLL_PERIOD);
 	if (spdk_unlikely(!g_sto_req_action_poller)) {
 		SPDK_ERRLOG("Cann't register the STO req poller\n");
 		return -ENOMEM;

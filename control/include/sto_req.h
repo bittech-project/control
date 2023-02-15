@@ -88,23 +88,23 @@ struct sto_req_step {
 	sto_req_action_t rollback_fn;
 };
 
-#define STO_REQ_STEP(_action_fn, _rollback_fn) 		\
-	{ 						\
-		.type = STO_REQ_STEP_SINGLE, 		\
-		.action_fn = _action_fn, 		\
-		.rollback_fn = _rollback_fn, 		\
+#define STO_REQ_STEP(_action_fn, _rollback_fn)		\
+	{						\
+		.type = STO_REQ_STEP_SINGLE,		\
+		.action_fn = _action_fn,		\
+		.rollback_fn = _rollback_fn,		\
 	}
 
-#define STO_REQ_STEP_CONSTRUCTOR(_constructor_fn, _destructor_fn) 	\
-	{ 								\
-		.type = STO_REQ_STEP_CONSTRUCTOR, 			\
-		.action_fn = _constructor_fn, 				\
-		.rollback_fn = _destructor_fn, 				\
+#define STO_REQ_STEP_CONSTRUCTOR(_constructor_fn, _destructor_fn)	\
+	{								\
+		.type = STO_REQ_STEP_CONSTRUCTOR,			\
+		.action_fn = _constructor_fn,				\
+		.rollback_fn = _destructor_fn,				\
 	}
 
-#define STO_REQ_STEP_TERMINATOR() 			\
-	{ 						\
-		.type = STO_REQ_STEP_TERMINATOR, 	\
+#define STO_REQ_STEP_TERMINATOR()			\
+	{						\
+		.type = STO_REQ_STEP_TERMINATOR,	\
 	}
 
 struct sto_req_properties {
@@ -165,7 +165,8 @@ sto_req_done(struct sto_req *req)
 }
 
 struct sto_req *sto_req_alloc(const struct sto_req_properties *properties);
-int sto_req_type_parse_params(struct sto_req_type *type, const struct sto_ops_params_properties *properties,
+int sto_req_type_parse_params(struct sto_req_type *type,
+			      const struct sto_ops_params_properties *properties,
 			      const struct sto_json_iter *iter,
 			      sto_ops_req_params_constructor_t params_constructor);
 void sto_req_free(struct sto_req *req);
