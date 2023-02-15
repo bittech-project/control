@@ -306,10 +306,9 @@ sto_core_req_parse(struct sto_core_req *core_req)
 		return IS_ERR(op) ? (int) PTR_ERR(op) : -ENOENT;
 	}
 
-	rc = sto_json_iter_next(&iter);
-	if (spdk_unlikely(rc)) {
+	if (!sto_json_iter_next(&iter)) {
 		SPDK_ERRLOG("Failed to get next JSON object\n");
-		return rc;
+		return -EINVAL;
 	}
 
 	op = sto_core_decode_ops(ops_map, &iter);
@@ -318,10 +317,9 @@ sto_core_req_parse(struct sto_core_req *core_req)
 		return PTR_ERR(op);
 	}
 
-	rc = sto_json_iter_next(&iter);
-	if (spdk_unlikely(rc)) {
+	if (!sto_json_iter_next(&iter)) {
 		SPDK_ERRLOG("Failed to get next JSON object\n");
-		return rc;
+		return -EINVAL;
 	}
 
 	req_ctx = sto_core_parse_ops(op, &iter);

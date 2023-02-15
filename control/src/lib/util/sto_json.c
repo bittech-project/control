@@ -56,15 +56,14 @@ sto_json_iter_decode_str(const struct sto_json_iter *iter, const char *name, cha
 	return 0;
 }
 
-int
+bool
 sto_json_iter_next(struct sto_json_iter *iter)
 {
 	const struct spdk_json_val *values;
 	int val_len;
 
 	if (iter->len < 2) {
-		SPDK_ERRLOG("JSON iter length < 2: %d\n", iter->len);
-		return -EINVAL;
+		return false;
 	}
 
 	values = sto_json_iter_ptr(iter);
@@ -74,7 +73,7 @@ sto_json_iter_next(struct sto_json_iter *iter)
 	iter->offset += val_len;
 	iter->len -= val_len;
 
-	return 0;
+	return true;
 }
 
 const struct spdk_json_val *
