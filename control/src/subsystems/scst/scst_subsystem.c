@@ -123,8 +123,9 @@ scst_parse_attributes(char *attributes, char **data)
 
 	*data = tmp;
 
-	free(parsed_attributes);
 out:
+	free(parsed_attributes);
+
 	return rc;
 }
 

@@ -56,6 +56,31 @@ sto_json_iter_decode_str(const struct sto_json_iter *iter, const char *name, cha
 	return 0;
 }
 
+int
+sto_json_iter_decode_str_field(const struct sto_json_iter *iter, struct sto_json_str_field *field)
+{
+	char *name = NULL, *value = NULL;
+	int rc;
+
+	rc = sto_json_iter_decode_name(iter, &name);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode str field name\n");
+		return rc;
+	}
+
+	rc = sto_json_iter_decode_str(iter, name, &value);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode str field %s value\n", name);
+		free(name);
+		return rc;
+	}
+
+	field->name = name;
+	field->value = value;
+
+	return 0;
+}
+
 bool
 sto_json_iter_next(struct sto_json_iter *iter)
 {
