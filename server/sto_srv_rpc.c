@@ -30,8 +30,8 @@ sto_srv_writefile_rpc(struct spdk_jsonrpc_request *request,
 		      const struct spdk_json_val *params)
 {
 	struct sto_srv_writefile_args args = {
-		.priv = request,
-		.done = sto_srv_writefile_rpc_done,
+		.cb_arg = request,
+		.cb_fn = sto_srv_writefile_rpc_done,
 	};
 	int rc;
 
@@ -69,8 +69,8 @@ sto_srv_readfile_rpc(struct spdk_jsonrpc_request *request,
 		     const struct spdk_json_val *params)
 {
 	struct sto_srv_readfile_args args = {
-		.priv = request,
-		.done = sto_srv_readfile_rpc_done,
+		.cb_arg = request,
+		.cb_fn = sto_srv_readfile_rpc_done,
 	};
 	int rc;
 
@@ -108,8 +108,8 @@ sto_srv_readlink_rpc(struct spdk_jsonrpc_request *request,
 		     const struct spdk_json_val *params)
 {
 	struct sto_srv_readlink_args args = {
-		.priv = request,
-		.done = sto_srv_readlink_rpc_done,
+		.cb_arg = request,
+		.cb_fn = sto_srv_readlink_rpc_done,
 	};
 	int rc;
 
@@ -147,8 +147,8 @@ sto_srv_readdir_rpc(struct spdk_jsonrpc_request *request,
 		    const struct spdk_json_val *params)
 {
 	struct sto_srv_readdir_args args = {
-		.priv = request,
-		.done = sto_srv_readdir_rpc_done,
+		.cb_arg = request,
+		.cb_fn = sto_srv_readdir_rpc_done,
 	};
 	int rc;
 
@@ -189,8 +189,8 @@ sto_srv_subprocess_rpc(struct spdk_jsonrpc_request *request,
 		       const struct spdk_json_val *params)
 {
 	struct sto_srv_subprocess_args args = {
-		.priv = request,
-		.done = sto_srv_subprocess_rpc_done,
+		.cb_arg = request,
+		.cb_fn = sto_srv_subprocess_rpc_done,
 	};
 	int rc;
 

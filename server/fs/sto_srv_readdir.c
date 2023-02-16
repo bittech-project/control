@@ -33,8 +33,8 @@ struct sto_srv_readdir_req {
 
 	struct sto_srv_dirents dirents;
 
-	void *priv;
-	sto_srv_readdir_done_t done;
+	void *cb_arg;
+	sto_srv_readdir_done_t cb_fn;
 };
 
 static void sto_srv_readdir_req_free(struct sto_srv_readdir_req *req);
@@ -44,7 +44,7 @@ sto_srv_readdir_exec_done(void *arg, int rc)
 {
 	struct sto_srv_readdir_req *req = arg;
 
-	req->done(req->priv, &req->dirents, rc);
+	req->cb_fn(req->cb_arg, &req->dirents, rc);
 
 	sto_srv_readdir_req_free(req);
 }
@@ -130,10 +130,10 @@ free_req:
 
 static void
 sto_srv_readdir_req_init_cb(struct sto_srv_readdir_req *req,
-			    sto_srv_readdir_done_t done, void *priv)
+			    sto_srv_readdir_done_t cb_fn, void *cb_arg)
 {
-	req->done = done;
-	req->priv = priv;
+	req->cb_fn = cb_fn;
+	req->cb_arg = cb_arg;
 }
 
 static void
@@ -164,7 +164,7 @@ sto_srv_readdir(const struct spdk_json_val *params,
 		return -ENOMEM;
 	}
 
-	sto_srv_readdir_req_init_cb(req, args->done, args->priv);
+	sto_srv_readdir_req_init_cb(req, args->cb_fn, args->cb_arg);
 
 	rc = sto_srv_readdir_req_submit(req);
 	if (spdk_unlikely(rc)) {

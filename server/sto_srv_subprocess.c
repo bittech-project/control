@@ -68,8 +68,8 @@ struct sto_srv_subprocess_req {
 
 	struct sto_srv_subprocess_params params;
 
-	void *priv;
-	sto_srv_subprocess_done_t done;
+	void *cb_arg;
+	sto_srv_subprocess_done_t cb_fn;
 };
 
 static int
@@ -241,7 +241,7 @@ sto_srv_subprocess_exec_done(void *arg, int rc)
 		output = req->output;
 	}
 
-	req->done(req->priv, output, rc);
+	req->cb_fn(req->cb_arg, output, rc);
 
 	sto_srv_subprocess_req_free(req);
 }
@@ -275,10 +275,10 @@ free_req:
 
 static void
 sto_srv_subprocess_req_init_cb(struct sto_srv_subprocess_req *req,
-			       sto_srv_subprocess_done_t done, void *priv)
+			       sto_srv_subprocess_done_t cb_fn, void *cb_arg)
 {
-	req->done = done;
-	req->priv = priv;
+	req->cb_fn = cb_fn;
+	req->cb_arg = cb_arg;
 }
 
 static void
@@ -308,7 +308,7 @@ sto_srv_subprocess(const struct spdk_json_val *params,
 		return -ENOMEM;
 	}
 
-	sto_srv_subprocess_req_init_cb(req, args->done, args->priv);
+	sto_srv_subprocess_req_init_cb(req, args->cb_fn, args->cb_arg);
 
 	rc = sto_srv_subprocess_req_submit(req);
 	if (spdk_unlikely(rc)) {

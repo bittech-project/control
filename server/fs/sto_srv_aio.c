@@ -23,8 +23,8 @@ struct sto_srv_writefile_req {
 
 	struct sto_srv_writefile_params params;
 
-	void *priv;
-	sto_srv_writefile_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 };
 
 static int sto_srv_writefile_exec(void *arg);
@@ -65,10 +65,10 @@ free_req:
 
 static void
 sto_srv_writefile_req_init_cb(struct sto_srv_writefile_req *req,
-			      sto_srv_writefile_done_t done, void *priv)
+			      sto_generic_cb cb_fn, void *cb_arg)
 {
-	req->done = done;
-	req->priv = priv;
+	req->cb_fn = cb_fn;
+	req->cb_arg = cb_arg;
 }
 
 static void
@@ -99,7 +99,8 @@ sto_srv_writefile_exec_done(void *arg, int rc)
 {
 	struct sto_srv_writefile_req *req = arg;
 
-	req->done(req->priv, rc);
+	req->cb_fn(req->cb_arg, rc);
+
 	sto_srv_writefile_req_free(req);
 }
 
@@ -116,7 +117,7 @@ sto_srv_writefile(const struct spdk_json_val *params,
 		return -ENOMEM;
 	}
 
-	sto_srv_writefile_req_init_cb(req, args->done, args->priv);
+	sto_srv_writefile_req_init_cb(req, args->cb_fn, args->cb_arg);
 
 	rc = sto_srv_writefile_req_submit(req);
 	if (spdk_unlikely(rc)) {
@@ -148,8 +149,8 @@ struct sto_srv_readfile_req {
 	struct sto_srv_readfile_params params;
 	char *buf;
 
-	void *priv;
-	sto_srv_readfile_done_t done;
+	void *cb_arg;
+	sto_srv_readfile_done_t cb_fn;
 };
 
 static int sto_srv_readfile_exec(void *arg);
@@ -190,10 +191,10 @@ free_req:
 
 static void
 sto_srv_readfile_req_init_cb(struct sto_srv_readfile_req *req,
-			     sto_srv_readfile_done_t done, void *priv)
+			     sto_srv_readfile_done_t cb_fn, void *cb_arg)
 {
-	req->done = done;
-	req->priv = priv;
+	req->cb_fn = cb_fn;
+	req->cb_arg = cb_arg;
 }
 
 static void
@@ -244,7 +245,7 @@ sto_srv_readfile_exec_done(void *arg, int rc)
 	struct sto_srv_readfile_req *req = arg;
 	char *buf = !rc ? req->buf : "";
 
-	req->done(req->priv, buf, rc);
+	req->cb_fn(req->cb_arg, buf, rc);
 	sto_srv_readfile_req_free(req);
 }
 
@@ -261,7 +262,7 @@ sto_srv_readfile(const struct spdk_json_val *params,
 		return -ENOMEM;
 	}
 
-	sto_srv_readfile_req_init_cb(req, args->done, args->priv);
+	sto_srv_readfile_req_init_cb(req, args->cb_fn, args->cb_arg);
 
 	rc = sto_srv_readfile_req_submit(req);
 	if (spdk_unlikely(rc)) {
@@ -291,8 +292,8 @@ struct sto_srv_readlink_req {
 	struct sto_srv_readlink_params params;
 	char *buf;
 
-	void *priv;
-	sto_srv_readlink_done_t done;
+	void *cb_arg;
+	sto_srv_readlink_done_t cb_fn;
 };
 
 static int sto_srv_readlink_exec(void *arg);
@@ -333,10 +334,10 @@ free_req:
 
 static void
 sto_srv_readlink_req_init_cb(struct sto_srv_readlink_req *req,
-			     sto_srv_readlink_done_t done, void *priv)
+			     sto_srv_readlink_done_t cb_fn, void *cb_arg)
 {
-	req->done = done;
-	req->priv = priv;
+	req->cb_fn = cb_fn;
+	req->cb_arg = cb_arg;
 }
 
 static void
@@ -391,7 +392,7 @@ sto_srv_readlink_exec_done(void *arg, int rc)
 	struct sto_srv_readlink_req *req = arg;
 	char *buf = !rc ? req->buf : "";
 
-	req->done(req->priv, buf, rc);
+	req->cb_fn(req->cb_arg, buf, rc);
 	sto_srv_readlink_req_free(req);
 }
 
@@ -408,7 +409,7 @@ sto_srv_readlink(const struct spdk_json_val *params,
 		return -ENOMEM;
 	}
 
-	sto_srv_readlink_req_init_cb(req, args->done, args->priv);
+	sto_srv_readlink_req_init_cb(req, args->cb_fn, args->cb_arg);
 
 	rc = sto_srv_readlink_req_submit(req);
 	if (spdk_unlikely(rc)) {

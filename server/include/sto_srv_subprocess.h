@@ -3,11 +3,11 @@
 
 struct spdk_json_val;
 
-typedef void (*sto_srv_subprocess_done_t)(void *priv, char *output, int rc);
+typedef void (*sto_srv_subprocess_done_t)(void *cb_arg, char *output, int rc);
 
 struct sto_srv_subprocess_args {
-	void *priv;
-	sto_srv_subprocess_done_t done;
+	void *cb_arg;
+	sto_srv_subprocess_done_t cb_fn;
 };
 
 int sto_srv_subprocess(const struct spdk_json_val *params,
