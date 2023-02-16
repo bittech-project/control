@@ -29,8 +29,8 @@ struct sto_rpc_subprocess_params {
 };
 
 struct sto_rpc_subprocess_cmd {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 
 	char **output;
 };
@@ -51,10 +51,10 @@ sto_rpc_subprocess_cmd_alloc(void)
 
 static void
 sto_rpc_subprocess_cmd_init_cb(struct sto_rpc_subprocess_cmd *cmd,
-			       sto_async_done_t done, void *priv)
+			       sto_generic_cb cb_fn, void *cb_arg)
 {
-	cmd->done = done;
-	cmd->priv = priv;
+	cmd->cb_fn = cb_fn;
+	cmd->cb_arg = cb_arg;
 }
 
 static void
@@ -85,7 +85,7 @@ sto_rpc_subprocess_resp_handler(void *priv, struct spdk_jsonrpc_client_response 
 	rc = info.returncode;
 
 out:
-	cmd->done(cmd->priv, rc);
+	cmd->cb_fn(cmd->cb_arg, rc);
 	sto_rpc_subprocess_cmd_free(cmd);
 }
 
@@ -140,7 +140,7 @@ sto_rpc_subprocess(const char *const *argv, struct sto_rpc_subprocess_args *args
 
 	cmd->output = args->output;
 
-	sto_rpc_subprocess_cmd_init_cb(cmd, args->done, args->priv);
+	sto_rpc_subprocess_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
 
 	rc = sto_rpc_subprocess_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {

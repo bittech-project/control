@@ -6,8 +6,8 @@
 #include "sto_async.h"
 
 struct sto_rpc_subprocess_args {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 
 	char **output;
 };

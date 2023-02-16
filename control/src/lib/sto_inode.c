@@ -264,8 +264,8 @@ sto_dir_inode_read(struct sto_inode *inode)
 {
 	struct sto_dir_inode *dir_inode = sto_dir_inode(inode);
 	struct sto_rpc_readdir_args args = {
-		.priv = inode,
-		.done = sto_inode_read_done,
+		.cb_arg = inode,
+		.cb_fn = sto_inode_read_done,
 		.dirents = &dir_inode->dirents,
 	};
 
@@ -355,8 +355,8 @@ sto_lnk_inode_read(struct sto_inode *inode)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
 	struct sto_rpc_readlink_args args = {
-		.priv = inode,
-		.done = sto_inode_read_done,
+		.cb_arg = inode,
+		.cb_fn = sto_inode_read_done,
 		.buf = &file_inode->buf,
 	};
 

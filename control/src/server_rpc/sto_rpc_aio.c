@@ -20,8 +20,8 @@ struct sto_rpc_writefile_params {
 };
 
 struct sto_rpc_writefile_cmd {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 };
 
 static struct sto_rpc_writefile_cmd *
@@ -40,10 +40,10 @@ sto_rpc_writefile_cmd_alloc(void)
 
 static void
 sto_rpc_writefile_cmd_init_cb(struct sto_rpc_writefile_cmd *cmd,
-			      sto_async_done_t done, void *priv)
+			      sto_generic_cb cb_fn, void *cb_arg)
 {
-	cmd->done = done;
-	cmd->priv = priv;
+	cmd->cb_fn = cb_fn;
+	cmd->cb_arg = cb_arg;
 }
 
 static void
@@ -72,7 +72,7 @@ sto_rpc_writefile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *
 	rc = info.returncode;
 
 out:
-	cmd->done(cmd->priv, rc);
+	cmd->cb_fn(cmd->cb_arg, rc);
 	sto_rpc_writefile_cmd_free(cmd);
 }
 
@@ -119,7 +119,7 @@ sto_rpc_writefile(const char *filepath, int oflag, char *buf, struct sto_rpc_wri
 		return -ENOMEM;
 	}
 
-	sto_rpc_writefile_cmd_init_cb(cmd, args->done, args->priv);
+	sto_rpc_writefile_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
 
 	rc = sto_rpc_writefile_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {
@@ -337,8 +337,8 @@ struct sto_rpc_readlink_params {
 };
 
 struct sto_rpc_readlink_cmd {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 
 	char **buf;
 };
@@ -359,10 +359,10 @@ sto_rpc_readlink_cmd_alloc(void)
 
 static void
 sto_rpc_readlink_cmd_init_cb(struct sto_rpc_readlink_cmd *cmd,
-			     sto_async_done_t done, void *priv)
+			     sto_generic_cb cb_fn, void *cb_arg)
 {
-	cmd->done = done;
-	cmd->priv = priv;
+	cmd->cb_fn = cb_fn;
+	cmd->cb_arg = cb_arg;
 }
 
 static void
@@ -393,7 +393,7 @@ sto_rpc_readlink_resp_handler(void *priv, struct spdk_jsonrpc_client_response *r
 	rc = info.returncode;
 
 out:
-	cmd->done(cmd->priv, rc);
+	cmd->cb_fn(cmd->cb_arg, rc);
 	sto_rpc_readlink_cmd_free(cmd);
 }
 
@@ -437,7 +437,7 @@ sto_rpc_readlink(const char *filepath, struct sto_rpc_readlink_args *args)
 
 	cmd->buf = args->buf;
 
-	sto_rpc_readlink_cmd_init_cb(cmd, args->done, args->priv);
+	sto_rpc_readlink_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
 
 	rc = sto_rpc_readlink_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {

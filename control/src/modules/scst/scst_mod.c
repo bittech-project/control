@@ -13,8 +13,8 @@ static int
 iscsi_start_daemon(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 	};
 
 	SPDK_ERRLOG("GLEB: Start iscsi-scstd\n");
@@ -26,8 +26,8 @@ static int
 iscsi_stop_daemon(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 	};
 
 	SPDK_ERRLOG("GLEB: Stop iscsi-scstd\n");
@@ -39,8 +39,8 @@ static int
 iscsi_modprobe(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 	};
 
 	SPDK_ERRLOG("GLEB: Modprobe iscsi-scst\n");
@@ -52,8 +52,8 @@ static int
 iscsi_rmmod(struct sto_req *req)
 {
 	struct sto_rpc_subprocess_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 	};
 	SPDK_ERRLOG("GLEB: Rmmod iscsi-scst\n");
 

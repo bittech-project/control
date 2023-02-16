@@ -31,8 +31,8 @@ struct sto_tree_params {
 };
 
 struct sto_tree_args {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 
 	struct sto_tree_node *tree_root;
 };

@@ -21,8 +21,8 @@ sto_write_req_exec(struct sto_req *req)
 {
 	struct sto_write_req_params *params = req->type.params;
 	struct sto_rpc_writefile_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 	};
 
 	return sto_rpc_writefile(params->file, 0, params->data, &args);
@@ -114,8 +114,8 @@ sto_readlink_req_exec(struct sto_req *req)
 	struct sto_readlink_req_priv *priv = req->type.priv;
 	struct sto_readlink_req_params *params = req->type.params;
 	struct sto_rpc_readlink_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 		.buf = &priv->buf,
 	};
 
@@ -169,8 +169,8 @@ sto_readdir_req_exec(struct sto_req *req)
 	struct sto_readdir_req_priv *priv = req->type.priv;
 	struct sto_readdir_req_params *params = req->type.params;
 	struct sto_rpc_readdir_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 		.dirents = &priv->dirents,
 	};
 
@@ -228,8 +228,8 @@ sto_tree_req_exec(struct sto_req *req)
 	struct sto_tree_req_priv *priv = req->type.priv;
 	struct sto_tree_req_params *params = req->type.params;
 	struct sto_tree_args args = {
-		.priv = req,
-		.done = sto_req_step_done,
+		.cb_arg = req,
+		.cb_fn = sto_req_step_done,
 		.tree_root = &priv->tree_root,
 	};
 

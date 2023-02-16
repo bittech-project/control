@@ -8,8 +8,8 @@
 #define STO_WRITE	1
 
 struct sto_rpc_writefile_args {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 };
 
 int sto_rpc_writefile(const char *filepath, int oflag, char *buf,
@@ -83,8 +83,8 @@ int sto_rpc_readfile(const char *filepath, uint32_t size,
 		     struct sto_rpc_readfile_args *args);
 
 struct sto_rpc_readlink_args {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 
 	char **buf;
 };

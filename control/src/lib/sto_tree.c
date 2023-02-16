@@ -15,8 +15,8 @@ struct sto_tree_cmd {
 
 	uint32_t refcnt;
 
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 };
 
 static struct sto_tree_cmd *
@@ -37,10 +37,10 @@ sto_tree_cmd_alloc(struct sto_tree_node *tree_root)
 }
 
 static void
-sto_tree_cmd_init_cb(struct sto_tree_cmd *cmd, sto_async_done_t done, void *priv)
+sto_tree_cmd_init_cb(struct sto_tree_cmd *cmd, sto_generic_cb cb_fn, void *cb_arg)
 {
-	cmd->done = done;
-	cmd->priv = priv;
+	cmd->cb_fn = cb_fn;
+	cmd->cb_arg = cb_arg;
 }
 
 static void
@@ -77,7 +77,7 @@ sto_tree_put_ref(struct sto_tree_node *node)
 
 	assert(cmd->refcnt > 0);
 	if (--cmd->refcnt == 0) {
-		cmd->done(cmd->priv, cmd->returncode);
+		cmd->cb_fn(cmd->cb_arg, cmd->returncode);
 		sto_tree_cmd_free(cmd);
 	}
 }
@@ -350,7 +350,7 @@ sto_tree(const char *dirpath, uint32_t depth, bool only_dirs, struct sto_tree_ar
 	cmd->params.depth = depth;
 	cmd->params.only_dirs = only_dirs;
 
-	sto_tree_cmd_init_cb(cmd, args->done, args->priv);
+	sto_tree_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
 
 	sto_tree_cmd_run(cmd);
 

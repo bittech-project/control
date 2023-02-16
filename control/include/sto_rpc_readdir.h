@@ -24,8 +24,8 @@ struct sto_dirents_json_cfg {
 };
 
 struct sto_rpc_readdir_args {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+	sto_generic_cb cb_fn;
 
 	struct sto_dirents *dirents;
 };
