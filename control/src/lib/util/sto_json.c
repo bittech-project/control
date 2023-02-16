@@ -177,6 +177,43 @@ sto_json_print(const struct spdk_json_val *values)
 	SPDK_ERRLOG("JSON: \n%s\n", buf.data);
 }
 
+struct spdk_json_val *
+sto_json_parse_buf(void *buf, size_t size)
+{
+	struct spdk_json_val *values;
+	void *end;
+	size_t values_cnt;
+	ssize_t rc;
+
+	rc = spdk_json_parse(buf, size, NULL, 0, &end, 0);
+	if (spdk_unlikely(rc < 0)) {
+		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
+		return ERR_PTR(rc);
+	}
+
+	values_cnt = rc;
+
+	values = calloc(values_cnt, sizeof(struct spdk_json_val));
+	if (spdk_unlikely(!values)) {
+		SPDK_ERRLOG("Failed to alloc json values: cnt=%zu\n", values_cnt);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	rc = spdk_json_parse(buf, size, (struct spdk_json_val *) values, values_cnt, &end, 0);
+	if (rc != (ssize_t) values_cnt) {
+		SPDK_ERRLOG("Parsing JSON failed (%zd)\n", rc);
+		rc = -EINVAL;
+		goto free_values;
+	}
+
+	return values;
+
+free_values:
+	free(values);
+
+	return ERR_PTR(rc);
+}
+
 bool
 sto_find_match_str(const char *key, const char *strings[])
 {
@@ -198,31 +235,15 @@ sto_find_match_str(const char *key, const char *strings[])
 static int
 json_ctx_parse_buf(struct sto_json_ctx *ctx)
 {
-	void *end;
-	size_t values_cnt;
-	ssize_t rc;
+	struct spdk_json_val *values;
 
-	rc = spdk_json_parse(ctx->buf, ctx->size, NULL, 0, &end, 0);
-	if (spdk_unlikely(rc < 0)) {
-		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
-		return rc;
+	values = sto_json_parse_buf(ctx->buf, ctx->size);
+	if (IS_ERR(values)) {
+		SPDK_ERRLOG("Failed to parse buf for JSON context\n");
+		return PTR_ERR(values);
 	}
 
-	values_cnt = rc;
-
-	ctx->values = calloc(values_cnt, sizeof(struct spdk_json_val));
-	if (spdk_unlikely(!ctx->values)) {
-		SPDK_ERRLOG("Failed to alloc json values: cnt=%zu\n",
-			    values_cnt);
-		return -ENOMEM;
-	}
-
-	rc = spdk_json_parse(ctx->buf, ctx->size, (struct spdk_json_val *) ctx->values,
-			     values_cnt, &end, 0);
-	if (rc != (ssize_t) values_cnt) {
-		SPDK_ERRLOG("Parsing JSON failed (%zd)\n", rc);
-		return -EINVAL;
-	}
+	ctx->values = values;
 
 	return 0;
 }

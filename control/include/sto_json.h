@@ -66,6 +66,7 @@ sto_json_str_field_destroy(struct sto_json_str_field *field)
 }
 
 void sto_json_print(const struct spdk_json_val *values);
+struct spdk_json_val *sto_json_parse_buf(void *buf, size_t size);
 
 bool sto_find_match_str(const char *key, const char *strings[]);
 
