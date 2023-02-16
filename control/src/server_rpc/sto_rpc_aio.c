@@ -159,14 +159,25 @@ struct sto_rpc_readfile_params {
 };
 
 struct sto_rpc_readfile_cmd {
-	void *priv;
-	sto_async_done_t done;
+	void *cb_arg;
+
+	enum sto_rpc_readfile_type type;
+	union {
+		struct {
+			sto_rpc_readfile_complete cb_fn;
+			char *buf;
+		} basic;
+
+		struct {
+			sto_rpc_readfile_with_buf_complete cb_fn;
+		} with_buf;
+	} u;
 
 	char **buf;
 };
 
 static struct sto_rpc_readfile_cmd *
-sto_rpc_readfile_cmd_alloc(void)
+sto_rpc_readfile_cmd_alloc(struct sto_rpc_readfile_args *args)
 {
 	struct sto_rpc_readfile_cmd *cmd;
 
@@ -176,21 +187,52 @@ sto_rpc_readfile_cmd_alloc(void)
 		return NULL;
 	}
 
-	return cmd;
-}
+	cmd->type = args->type;
+	cmd->cb_arg = args->cb_arg;
 
-static void
-sto_rpc_readfile_cmd_init_cb(struct sto_rpc_readfile_cmd *cmd,
-			     sto_async_done_t done, void *priv)
-{
-	cmd->done = done;
-	cmd->priv = priv;
+	switch (cmd->type) {
+	case STO_RPC_READFILE_TYPE_BASIC:
+		cmd->buf = &cmd->u.basic.buf;
+		cmd->u.basic.cb_fn = args->u.basic.cb_fn;
+		break;
+	case STO_RPC_READFILE_TYPE_WITH_BUF:
+		cmd->buf = args->u.with_buf.buf;
+		cmd->u.with_buf.cb_fn = args->u.with_buf.cb_fn;
+		break;
+	default:
+		SPDK_ERRLOG("Got unsupported readfile type (%d)\n", cmd->type);
+		goto free_cmd;
+	};
+
+	return cmd;
+
+free_cmd:
+	free(cmd);
+
+	return NULL;
 }
 
 static void
 sto_rpc_readfile_cmd_free(struct sto_rpc_readfile_cmd *cmd)
 {
 	free(cmd);
+}
+
+static void
+sto_rpc_readfile_cmd_complete(struct sto_rpc_readfile_cmd *cmd, int rc)
+{
+	switch (cmd->type) {
+	case STO_RPC_READFILE_TYPE_BASIC:
+		cmd->u.basic.cb_fn(cmd->cb_arg, cmd->u.basic.buf, rc);
+		break;
+	case STO_RPC_READFILE_TYPE_WITH_BUF:
+		cmd->u.with_buf.cb_fn(cmd->cb_arg, rc);
+		break;
+	default:
+		assert(0);
+	};
+
+	sto_rpc_readfile_cmd_free(cmd);
 }
 
 static void
@@ -215,8 +257,7 @@ sto_rpc_readfile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *r
 	rc = info.returncode;
 
 out:
-	cmd->done(cmd->priv, rc);
-	sto_rpc_readfile_cmd_free(cmd);
+	sto_rpc_readfile_cmd_complete(cmd, rc);
 }
 
 static void
@@ -253,15 +294,11 @@ sto_rpc_readfile(const char *filepath, uint32_t size, struct sto_rpc_readfile_ar
 	};
 	int rc;
 
-	cmd = sto_rpc_readfile_cmd_alloc();
+	cmd = sto_rpc_readfile_cmd_alloc(args);
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to allocate RPC readfile cmd\n");
 		return -ENOMEM;
 	}
-
-	cmd->buf = args->buf;
-
-	sto_rpc_readfile_cmd_init_cb(cmd, args->done, args->priv);
 
 	rc = sto_rpc_readfile_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {
