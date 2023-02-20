@@ -7,13 +7,8 @@
 #define STO_READ	0
 #define STO_WRITE	1
 
-struct sto_rpc_writefile_args {
-	void *cb_arg;
-	sto_generic_cb cb_fn;
-};
-
-int sto_rpc_writefile(const char *filepath, int oflag, char *buf,
-		      struct sto_rpc_writefile_args *args);
+void sto_rpc_writefile(const char *filepath, int oflag, char *buf,
+		       sto_generic_cb cb_fn, void *cb_arg);
 
 typedef void (*sto_rpc_readfile_complete)(void *cb_arg, char *buf, int rc);
 

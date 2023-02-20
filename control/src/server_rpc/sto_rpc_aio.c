@@ -102,8 +102,9 @@ sto_rpc_writefile_cmd_run(struct sto_rpc_writefile_cmd *cmd,
 	return sto_client_send("writefile", params, sto_rpc_writefile_info_json, &args);
 }
 
-int
-sto_rpc_writefile(const char *filepath, int oflag, char *buf, struct sto_rpc_writefile_args *args)
+void
+sto_rpc_writefile(const char *filepath, int oflag, char *buf,
+		  sto_generic_cb cb_fn, void *cb_arg)
 {
 	struct sto_rpc_writefile_cmd *cmd;
 	struct sto_rpc_writefile_params params = {
@@ -116,10 +117,11 @@ sto_rpc_writefile(const char *filepath, int oflag, char *buf, struct sto_rpc_wri
 	cmd = sto_rpc_writefile_cmd_alloc();
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to allocate RPC writefile cmd\n");
-		return -ENOMEM;
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
-	sto_rpc_writefile_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
+	sto_rpc_writefile_cmd_init_cb(cmd, cb_fn, cb_arg);
 
 	rc = sto_rpc_writefile_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {
@@ -127,12 +129,13 @@ sto_rpc_writefile(const char *filepath, int oflag, char *buf, struct sto_rpc_wri
 		goto free_cmd;
 	}
 
-	return 0;
+	return;
 
 free_cmd:
 	sto_rpc_writefile_cmd_free(cmd);
 
-	return rc;
+	cb_fn(cb_arg, rc);
+	return;
 }
 
 struct rpc_readfile_info {

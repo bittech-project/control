@@ -20,12 +20,10 @@ static int
 sto_write_req_exec(struct sto_req *req)
 {
 	struct sto_write_req_params *params = req->type.params;
-	struct sto_rpc_writefile_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-	};
 
-	return sto_rpc_writefile(params->file, 0, params->data, &args);
+	sto_rpc_writefile(params->file, 0, params->data, sto_req_step_done, req);
+
+	return 0;
 }
 
 const struct sto_req_properties sto_write_req_properties = {
