@@ -169,10 +169,11 @@ static int
 sto_file_inode_read(struct sto_inode *inode)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
-	struct sto_rpc_readfile_args args =
-		STO_RPC_READFILE_ARGS_WITH_BUF(inode, sto_inode_read_done, file_inode->buf);
 
-	return sto_rpc_readfile(inode->path, 0, &args);
+	sto_rpc_readfile_buf(inode->path, 0, &file_inode->buf,
+			     sto_inode_read_done, inode);
+
+	return 0;
 }
 
 static int

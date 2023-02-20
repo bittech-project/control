@@ -62,10 +62,11 @@ sto_read_req_exec(struct sto_req *req)
 {
 	struct sto_read_req_priv *priv = req->type.priv;
 	struct sto_read_req_params *params = req->type.params;
-	struct sto_rpc_readfile_args args =
-		STO_RPC_READFILE_ARGS_WITH_BUF(req, sto_req_step_done, priv->buf);
 
-	return sto_rpc_readfile(params->file, params->size, &args);
+	sto_rpc_readfile_buf(params->file, params->size, &priv->buf,
+			     sto_req_step_done, req);
+
+	return 0;
 }
 
 static void

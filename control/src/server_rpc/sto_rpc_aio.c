@@ -135,33 +135,39 @@ free_cmd:
 	return rc;
 }
 
-struct sto_rpc_readfile_info {
+struct rpc_readfile_info {
 	int returncode;
 	char **buf;
 };
 
 static int
-sto_rpc_readfile_buf_decode(const struct spdk_json_val *val, void *out)
+rpc_readfile_buf_decode(const struct spdk_json_val *val, void *out)
 {
 	char **buf = *(char ***) out;
 
 	return spdk_json_decode_string(val, buf);
 }
 
-static const struct spdk_json_object_decoder sto_rpc_readfile_info_decoders[] = {
-	{"returncode", offsetof(struct sto_rpc_readfile_info, returncode), spdk_json_decode_int32},
-	{"buf", offsetof(struct sto_rpc_readfile_info, buf), sto_rpc_readfile_buf_decode},
+static const struct spdk_json_object_decoder rpc_readfile_info_decoders[] = {
+	{"returncode", offsetof(struct rpc_readfile_info, returncode), spdk_json_decode_int32},
+	{"buf", offsetof(struct rpc_readfile_info, buf), rpc_readfile_buf_decode},
 };
 
-struct sto_rpc_readfile_params {
+struct rpc_readfile_params {
 	const char *filepath;
 	uint32_t size;
 };
 
-struct sto_rpc_readfile_cmd {
+enum rpc_readfile_type {
+	RPC_READFILE_TYPE_NONE,
+	RPC_READFILE_TYPE_BASIC,
+	RPC_READFILE_TYPE_WITH_BUF,
+};
+
+struct rpc_readfile_cpl {
 	void *cb_arg;
 
-	enum sto_rpc_readfile_type type;
+	enum rpc_readfile_type type;
 	union {
 		struct {
 			sto_rpc_readfile_complete cb_fn;
@@ -169,17 +175,57 @@ struct sto_rpc_readfile_cmd {
 		} basic;
 
 		struct {
-			sto_rpc_readfile_with_buf_complete cb_fn;
+			sto_rpc_readfile_buf_complete cb_fn;
+			char **buf;
 		} with_buf;
 	} u;
+};
 
+static void
+rpc_readfile_call_cpl(struct rpc_readfile_cpl *cpl, int rc)
+{
+	switch (cpl->type) {
+	case RPC_READFILE_TYPE_BASIC:
+		cpl->u.basic.cb_fn(cpl->cb_arg, cpl->u.basic.buf, rc);
+		break;
+	case RPC_READFILE_TYPE_WITH_BUF:
+		cpl->u.with_buf.cb_fn(cpl->cb_arg, rc);
+		break;
+	default:
+		assert(0);
+	};
+}
+
+struct rpc_readfile_cmd {
+	struct rpc_readfile_cpl cpl;
 	char **buf;
 };
 
-static struct sto_rpc_readfile_cmd *
-sto_rpc_readfile_cmd_alloc(struct sto_rpc_readfile_args *args)
+static int
+rpc_readfile_cmd_init(struct rpc_readfile_cmd *cmd)
 {
-	struct sto_rpc_readfile_cmd *cmd;
+	struct rpc_readfile_cpl *cpl = &cmd->cpl;
+
+	switch (cpl->type) {
+	case RPC_READFILE_TYPE_BASIC:
+		cmd->buf = &cpl->u.basic.buf;
+		break;
+	case RPC_READFILE_TYPE_WITH_BUF:
+		cmd->buf = cpl->u.with_buf.buf;
+		break;
+	default:
+		SPDK_ERRLOG("Got unsupported readfile type (%d)\n", cpl->type);
+		return -EINVAL;
+	};
+
+	return 0;
+}
+
+static struct rpc_readfile_cmd *
+rpc_readfile_cmd_alloc(struct rpc_readfile_cpl *cpl)
+{
+	struct rpc_readfile_cmd *cmd;
+	int rc;
 
 	cmd = calloc(1, sizeof(*cmd));
 	if (spdk_unlikely(!cmd)) {
@@ -187,22 +233,13 @@ sto_rpc_readfile_cmd_alloc(struct sto_rpc_readfile_args *args)
 		return NULL;
 	}
 
-	cmd->type = args->type;
-	cmd->cb_arg = args->cb_arg;
+	cmd->cpl = *cpl;
 
-	switch (cmd->type) {
-	case STO_RPC_READFILE_TYPE_BASIC:
-		cmd->buf = &cmd->u.basic.buf;
-		cmd->u.basic.cb_fn = args->u.basic.cb_fn;
-		break;
-	case STO_RPC_READFILE_TYPE_WITH_BUF:
-		cmd->buf = args->u.with_buf.buf;
-		cmd->u.with_buf.cb_fn = args->u.with_buf.cb_fn;
-		break;
-	default:
-		SPDK_ERRLOG("Got unsupported readfile type (%d)\n", cmd->type);
+	rc = rpc_readfile_cmd_init(cmd);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to init rpc_readfile cmd\n");
 		goto free_cmd;
-	};
+	}
 
 	return cmd;
 
@@ -213,33 +250,23 @@ free_cmd:
 }
 
 static void
-sto_rpc_readfile_cmd_free(struct sto_rpc_readfile_cmd *cmd)
+rpc_readfile_cmd_free(struct rpc_readfile_cmd *cmd)
 {
 	free(cmd);
 }
 
 static void
-sto_rpc_readfile_cmd_complete(struct sto_rpc_readfile_cmd *cmd, int rc)
+rpc_readfile_cmd_complete(struct rpc_readfile_cmd *cmd, int rc)
 {
-	switch (cmd->type) {
-	case STO_RPC_READFILE_TYPE_BASIC:
-		cmd->u.basic.cb_fn(cmd->cb_arg, cmd->u.basic.buf, rc);
-		break;
-	case STO_RPC_READFILE_TYPE_WITH_BUF:
-		cmd->u.with_buf.cb_fn(cmd->cb_arg, rc);
-		break;
-	default:
-		assert(0);
-	};
-
-	sto_rpc_readfile_cmd_free(cmd);
+	rpc_readfile_call_cpl(&cmd->cpl, rc);
+	rpc_readfile_cmd_free(cmd);
 }
 
 static void
-sto_rpc_readfile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp, int rc)
+rpc_readfile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *resp, int rc)
 {
-	struct sto_rpc_readfile_cmd *cmd = priv;
-	struct sto_rpc_readfile_info info = {
+	struct rpc_readfile_cmd *cmd = priv;
+	struct rpc_readfile_info info = {
 		.buf = cmd->buf,
 	};
 
@@ -247,8 +274,8 @@ sto_rpc_readfile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *r
 		goto out;
 	}
 
-	if (spdk_json_decode_object(resp->result, sto_rpc_readfile_info_decoders,
-				    SPDK_COUNTOF(sto_rpc_readfile_info_decoders), &info)) {
+	if (spdk_json_decode_object(resp->result, rpc_readfile_info_decoders,
+				    SPDK_COUNTOF(rpc_readfile_info_decoders), &info)) {
 		SPDK_ERRLOG("Failed to decode response for STO RPC readfile cmd\n");
 		rc = -ENOMEM;
 		goto out;
@@ -257,13 +284,13 @@ sto_rpc_readfile_resp_handler(void *priv, struct spdk_jsonrpc_client_response *r
 	rc = info.returncode;
 
 out:
-	sto_rpc_readfile_cmd_complete(cmd, rc);
+	rpc_readfile_cmd_complete(cmd, rc);
 }
 
 static void
-sto_rpc_readfile_info_json(void *priv, struct spdk_json_write_ctx *w)
+rpc_readfile_info_json(void *priv, struct spdk_json_write_ctx *w)
 {
-	struct sto_rpc_readfile_params *params = priv;
+	struct rpc_readfile_params *params = priv;
 
 	spdk_json_write_object_begin(w);
 
@@ -274,33 +301,29 @@ sto_rpc_readfile_info_json(void *priv, struct spdk_json_write_ctx *w)
 }
 
 static int
-sto_rpc_readfile_cmd_run(struct sto_rpc_readfile_cmd *cmd, struct sto_rpc_readfile_params *params)
+rpc_readfile_cmd_run(struct rpc_readfile_cmd *cmd, struct rpc_readfile_params *params)
 {
 	struct sto_client_args args = {
 		.priv = cmd,
-		.response_handler = sto_rpc_readfile_resp_handler,
+		.response_handler = rpc_readfile_resp_handler,
 	};
 
-	return sto_client_send("readfile", params, sto_rpc_readfile_info_json, &args);
+	return sto_client_send("readfile", params, rpc_readfile_info_json, &args);
 }
 
-int
-sto_rpc_readfile(const char *filepath, uint32_t size, struct sto_rpc_readfile_args *args)
+static int
+rpc_readfile(struct rpc_readfile_cpl *cpl, struct rpc_readfile_params *params)
 {
-	struct sto_rpc_readfile_cmd *cmd;
-	struct sto_rpc_readfile_params params = {
-		.filepath = filepath,
-		.size = size,
-	};
+	struct rpc_readfile_cmd *cmd;
 	int rc;
 
-	cmd = sto_rpc_readfile_cmd_alloc(args);
+	cmd = rpc_readfile_cmd_alloc(cpl);
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to allocate RPC readfile cmd\n");
 		return -ENOMEM;
 	}
 
-	rc = sto_rpc_readfile_cmd_run(cmd, &params);
+	rc = rpc_readfile_cmd_run(cmd, params);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to run RPC readfile cmd, rc=%d\n", rc);
 		goto free_cmd;
@@ -309,9 +332,60 @@ sto_rpc_readfile(const char *filepath, uint32_t size, struct sto_rpc_readfile_ar
 	return 0;
 
 free_cmd:
-	sto_rpc_readfile_cmd_free(cmd);
+	rpc_readfile_cmd_free(cmd);
 
 	return rc;
+}
+
+void
+sto_rpc_readfile(const char *filepath, uint32_t size,
+		 sto_rpc_readfile_complete cb_fn, void *cb_arg)
+{
+	struct rpc_readfile_cpl cpl = {};
+	struct rpc_readfile_params params = {
+		.filepath = filepath,
+		.size = size,
+	};
+	int rc;
+
+	cpl.type = RPC_READFILE_TYPE_BASIC;
+	cpl.u.basic.cb_fn = cb_fn;
+	cpl.cb_arg = cb_arg;
+
+	rc = rpc_readfile(&cpl, &params);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("rpc_readfile() failed\n");
+		rpc_readfile_call_cpl(&cpl, rc);
+		return;
+	}
+
+	return;
+}
+
+void
+sto_rpc_readfile_buf(const char *filepath, uint32_t size, char **buf,
+		     sto_rpc_readfile_buf_complete cb_fn, void *cb_arg)
+{
+	struct rpc_readfile_cpl cpl = {};
+	struct rpc_readfile_params params = {
+		.filepath = filepath,
+		.size = size,
+	};
+	int rc;
+
+	cpl.type = RPC_READFILE_TYPE_WITH_BUF;
+	cpl.u.with_buf.cb_fn = cb_fn;
+	cpl.cb_arg = cb_arg;
+	cpl.u.with_buf.buf = buf;
+
+	rc = rpc_readfile(&cpl, &params);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("rpc_readfile() failed\n");
+		rpc_readfile_call_cpl(&cpl, rc);
+		return;
+	}
+
+	return;
 }
 
 struct sto_rpc_readlink_info {
