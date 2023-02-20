@@ -327,32 +327,34 @@ sto_tree_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *
 	spdk_json_write_array_end(w);
 }
 
-int
-sto_tree(const char *dirpath, uint32_t depth, bool only_dirs, struct sto_tree_args *args)
+void
+sto_tree(const char *dirpath, uint32_t depth, bool only_dirs,
+	 sto_generic_cb cb_fn, void *cb_arg, struct sto_tree_node *tree_root)
 {
-	struct sto_tree_node *tree_root = args->tree_root;
 	struct sto_tree_cmd *cmd;
 	int rc;
 
 	rc = sto_tree_init(tree_root, dirpath);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to init root node\n");
-		return rc;
+		cb_fn(cb_arg, rc);
+		return;
 	}
 
 	cmd = sto_tree_cmd_alloc(tree_root);
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to alloc memory for tree cmd\n");
 		__sto_tree_node_free(tree_root);
-		return -ENOMEM;
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
 	cmd->params.depth = depth;
 	cmd->params.only_dirs = only_dirs;
 
-	sto_tree_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
+	sto_tree_cmd_init_cb(cmd, cb_fn, cb_arg);
 
 	sto_tree_cmd_run(cmd);
 
-	return 0;
+	return;
 }

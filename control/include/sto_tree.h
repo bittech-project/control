@@ -30,14 +30,9 @@ struct sto_tree_params {
 	bool only_dirs;
 };
 
-struct sto_tree_args {
-	void *cb_arg;
-	sto_generic_cb cb_fn;
+void sto_tree(const char *dirpath, uint32_t depth, bool only_dirs,
+	      sto_generic_cb cb_fn, void *cb_arg, struct sto_tree_node *tree_root);
 
-	struct sto_tree_node *tree_root;
-};
-
-int sto_tree(const char *dirpath, uint32_t depth, bool only_dirs, struct sto_tree_args *args);
 void sto_tree_free(struct sto_tree_node *tree_root);
 
 void sto_tree_get_ref(struct sto_tree_node *node);

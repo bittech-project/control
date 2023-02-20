@@ -228,13 +228,11 @@ sto_tree_req_exec(struct sto_req *req)
 {
 	struct sto_tree_req_priv *priv = req->type.priv;
 	struct sto_tree_req_params *params = req->type.params;
-	struct sto_tree_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-		.tree_root = &priv->tree_root,
-	};
 
-	return sto_tree(params->dirpath, params->depth, params->only_dirs, &args);
+	sto_tree(params->dirpath, params->depth, params->only_dirs,
+		 sto_req_step_done, req, &priv->tree_root);
+
+	return 0;
 }
 
 static void
