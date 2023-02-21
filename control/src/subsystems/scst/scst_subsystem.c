@@ -41,65 +41,6 @@ out:
 	return rc;
 }
 
-static char *
-scst_attr(const char *buf, bool nonkey)
-{
-	char *attr = NULL;
-	char **lines;
-
-	if (spdk_unlikely(!buf)) {
-		return NULL;
-	}
-
-	lines = spdk_strarray_from_string(buf, "\n");
-	if (spdk_unlikely(!lines)) {
-		SPDK_ERRLOG("Failed to split scst attr\n");
-		return NULL;
-	}
-
-	if (!nonkey && (!lines[1] || strcmp(lines[1], "[key]"))) {
-		goto out;
-	}
-
-	attr = strdup(lines[0]);
-
-out:
-	spdk_strarray_free(lines);
-
-	return attr;
-}
-
-static void
-scst_serialize_attr(struct sto_inode *attr_inode, struct spdk_json_write_ctx *w)
-{
-	char *attr;
-
-	if (sto_inode_read_only(attr_inode)) {
-		return;
-	}
-
-	attr = scst_attr(sto_file_inode_buf(attr_inode), false);
-	if (!attr) {
-		return;
-	}
-
-	spdk_json_write_named_string(w, attr_inode->name, attr);
-
-	free(attr);
-}
-
-static void
-scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write_ctx *w)
-{
-	struct sto_tree_node *attr_node;
-
-	STO_TREE_FOREACH_TYPE(attr_node, obj_node, STO_INODE_TYPE_FILE) {
-		struct sto_inode *inode = attr_node->inode;
-
-		scst_serialize_attr(inode, w);
-	}
-}
-
 static void
 scst_snapshot_dev_info_json(struct sto_tree_node *dev_lnk_node, struct spdk_json_write_ctx *w)
 {

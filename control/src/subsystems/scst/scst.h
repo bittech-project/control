@@ -1,6 +1,9 @@
 #ifndef _SCST_H_
 #define _SCST_H_
 
+#include "sto_async.h"
+#include "sto_json.h"
+
 #define SCST_ROOT "/sys/kernel/scst_tgt"
 
 /* Root-level */
@@ -90,5 +93,14 @@ scst_target_lun_mgmt(const char *target_driver, const char *target, const char *
 				  SCST_TARGETS, target_driver,
 				  target, "luns", SCST_MGMT_IO);
 }
+
+void scst_read_available_attrs(const char *mgmt_path, const char *prefix,
+			       sto_generic_cb cb_fn, void *cb_arg, char ***available_attrs);
+void scst_available_attrs_print(char **available_attrs);
+bool scst_available_attrs_find(char **available_attrs, char *attr);
+void scst_available_attrs_destroy(char **available_attrs);
+
+void scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write_ctx *w);
+void scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
 
 #endif /* _SCST_H_ */

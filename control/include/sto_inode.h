@@ -1,6 +1,8 @@
 #ifndef _STO_INODE_H_
 #define _STO_INODE_H_
 
+#include <spdk/util.h>
+
 #include "sto_rpc_readdir.h"
 
 enum sto_inode_type {
