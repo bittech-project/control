@@ -5,9 +5,26 @@
 #include "sto_json.h"
 #include "sto_err.h"
 
-static TAILQ_HEAD(sto_component_list, sto_core_component) g_sto_components =
-	TAILQ_HEAD_INITIALIZER(g_sto_components);
+TAILQ_HEAD(sto_component_list, sto_core_component);
+static struct sto_component_list g_components = TAILQ_HEAD_INITIALIZER(g_components);
 
+static struct sto_core_component *g_next_component;
+
+static bool g_components_initialized = false;
+static bool g_components_init_interrupted = false;
+
+static sto_core_component_init_fn g_component_start_fn = NULL;
+static void *g_component_start_arg = NULL;
+
+static sto_core_component_fini_fn g_component_stop_fn = NULL;
+static void *g_component_stop_arg = NULL;
+
+
+void
+sto_core_add_component(struct sto_core_component *component)
+{
+	TAILQ_INSERT_TAIL(&g_components, component, list);
+}
 
 static struct sto_core_component *
 _core_component_find(struct sto_component_list *list, const char *name, bool skip_internal)
@@ -30,13 +47,99 @@ _core_component_find(struct sto_component_list *list, const char *name, bool ski
 struct sto_core_component *
 sto_core_component_find(const char *name, bool skip_internal)
 {
-	return _core_component_find(&g_sto_components, name, skip_internal);
+	return _core_component_find(&g_components, name, skip_internal);
+}
+
+static inline struct sto_core_component *
+core_component_next(struct sto_core_component *component, struct sto_component_list *list)
+{
+	return !component ? TAILQ_FIRST(list) : TAILQ_NEXT(component, list);
+}
+
+static struct sto_core_component *
+sto_core_component_next(struct sto_core_component *component)
+{
+	return core_component_next(component, &g_components);
 }
 
 void
-sto_core_add_component(struct sto_core_component *component)
+sto_core_component_init_next(int rc)
 {
-	TAILQ_INSERT_TAIL(&g_sto_components, component, list);
+	/* The initialization is interrupted by the sto_core_component_fini, so just return */
+	if (g_components_init_interrupted) {
+		return;
+	}
+
+	if (rc) {
+		SPDK_ERRLOG("Init core component %s failed\n", g_next_component->name);
+		g_component_start_fn(g_component_start_arg, rc);
+		return;
+	}
+
+	g_next_component = sto_core_component_next(g_next_component);
+
+	if (!g_next_component) {
+		g_components_initialized = true;
+		g_component_start_fn(g_component_start_arg, rc);
+		return;
+	}
+
+	if (g_next_component->init) {
+		g_next_component->init();
+		return;
+	}
+
+	sto_core_component_init_next(rc);
+}
+
+void
+sto_core_component_init(sto_core_component_init_fn cb_fn, void *cb_arg)
+{
+	g_component_start_fn = cb_fn;
+	g_component_start_arg = cb_arg;
+
+	sto_core_component_init_next(0);
+}
+
+void
+sto_core_component_fini_next(void)
+{
+	if (!g_next_component) {
+		/* If the initialized flag is false, then we've failed to initialize
+		 * the very first component and no de-init is needed
+		 */
+		if (g_components_initialized) {
+			g_next_component = TAILQ_LAST(&g_components, sto_component_list);
+		}
+	} else {
+		if (g_components_initialized || g_components_init_interrupted) {
+			g_next_component = TAILQ_PREV(g_next_component, sto_component_list, list);
+		} else {
+			g_components_init_interrupted = true;
+		}
+	}
+
+	while (g_next_component) {
+		if (g_next_component->fini) {
+			g_next_component->fini();
+			return;
+		}
+
+		g_next_component = TAILQ_PREV(g_next_component, sto_component_list, list);
+	}
+
+	g_component_stop_fn(g_component_stop_arg);
+
+	return;
+}
+
+void
+sto_core_component_fini(sto_core_component_fini_fn cb_fn, void *cb_arg)
+{
+	g_component_stop_fn = cb_fn;
+	g_component_stop_arg = cb_arg;
+
+	sto_core_component_fini_next();
 }
 
 static const struct sto_core_component *

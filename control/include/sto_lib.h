@@ -2,6 +2,7 @@
 #define _STO_LIB_H_
 
 #include <spdk/queue.h>
+#include <spdk/json.h>
 #include <spdk/util.h>
 #include <spdk/string.h>
 

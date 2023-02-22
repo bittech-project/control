@@ -35,8 +35,11 @@ struct sto_core_req {
 	bool internal;
 };
 
-int sto_core_init(void);
-void sto_core_fini(void);
+typedef void (*sto_core_init_fn)(void *cb_arg, int rc);
+typedef void (*sto_core_fini_fn)(void *cb_arg);
+
+void sto_core_init(sto_core_init_fn cb_fn, void *cb_arg);
+void sto_core_fini(sto_core_fini_fn cb_fn, void *cb_arg);
 
 const char *sto_core_req_state_name(enum sto_core_req_state state);
 

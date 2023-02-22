@@ -1117,4 +1117,4 @@ static const struct sto_ops scst_ops[] = {
 
 static const struct sto_op_table scst_op_table = STO_OP_TABLE_INITIALIZER(scst_ops);
 
-STO_SUBSYSTEM_REGISTER(scst, &scst_op_table);
+STO_SUBSYSTEM_REGISTER(scst, &scst_op_table, NULL);

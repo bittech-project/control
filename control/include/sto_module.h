@@ -7,25 +7,36 @@
 
 struct sto_op_table;
 
+struct sto_module_ops {
+	void (*init)(void);
+	void (*fini)(void);
+};
+
 struct sto_module {
 	const char *name;
+
 	const struct sto_shash ops_map;
 	const struct sto_op_table *op_table;
+
+	struct sto_module_ops *ops;
 
 	TAILQ_ENTRY(sto_module) list;
 };
 
-struct sto_module *sto_module_find(const char *name);
 void sto_add_module(struct sto_module *module);
+struct sto_module *sto_module_find(const char *name);
 
-#define STO_MODULE_REGISTER(MODULE, OP_TABLE)						\
+void sto_module_init_next(int rc);
+void sto_module_fini_next(void);
+
+#define STO_MODULE_REGISTER(MODULE, OP_TABLE, OPS)					\
 static struct sto_module sto_module_ ## MODULE = {					\
 	.name = # MODULE,								\
 	.op_table = (OP_TABLE),								\
+	.ops = (OPS),									\
 };											\
 static void __attribute__((constructor)) sto_module_ ## MODULE ## _register(void)	\
 {											\
-	assert(!sto_ops_map_init(&sto_module_ ## MODULE.ops_map, (OP_TABLE)));		\
 	sto_add_module(&sto_module_ ## MODULE);						\
 }
 

@@ -422,29 +422,37 @@ sto_core_process_req(struct sto_core_req *core_req)
 	return;
 }
 
-int
-sto_core_init(void)
+void
+sto_core_init(sto_core_init_fn cb_fn, void *cb_arg)
 {
 	int rc;
 
 	g_sto_core_req_poller = SPDK_POLLER_REGISTER(sto_core_req_poll, NULL, STO_CORE_REQ_POLL_PERIOD);
 	if (spdk_unlikely(!g_sto_core_req_poller)) {
 		SPDK_ERRLOG("Cann't register the STO core req poller\n");
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto out_err;
 	}
 
 	rc = sto_req_lib_init();
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("sto_req_lib_init() failed, rc=%d\n", rc);
-		return rc;
+		goto out_err;
 	}
 
-	return 0;
+	sto_core_component_init(cb_fn, cb_arg);
+
+	return;
+
+out_err:
+	cb_fn(cb_arg, rc);
 }
 
 void
-sto_core_fini(void)
+sto_core_fini(sto_core_fini_fn cb_fn, void *cb_arg)
 {
 	sto_req_lib_fini();
 	spdk_poller_unregister(&g_sto_core_req_poller);
+
+	sto_core_component_fini(cb_fn, cb_arg);
 }
