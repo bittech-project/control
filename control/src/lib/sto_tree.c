@@ -7,22 +7,100 @@
 #include "sto_tree.h"
 #include "sto_inode.h"
 
-struct sto_tree_cmd {
-	struct sto_tree_params params;
-	struct sto_tree_node *tree_root;
-
-	int returncode;
-
-	uint32_t refcnt;
-
-	void *cb_arg;
-	sto_generic_cb cb_fn;
+enum tree_type {
+	TREE_TYPE_NONE,
+	TREE_TYPE_BASIC,
+	TREE_TYPE_WITH_BUF,
 };
 
+struct tree_cpl {
+	void *cb_arg;
+
+	enum tree_type type;
+	union {
+		struct {
+			sto_tree_complete cb_fn;
+			struct sto_tree_node tree_root;
+		} basic;
+
+		struct {
+			sto_tree_buf_complete cb_fn;
+			struct sto_tree_node *tree_root;
+		} with_buf;
+	} u;
+};
+
+static void
+tree_call_cpl(struct tree_cpl *cpl, int rc)
+{
+	switch (cpl->type) {
+	case TREE_TYPE_BASIC:
+		cpl->u.basic.cb_fn(cpl->cb_arg, &cpl->u.basic.tree_root, rc);
+		break;
+	case TREE_TYPE_WITH_BUF:
+		cpl->u.with_buf.cb_fn(cpl->cb_arg, rc);
+		break;
+	default:
+		assert(0);
+	};
+}
+
+struct sto_tree_cmd {
+	struct sto_tree_node *tree_root;
+	struct sto_tree_params params;
+	struct tree_cpl cpl;
+
+	int returncode;
+	uint32_t refcnt;
+};
+
+struct sto_tree_cmd_opts {
+	const char *dirpath;
+	uint32_t depth;
+	bool only_dirs;
+};
+
+static int sto_tree_init(struct sto_tree_node *tree_root, const char *dirpath);
+
+static int
+tree_cmd_init(struct sto_tree_cmd *cmd, struct sto_tree_cmd_opts *opts)
+{
+	struct tree_cpl *cpl = &cmd->cpl;
+	struct sto_tree_node *tree_root;
+	int rc;
+
+	switch (cpl->type) {
+	case TREE_TYPE_BASIC:
+		tree_root = &cpl->u.basic.tree_root;
+		break;
+	case TREE_TYPE_WITH_BUF:
+		tree_root = cpl->u.with_buf.tree_root;
+		break;
+	default:
+		SPDK_ERRLOG("Got unsupported readfile type (%d)\n", cpl->type);
+		return -EINVAL;
+	};
+
+	rc = sto_tree_init(tree_root, opts->dirpath);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to init root node\n");
+		return rc;
+	}
+
+	cmd->tree_root = tree_root;
+	tree_root->priv = cmd;
+
+	cmd->params.depth = opts->depth;
+	cmd->params.only_dirs = opts->only_dirs;
+
+	return 0;
+}
+
 static struct sto_tree_cmd *
-sto_tree_cmd_alloc(struct sto_tree_node *tree_root)
+sto_tree_cmd_alloc(struct sto_tree_cmd_opts *opts, struct tree_cpl *cpl)
 {
 	struct sto_tree_cmd *cmd;
+	int rc;
 
 	cmd = calloc(1, sizeof(*cmd));
 	if (spdk_unlikely(!cmd)) {
@@ -30,17 +108,20 @@ sto_tree_cmd_alloc(struct sto_tree_node *tree_root)
 		return NULL;
 	}
 
-	cmd->tree_root = tree_root;
-	tree_root->priv = cmd;
+	cmd->cpl = *cpl;
+
+	rc = tree_cmd_init(cmd, opts);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Faild to init tree cmd\n");
+		goto free_cmd;
+	}
 
 	return cmd;
-}
 
-static void
-sto_tree_cmd_init_cb(struct sto_tree_cmd *cmd, sto_generic_cb cb_fn, void *cb_arg)
-{
-	cmd->cb_fn = cb_fn;
-	cmd->cb_arg = cb_arg;
+free_cmd:
+	free(cmd);
+
+	return NULL;
 }
 
 static void
@@ -77,7 +158,7 @@ sto_tree_put_ref(struct sto_tree_node *node)
 
 	assert(cmd->refcnt > 0);
 	if (--cmd->refcnt == 0) {
-		cmd->cb_fn(cmd->cb_arg, cmd->returncode);
+		tree_call_cpl(&cmd->cpl, cmd->returncode);
 		sto_tree_cmd_free(cmd);
 	}
 }
@@ -327,34 +408,72 @@ sto_tree_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *
 	spdk_json_write_array_end(w);
 }
 
-void
-sto_tree(const char *dirpath, uint32_t depth, bool only_dirs,
-	 sto_generic_cb cb_fn, void *cb_arg, struct sto_tree_node *tree_root)
+static int
+tree(struct sto_tree_cmd_opts *opts, struct tree_cpl *cpl)
 {
 	struct sto_tree_cmd *cmd;
-	int rc;
 
-	rc = sto_tree_init(tree_root, dirpath);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to init root node\n");
-		cb_fn(cb_arg, rc);
-		return;
-	}
-
-	cmd = sto_tree_cmd_alloc(tree_root);
+	cmd = sto_tree_cmd_alloc(opts, cpl);
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to alloc memory for tree cmd\n");
-		__sto_tree_node_free(tree_root);
-		cb_fn(cb_arg, -ENOMEM);
+		return -ENOMEM;
+	}
+
+	sto_tree_cmd_run(cmd);
+
+	return 0;
+}
+
+void
+sto_tree(const char *dirpath, uint32_t depth, bool only_dirs,
+	 sto_tree_complete cb_fn, void *cb_arg)
+{
+	struct tree_cpl cpl = {};
+	struct sto_tree_cmd_opts opts = {
+		.dirpath = dirpath,
+		.depth = depth,
+		.only_dirs = only_dirs,
+	};
+	int rc;
+
+	cpl.type = TREE_TYPE_BASIC;
+	cpl.u.basic.cb_fn = cb_fn;
+	cpl.cb_arg = cb_arg;
+
+	rc = tree(&opts, &cpl);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("tree() failed\n");
+		tree_call_cpl(&cpl, rc);
 		return;
 	}
 
-	cmd->params.depth = depth;
-	cmd->params.only_dirs = only_dirs;
+	return;
+}
 
-	sto_tree_cmd_init_cb(cmd, cb_fn, cb_arg);
+void
+sto_tree_buf(const char *dirpath, uint32_t depth, bool only_dirs,
+	     sto_tree_buf_complete cb_fn, void *cb_arg,
+	     struct sto_tree_node *tree_root)
+{
+	struct tree_cpl cpl = {};
+	struct sto_tree_cmd_opts opts = {
+		.dirpath = dirpath,
+		.depth = depth,
+		.only_dirs = only_dirs,
+	};
+	int rc;
 
-	sto_tree_cmd_run(cmd);
+	cpl.type = TREE_TYPE_WITH_BUF;
+	cpl.u.with_buf.cb_fn = cb_fn;
+	cpl.cb_arg = cb_arg;
+	cpl.u.with_buf.tree_root = tree_root;
+
+	rc = tree(&opts, &cpl);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("tree() failed\n");
+		tree_call_cpl(&cpl, rc);
+		return;
+	}
 
 	return;
 }

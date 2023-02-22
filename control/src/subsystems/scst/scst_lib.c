@@ -295,7 +295,7 @@ scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct 
 	ctx->cb_arg = cb_arg;
 	ctx->json = json;
 
-	sto_tree(dirpath, 1, false, read_attrs_done, ctx, &ctx->tree_root);
+	sto_tree_buf(dirpath, 1, false, read_attrs_done, ctx, &ctx->tree_root);
 
 	return;
 }
