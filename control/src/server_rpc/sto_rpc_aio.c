@@ -366,8 +366,9 @@ sto_rpc_readfile(const char *filepath, uint32_t size,
 }
 
 void
-sto_rpc_readfile_buf(const char *filepath, uint32_t size, char **buf,
-		     sto_rpc_readfile_buf_complete cb_fn, void *cb_arg)
+sto_rpc_readfile_buf(const char *filepath, uint32_t size,
+		     sto_rpc_readfile_buf_complete cb_fn, void *cb_arg,
+		     char **buf)
 {
 	struct rpc_readfile_cpl cpl = {};
 	struct rpc_readfile_params params = {
@@ -497,8 +498,8 @@ sto_rpc_readlink_cmd_run(struct sto_rpc_readlink_cmd *cmd, struct sto_rpc_readli
 	return sto_client_send("readlink", params, sto_rpc_readlink_info_json, &args);
 }
 
-int
-sto_rpc_readlink(const char *filepath, struct sto_rpc_readlink_args *args)
+void
+sto_rpc_readlink(const char *filepath, sto_generic_cb cb_fn, void *cb_arg, char **buf)
 {
 	struct sto_rpc_readlink_cmd *cmd;
 	struct sto_rpc_readlink_params params = {
@@ -509,12 +510,13 @@ sto_rpc_readlink(const char *filepath, struct sto_rpc_readlink_args *args)
 	cmd = sto_rpc_readlink_cmd_alloc();
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to allocate RPC readlink cmd\n");
-		return -ENOMEM;
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
-	cmd->buf = args->buf;
+	cmd->buf = buf;
 
-	sto_rpc_readlink_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
+	sto_rpc_readlink_cmd_init_cb(cmd, cb_fn, cb_arg);
 
 	rc = sto_rpc_readlink_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {
@@ -522,10 +524,11 @@ sto_rpc_readlink(const char *filepath, struct sto_rpc_readlink_args *args)
 		goto free_cmd;
 	}
 
-	return 0;
+	return;
 
 free_cmd:
 	sto_rpc_readlink_cmd_free(cmd);
+	cb_fn(cb_arg, rc);
 
-	return rc;
+	return;
 }

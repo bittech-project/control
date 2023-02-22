@@ -12,52 +12,41 @@
 static int
 iscsi_start_daemon(struct sto_req *req)
 {
-	struct sto_rpc_subprocess_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-	};
-
 	SPDK_ERRLOG("GLEB: Start iscsi-scstd\n");
 
-	return sto_rpc_subprocess_fmt("iscsi-scstd -p 3260", &args);
+	sto_rpc_subprocess_fmt("iscsi-scstd -p 3260", sto_req_step_done, req, NULL);
+
+	return 0;
 }
 
 static int
 iscsi_stop_daemon(struct sto_req *req)
 {
-	struct sto_rpc_subprocess_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-	};
-
 	SPDK_ERRLOG("GLEB: Stop iscsi-scstd\n");
 
-	return sto_rpc_subprocess_fmt("pkill iscsi-scstd", &args);
+	sto_rpc_subprocess_fmt("pkill iscsi-scstd", sto_req_step_done, req, NULL);
+
+	return 0;
 }
 
 static int
 iscsi_modprobe(struct sto_req *req)
 {
-	struct sto_rpc_subprocess_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-	};
-
 	SPDK_ERRLOG("GLEB: Modprobe iscsi-scst\n");
 
-	return sto_rpc_subprocess_fmt("modprobe %s", &args, "iscsi-scst");
+	sto_rpc_subprocess_fmt("modprobe %s", sto_req_step_done, req, NULL, "iscsi-scst");
+
+	return 0;
 }
 
 static int
 iscsi_rmmod(struct sto_req *req)
 {
-	struct sto_rpc_subprocess_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-	};
 	SPDK_ERRLOG("GLEB: Rmmod iscsi-scst\n");
 
-	return sto_rpc_subprocess_fmt("rmmod %s", &args, "iscsi-scst");
+	sto_rpc_subprocess_fmt("rmmod %s", sto_req_step_done, req, NULL, "iscsi-scst");
+
+	return 0;
 }
 
 const struct sto_req_properties sto_iscsi_init_req_properties = {

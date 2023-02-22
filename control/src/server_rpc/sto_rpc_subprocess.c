@@ -120,13 +120,13 @@ sto_rpc_subprocess_cmd_run(struct sto_rpc_subprocess_cmd *cmd,
 	return sto_client_send("subprocess", params, sto_rpc_subprocess_info_json, &args);
 }
 
-int
-sto_rpc_subprocess(const char *const *argv, struct sto_rpc_subprocess_args *args)
+void
+sto_rpc_subprocess(const char *const *argv, sto_generic_cb cb_fn, void *cb_arg, char **output)
 {
 	struct sto_rpc_subprocess_cmd *cmd;
 	struct sto_rpc_subprocess_params params = {
 		.argv = argv,
-		.capture_output = args->output != NULL,
+		.capture_output = output != NULL,
 	};
 	int rc = 0;
 
@@ -135,12 +135,13 @@ sto_rpc_subprocess(const char *const *argv, struct sto_rpc_subprocess_args *args
 	cmd = sto_rpc_subprocess_cmd_alloc();
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to create subprocess\n");
-		return -ENOMEM;
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
-	cmd->output = args->output;
+	cmd->output = output;
 
-	sto_rpc_subprocess_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
+	sto_rpc_subprocess_cmd_init_cb(cmd, cb_fn, cb_arg);
 
 	rc = sto_rpc_subprocess_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {
@@ -148,31 +149,32 @@ sto_rpc_subprocess(const char *const *argv, struct sto_rpc_subprocess_args *args
 		goto free_cmd;
 	}
 
-	return 0;
+	return;
 
 free_cmd:
 	sto_rpc_subprocess_cmd_free(cmd);
+	cb_fn(cb_arg, rc);
 
-	return rc;
+	return;
 }
 
-int
-sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ...)
+void
+sto_rpc_subprocess_fmt(const char *fmt, sto_generic_cb cb_fn, void *cb_arg, char **output, ...)
 {
 	va_list fmt_args;
 	char *argv_s;
 	const char * const *argv;
-	int rc = 0;
 
 	assert(fmt && fmt[0] != '\0');
 
-	va_start(fmt_args, args);
+	va_start(fmt_args, output);
 	argv_s = spdk_vsprintf_alloc(fmt, fmt_args);
 	va_end(fmt_args);
 
 	if (spdk_unlikely(!argv_s)) {
 		SPDK_ERRLOG("Failed to alloc format string for subprocess arguments\n");
-		return -ENOMEM;
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
 	argv = (const char * const *) spdk_strarray_from_string(argv_s, " ");
@@ -181,12 +183,13 @@ sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ..
 
 	if (spdk_unlikely(!argv)) {
 		SPDK_ERRLOG("Failed to split subprocess arguments string\n");
-		return -EINVAL;
+		cb_fn(cb_arg, -EINVAL);
+		return;
 	}
 
-	rc = sto_rpc_subprocess((const char * const *) argv, args);
+	sto_rpc_subprocess((const char * const *) argv, cb_fn, cb_arg, output);
 
 	spdk_strarray_free((char **) argv);
 
-	return rc;
+	return;
 }

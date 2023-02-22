@@ -153,8 +153,8 @@ sto_rpc_readdir_cmd_run(struct sto_rpc_readdir_cmd *cmd, struct sto_rpc_readdir_
 	return sto_client_send("readdir", params, sto_rpc_readdir_info_json, &args);
 }
 
-int
-sto_rpc_readdir(const char *dirpath, struct sto_rpc_readdir_args *args)
+void
+sto_rpc_readdir(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct sto_dirents *dirents)
 {
 	struct sto_rpc_readdir_cmd *cmd;
 	struct sto_rpc_readdir_params params = {
@@ -166,12 +166,13 @@ sto_rpc_readdir(const char *dirpath, struct sto_rpc_readdir_args *args)
 	cmd = sto_rpc_readdir_cmd_alloc();
 	if (spdk_unlikely(!cmd)) {
 		SPDK_ERRLOG("Failed to alloc memory for readdir cmd\n");
-		return -ENOMEM;
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
-	cmd->dirents = args->dirents;
+	cmd->dirents = dirents;
 
-	sto_rpc_readdir_cmd_init_cb(cmd, args->cb_fn, args->cb_arg);
+	sto_rpc_readdir_cmd_init_cb(cmd, cb_fn, cb_arg);
 
 	rc = sto_rpc_readdir_cmd_run(cmd, &params);
 	if (spdk_unlikely(rc)) {
@@ -179,12 +180,13 @@ sto_rpc_readdir(const char *dirpath, struct sto_rpc_readdir_args *args)
 		goto free_cmd;
 	}
 
-	return 0;
+	return;
 
 free_cmd:
 	sto_rpc_readdir_cmd_free(cmd);
+	cb_fn(cb_arg, rc);
 
-	return rc;
+	return;
 }
 
 void

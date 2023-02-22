@@ -23,14 +23,7 @@ struct sto_dirents_json_cfg {
 	uint32_t type;
 };
 
-struct sto_rpc_readdir_args {
-	void *cb_arg;
-	sto_generic_cb cb_fn;
-
-	struct sto_dirents *dirents;
-};
-
-int sto_rpc_readdir(const char *dirpath, struct sto_rpc_readdir_args *args);
+void sto_rpc_readdir(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct sto_dirents *dirents);
 
 void sto_dirents_info_json(struct sto_dirents *dirents,
 			   struct sto_dirents_json_cfg *cfg, struct spdk_json_write_ctx *w);

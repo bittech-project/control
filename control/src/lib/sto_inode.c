@@ -170,8 +170,9 @@ sto_file_inode_read(struct sto_inode *inode)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
 
-	sto_rpc_readfile_buf(inode->path, 0, &file_inode->buf,
-			     sto_inode_read_done, inode);
+	sto_rpc_readfile_buf(inode->path, 0,
+			     sto_inode_read_done, inode,
+			     &file_inode->buf);
 
 	return 0;
 }
@@ -264,18 +265,15 @@ static int
 sto_dir_inode_read(struct sto_inode *inode)
 {
 	struct sto_dir_inode *dir_inode = sto_dir_inode(inode);
-	struct sto_rpc_readdir_args args = {
-		.cb_arg = inode,
-		.cb_fn = sto_inode_read_done,
-		.dirents = &dir_inode->dirents,
-	};
 
 	if (sto_inode_check_tree_depth(inode)) {
 		sto_inode_put_ref(inode);
 		return 0;
 	}
 
-	return sto_rpc_readdir(inode->path, &args);
+	sto_rpc_readdir(inode->path, sto_inode_read_done, inode, &dir_inode->dirents);
+
+	return 0;
 }
 
 static int
@@ -355,13 +353,10 @@ static int
 sto_lnk_inode_read(struct sto_inode *inode)
 {
 	struct sto_file_inode *file_inode = sto_file_inode(inode);
-	struct sto_rpc_readlink_args args = {
-		.cb_arg = inode,
-		.cb_fn = sto_inode_read_done,
-		.buf = &file_inode->buf,
-	};
 
-	return sto_rpc_readlink(inode->path, &args);
+	sto_rpc_readlink(inode->path, sto_inode_read_done, inode, &file_inode->buf);
+
+	return 0;
 }
 
 static struct sto_inode_ops sto_lnk_inode_ops = {

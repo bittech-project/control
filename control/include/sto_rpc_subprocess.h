@@ -12,7 +12,7 @@ struct sto_rpc_subprocess_args {
 	char **output;
 };
 
-int sto_rpc_subprocess(const char *const *argv, struct sto_rpc_subprocess_args *args);
-int sto_rpc_subprocess_fmt(const char *fmt, struct sto_rpc_subprocess_args *args, ...);
+void sto_rpc_subprocess(const char *const *argv, sto_generic_cb cb_fn, void *cb_arg, char **output);
+void sto_rpc_subprocess_fmt(const char *fmt, sto_generic_cb cb_fn, void *cb_arg, char **output, ...);
 
 #endif /* _STO_RPC_SUBPROCESS_H_ */

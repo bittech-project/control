@@ -17,17 +17,10 @@ void sto_rpc_readfile(const char *filepath, uint32_t size,
 
 typedef void (*sto_rpc_readfile_buf_complete)(void *cb_arg, int rc);
 
-void sto_rpc_readfile_buf(const char *filepath, uint32_t size, char **buf,
-			  sto_rpc_readfile_buf_complete cb_fn, void *cb_arg);
+void sto_rpc_readfile_buf(const char *filepath, uint32_t size,
+			  sto_rpc_readfile_buf_complete cb_fn, void *cb_arg,
+			  char **buf);
 
-struct sto_rpc_readlink_args {
-	void *cb_arg;
-	sto_generic_cb cb_fn;
-
-	char **buf;
-};
-
-int sto_rpc_readlink(const char *filepath,
-		     struct sto_rpc_readlink_args *args);
+void sto_rpc_readlink(const char *filepath, sto_generic_cb cb_fn, void *cb_arg, char **buf);
 
 #endif /* _STO_RPC_AIO_H_ */

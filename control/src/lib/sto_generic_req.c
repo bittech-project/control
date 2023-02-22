@@ -61,8 +61,9 @@ sto_read_req_exec(struct sto_req *req)
 	struct sto_read_req_priv *priv = req->type.priv;
 	struct sto_read_req_params *params = req->type.params;
 
-	sto_rpc_readfile_buf(params->file, params->size, &priv->buf,
-			     sto_req_step_done, req);
+	sto_rpc_readfile_buf(params->file, params->size,
+			     sto_req_step_done, req,
+			     &priv->buf);
 
 	return 0;
 }
@@ -112,13 +113,10 @@ sto_readlink_req_exec(struct sto_req *req)
 {
 	struct sto_readlink_req_priv *priv = req->type.priv;
 	struct sto_readlink_req_params *params = req->type.params;
-	struct sto_rpc_readlink_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-		.buf = &priv->buf,
-	};
 
-	return sto_rpc_readlink(params->file, &args);
+	sto_rpc_readlink(params->file, sto_req_step_done, req, &priv->buf);
+
+	return 0;
 }
 
 static void
@@ -167,13 +165,10 @@ sto_readdir_req_exec(struct sto_req *req)
 {
 	struct sto_readdir_req_priv *priv = req->type.priv;
 	struct sto_readdir_req_params *params = req->type.params;
-	struct sto_rpc_readdir_args args = {
-		.cb_arg = req,
-		.cb_fn = sto_req_step_done,
-		.dirents = &priv->dirents,
-	};
 
-	return sto_rpc_readdir(params->dirpath, &args);
+	sto_rpc_readdir(params->dirpath, sto_req_step_done, req, &priv->dirents);
+
+	return 0;
 }
 
 static void
