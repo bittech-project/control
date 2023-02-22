@@ -245,7 +245,6 @@ scst_serialize_attrs_cb(void *priv, struct spdk_json_write_ctx *w)
 }
 
 struct read_attrs_ctx {
-	struct sto_tree_node tree_root;
 	struct sto_json_ctx *json;
 
 	void *cb_arg;
@@ -253,7 +252,7 @@ struct read_attrs_ctx {
 };
 
 static void
-read_attrs_done(void *cb_arg, int rc)
+read_attrs_done(void *cb_arg, struct sto_tree_node *tree_root, int rc)
 {
 	struct read_attrs_ctx *ctx = cb_arg;
 
@@ -261,7 +260,7 @@ read_attrs_done(void *cb_arg, int rc)
 		goto out;
 	}
 
-	rc = sto_json_ctx_dump(ctx->json, true, (void *) &ctx->tree_root, scst_serialize_attrs_cb);
+	rc = sto_json_ctx_dump(ctx->json, true, (void *) tree_root, scst_serialize_attrs_cb);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to dump SCST dev attributes\n");
 		goto out;
@@ -273,7 +272,7 @@ read_attrs_done(void *cb_arg, int rc)
 out:
 	ctx->cb_fn(ctx->cb_arg, rc);
 
-	sto_tree_free(&ctx->tree_root);
+	sto_tree_free(tree_root);
 	free(ctx);
 
 	return;
@@ -295,7 +294,7 @@ scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct 
 	ctx->cb_arg = cb_arg;
 	ctx->json = json;
 
-	sto_tree_buf(dirpath, 1, false, read_attrs_done, ctx, &ctx->tree_root);
+	sto_tree(dirpath, 1, false, read_attrs_done, ctx);
 
 	return;
 }
