@@ -10,41 +10,41 @@
 #include "sto_err.h"
 
 static int
-iscsi_start_daemon(struct sto_req *req)
+iscsi_start_daemon(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Start iscsi-scstd\n");
 
-	sto_rpc_subprocess_fmt("iscsi-scstd -p 3260", sto_req_step_done, req, NULL);
+	sto_rpc_subprocess_fmt("iscsi-scstd -p 3260", sto_pipeline_step_done, pipe, NULL);
 
 	return 0;
 }
 
 static int
-iscsi_stop_daemon(struct sto_req *req)
+iscsi_stop_daemon(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Stop iscsi-scstd\n");
 
-	sto_rpc_subprocess_fmt("pkill iscsi-scstd", sto_req_step_done, req, NULL);
+	sto_rpc_subprocess_fmt("pkill iscsi-scstd", sto_pipeline_step_done, pipe, NULL);
 
 	return 0;
 }
 
 static int
-iscsi_modprobe(struct sto_req *req)
+iscsi_modprobe(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Modprobe iscsi-scst\n");
 
-	sto_rpc_subprocess_fmt("modprobe %s", sto_req_step_done, req, NULL, "iscsi-scst");
+	sto_rpc_subprocess_fmt("modprobe %s", sto_pipeline_step_done, pipe, NULL, "iscsi-scst");
 
 	return 0;
 }
 
 static int
-iscsi_rmmod(struct sto_req *req)
+iscsi_rmmod(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Rmmod iscsi-scst\n");
 
-	sto_rpc_subprocess_fmt("rmmod %s", sto_req_step_done, req, NULL, "iscsi-scst");
+	sto_rpc_subprocess_fmt("rmmod %s", sto_pipeline_step_done, pipe, NULL, "iscsi-scst");
 
 	return 0;
 }
@@ -52,24 +52,25 @@ iscsi_rmmod(struct sto_req *req)
 const struct sto_req_properties sto_iscsi_init_req_properties = {
 	.response = sto_dummy_req_response,
 	.steps = {
-		STO_REQ_STEP(iscsi_modprobe, iscsi_rmmod),
-		STO_REQ_STEP(iscsi_start_daemon, iscsi_stop_daemon),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(iscsi_modprobe, iscsi_rmmod),
+		STO_PL_STEP(iscsi_start_daemon, iscsi_stop_daemon),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 
 const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 	.response = sto_dummy_req_response,
 	.steps = {
-		STO_REQ_STEP(iscsi_stop_daemon, NULL),
-		STO_REQ_STEP(iscsi_rmmod, NULL),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(iscsi_stop_daemon, NULL),
+		STO_PL_STEP(iscsi_rmmod, NULL),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 
 static int
-scst_dev_open(struct sto_req *req)
+scst_dev_open(struct sto_pipeline *pipe)
 {
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
 	struct sto_json_head_raw *head = sto_json_subsystem_head_raw("scst", "dev_open");
 
 	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("device", "gleb"));
@@ -82,8 +83,8 @@ scst_dev_open(struct sto_req *req)
 const struct sto_req_properties scst_dev_over_iscsi_req_properties = {
 	.response = sto_dummy_req_response,
 	.steps = {
-		STO_REQ_STEP(scst_dev_open, NULL),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(scst_dev_open, NULL),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 

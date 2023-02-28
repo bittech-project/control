@@ -17,23 +17,24 @@ sto_write_req_params_deinit(void *params_ptr)
 }
 
 static int
-sto_write_req_exec(struct sto_req *req)
+sto_write_req_exec(struct sto_pipeline *pipe)
 {
-	struct sto_write_req_params *params = req->type.params;
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct sto_write_req_params *params = sto_req_get_params(req);
 
-	sto_rpc_writefile(params->file, 0, params->data, sto_req_step_done, req);
+	sto_rpc_writefile(params->file, 0, params->data, sto_pipeline_step_done, pipe);
 
 	return 0;
 }
 
 const struct sto_req_properties sto_write_req_properties = {
 	.params_size = sizeof(struct sto_write_req_params),
-	.params_deinit = sto_write_req_params_deinit,
+	.params_deinit_fn = sto_write_req_params_deinit,
 
 	.response = sto_dummy_req_response,
 	.steps = {
-		STO_REQ_STEP(sto_write_req_exec, NULL),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(sto_write_req_exec, NULL),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 
@@ -56,14 +57,14 @@ sto_read_req_params_deinit(void *params_ptr)
 }
 
 static int
-sto_read_req_exec(struct sto_req *req)
+sto_read_req_exec(struct sto_pipeline *pipe)
 {
-	struct sto_read_req_priv *priv = req->type.priv;
-	struct sto_read_req_params *params = req->type.params;
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct sto_read_req_priv *priv = sto_req_get_priv(req);
+	struct sto_read_req_params *params = sto_req_get_params(req);
 
 	sto_rpc_readfile_buf(params->file, params->size,
-			     sto_req_step_done, req,
-			     &priv->buf);
+			     sto_pipeline_step_done, pipe, &priv->buf);
 
 	return 0;
 }
@@ -71,22 +72,22 @@ sto_read_req_exec(struct sto_req *req)
 static void
 sto_read_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_read_req_priv *priv = req->type.priv;
+	struct sto_read_req_priv *priv = sto_req_get_priv(req);
 
 	spdk_json_write_string(w, priv->buf);
 }
 
 const struct sto_req_properties sto_read_req_properties = {
 	.params_size = sizeof(struct sto_read_req_params),
-	.params_deinit = sto_read_req_params_deinit,
+	.params_deinit_fn = sto_read_req_params_deinit,
 
 	.priv_size = sizeof(struct sto_read_req_priv),
-	.priv_deinit = sto_read_req_priv_deinit,
+	.priv_deinit_fn = sto_read_req_priv_deinit,
 
 	.response = sto_read_req_response,
 	.steps = {
-		STO_REQ_STEP(sto_read_req_exec, NULL),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(sto_read_req_exec, NULL),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 
@@ -109,12 +110,13 @@ sto_readlink_req_priv_deinit(void *priv_ptr)
 }
 
 static int
-sto_readlink_req_exec(struct sto_req *req)
+sto_readlink_req_exec(struct sto_pipeline *pipe)
 {
-	struct sto_readlink_req_priv *priv = req->type.priv;
-	struct sto_readlink_req_params *params = req->type.params;
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct sto_readlink_req_priv *priv = sto_req_get_priv(req);
+	struct sto_readlink_req_params *params = sto_req_get_params(req);
 
-	sto_rpc_readlink(params->file, sto_req_step_done, req, &priv->buf);
+	sto_rpc_readlink(params->file, sto_pipeline_step_done, pipe, &priv->buf);
 
 	return 0;
 }
@@ -122,22 +124,22 @@ sto_readlink_req_exec(struct sto_req *req)
 static void
 sto_readlink_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readlink_req_priv *priv = req->type.priv;
+	struct sto_readlink_req_priv *priv = sto_req_get_priv(req);
 
 	spdk_json_write_string(w, priv->buf);
 }
 
 const struct sto_req_properties sto_readlink_req_properties = {
 	.params_size = sizeof(struct sto_readlink_req_params),
-	.params_deinit = sto_readlink_req_params_deinit,
+	.params_deinit_fn = sto_readlink_req_params_deinit,
 
 	.priv_size = sizeof(struct sto_readlink_req_priv),
-	.priv_deinit = sto_readlink_req_priv_deinit,
+	.priv_deinit_fn = sto_readlink_req_priv_deinit,
 
 	.response = sto_readlink_req_response,
 	.steps = {
-		STO_REQ_STEP(sto_readlink_req_exec, NULL),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(sto_readlink_req_exec, NULL),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 
@@ -161,12 +163,13 @@ sto_readdir_req_priv_deinit(void *priv_ptr)
 }
 
 static int
-sto_readdir_req_exec(struct sto_req *req)
+sto_readdir_req_exec(struct sto_pipeline *pipe)
 {
-	struct sto_readdir_req_priv *priv = req->type.priv;
-	struct sto_readdir_req_params *params = req->type.params;
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct sto_readdir_req_priv *priv = sto_req_get_priv(req);
+	struct sto_readdir_req_params *params = sto_req_get_params(req);
 
-	sto_rpc_readdir(params->dirpath, sto_req_step_done, req, &priv->dirents);
+	sto_rpc_readdir(params->dirpath, sto_pipeline_step_done, pipe, &priv->dirents);
 
 	return 0;
 }
@@ -174,27 +177,27 @@ sto_readdir_req_exec(struct sto_req *req)
 static void
 sto_readdir_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_readdir_req_priv *priv = req->type.priv;
-	struct sto_readdir_req_params *params = req->type.params;
+	struct sto_readdir_req_priv *req_priv = sto_req_get_priv(req);
+	struct sto_readdir_req_params *params = sto_req_get_params(req);
 	struct sto_dirents_json_cfg cfg = {
 		.name = params->name,
 		.exclude_list = params->exclude_list,
 	};
 
-	sto_dirents_info_json(&priv->dirents, &cfg, w);
+	sto_dirents_info_json(&req_priv->dirents, &cfg, w);
 }
 
 const struct sto_req_properties sto_readdir_req_properties = {
 	.params_size = sizeof(struct sto_readdir_req_params),
-	.params_deinit = sto_readdir_req_params_deinit,
+	.params_deinit_fn = sto_readdir_req_params_deinit,
 
 	.priv_size = sizeof(struct sto_readdir_req_priv),
-	.priv_deinit = sto_readdir_req_priv_deinit,
+	.priv_deinit_fn = sto_readdir_req_priv_deinit,
 
 	.response = sto_readdir_req_response,
 	.steps = {
-		STO_REQ_STEP(sto_readdir_req_exec, NULL),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(sto_readdir_req_exec, NULL),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 
@@ -217,13 +220,14 @@ sto_tree_req_priv_deinit(void *priv_ptr)
 }
 
 static int
-sto_tree_req_exec(struct sto_req *req)
+sto_tree_req_exec(struct sto_pipeline *pipe)
 {
-	struct sto_tree_req_priv *priv = req->type.priv;
-	struct sto_tree_req_params *params = req->type.params;
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct sto_tree_req_priv *priv = sto_req_get_priv(req);
+	struct sto_tree_req_params *params = sto_req_get_params(req);
 
 	sto_tree_buf(params->dirpath, params->depth, params->only_dirs,
-		     sto_req_step_done, req, &priv->tree_root);
+		     sto_pipeline_step_done, pipe, &priv->tree_root);
 
 	return 0;
 }
@@ -231,8 +235,8 @@ sto_tree_req_exec(struct sto_req *req)
 static void
 sto_tree_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_req_priv *priv = req->type.priv;
-	struct sto_tree_req_params *params = req->type.params;
+	struct sto_tree_req_priv *priv = sto_req_get_priv(req);
+	struct sto_tree_req_params *params = sto_req_get_params(req);
 	struct sto_tree_node *tree_root = &priv->tree_root;
 
 	if (params->info_json) {
@@ -245,14 +249,14 @@ sto_tree_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 
 const struct sto_req_properties sto_tree_req_properties = {
 	.params_size = sizeof(struct sto_tree_req_params),
-	.params_deinit = sto_tree_req_params_deinit,
+	.params_deinit_fn = sto_tree_req_params_deinit,
 
 	.priv_size = sizeof(struct sto_tree_req_priv),
-	.priv_deinit = sto_tree_req_priv_deinit,
+	.priv_deinit_fn = sto_tree_req_priv_deinit,
 
 	.response = sto_tree_req_response,
 	.steps = {
-		STO_REQ_STEP(sto_tree_req_exec, NULL),
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP(sto_tree_req_exec, NULL),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };

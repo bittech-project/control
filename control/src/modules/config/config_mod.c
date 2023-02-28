@@ -16,7 +16,7 @@ config_version_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 const struct sto_req_properties config_version_req_properties = {
 	.response = config_version_req_response,
 	.steps = {
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 
@@ -129,7 +129,7 @@ config_op_json_info(const struct sto_ops *op, struct spdk_json_write_ctx *w)
 static void
 config_info_req_response(struct sto_req *req, struct spdk_json_write_ctx *w)
 {
-	struct config_info_req_params *params = req->type.params;
+	struct config_info_req_params *params = sto_req_get_params(req);
 
 	switch (params->type) {
 	case CONFIG_INFO_TYPE_COMPONENT:
@@ -155,7 +155,7 @@ const struct sto_req_properties config_info_req_properties = {
 
 	.response = config_info_req_response,
 	.steps = {
-		STO_REQ_STEP_TERMINATOR(),
+		STO_PL_STEP_TERMINATOR(),
 	}
 };
 

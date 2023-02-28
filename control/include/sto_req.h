@@ -5,6 +5,7 @@
 #include <spdk/util.h>
 
 #include "sto_lib.h"
+#include "sto_pipeline.h"
 #include "sto_core.h"
 
 typedef void (*sto_req_context_done_t)(void *priv);
@@ -17,41 +18,28 @@ struct sto_req_context {
 
 struct sto_req;
 
-typedef int (*sto_req_action_t)(struct sto_req *req);
-
-#define STO_REQ_CONSTRUCTOR_FINISHED INT_MAX
-
-enum sto_req_action_type {
-	STO_REQ_ACTION_NORMAL,
-	STO_REQ_ACTION_ROLLBACK,
-	STO_REQ_ACTION_CONSTRUCTOR,
-	STO_REQ_ACTION_DESTRUCTOR,
-	STO_REQ_ACTION_CNT,
-};
-
-struct sto_req_action {
-	sto_req_action_t fn;
-
-	void *priv;
-	void (*priv_free)(void *priv);
-
-	int (*execute)(struct sto_req_action *action, struct sto_req *req);
-
-	TAILQ_ENTRY(sto_req_action) list;
-};
-TAILQ_HEAD(sto_req_action_list, sto_req_action);
-
 typedef void (*sto_req_params_deinit_t)(void *priv);
 typedef void (*sto_req_priv_deinit_t)(void *priv);
 
 typedef void (*sto_req_response_t)(struct sto_req *req, struct spdk_json_write_ctx *w);
 
+struct sto_req_properties {
+	size_t params_size;
+	sto_req_params_deinit_t params_deinit_fn;
+
+	size_t priv_size;
+	sto_req_priv_deinit_t priv_deinit_fn;
+
+	sto_req_response_t response;
+	struct sto_pipeline_step steps[];
+};
+
 struct sto_req_type {
 	void *params;
-	sto_req_params_deinit_t params_deinit;
+	sto_req_params_deinit_t params_deinit_fn;
 
 	void *priv;
-	sto_req_priv_deinit_t priv_deinit;
+	sto_req_priv_deinit_t priv_deinit_fn;
 
 	sto_req_response_t response;
 };
@@ -60,106 +48,41 @@ struct sto_req {
 	struct sto_req_context ctx;
 	struct sto_req_type type;
 
-	int returncode;
-	bool rollback;
-
-	struct sto_req_action *cur_rollback;
-
-	struct sto_req_action_list action_queue;
-	struct sto_req_action_list rollback_stack;
-
-	TAILQ_ENTRY(sto_req) list;
-};
-
-#define STO_REQ(x) \
-	SPDK_CONTAINEROF((x), struct sto_req, ctx)
-
-enum sto_req_step_type {
-	STO_REQ_STEP_SINGLE,
-	STO_REQ_STEP_CONSTRUCTOR,
-	STO_REQ_STEP_TERMINATOR,
-	STO_REQ_STEP_CNT,
-};
-
-struct sto_req_step {
-	enum sto_req_step_type type;
-
-	sto_req_action_t action_fn;
-	sto_req_action_t rollback_fn;
-};
-
-#define STO_REQ_STEP(_action_fn, _rollback_fn)		\
-	{						\
-		.type = STO_REQ_STEP_SINGLE,		\
-		.action_fn = _action_fn,		\
-		.rollback_fn = _rollback_fn,		\
-	}
-
-#define STO_REQ_STEP_CONSTRUCTOR(_constructor_fn, _destructor_fn)	\
-	{								\
-		.type = STO_REQ_STEP_CONSTRUCTOR,			\
-		.action_fn = _constructor_fn,				\
-		.rollback_fn = _destructor_fn,				\
-	}
-
-#define STO_REQ_STEP_TERMINATOR()			\
-	{						\
-		.type = STO_REQ_STEP_TERMINATOR,	\
-	}
-
-struct sto_req_properties {
-	size_t params_size;
-	sto_req_params_deinit_t params_deinit;
-
-	size_t priv_size;
-	sto_req_priv_deinit_t priv_deinit;
-
-	sto_req_response_t response;
-	struct sto_req_step steps[];
+	struct sto_pipeline pipeline;
 };
 
 int sto_req_lib_init(void);
 void sto_req_lib_fini(void);
 
-void sto_req_step_next(struct sto_req *req, int rc);
+void sto_req_run(struct sto_req *req);
 
-static inline void
-sto_req_step_start(struct sto_req *req)
+static inline struct sto_req *
+sto_req_from_ctx(struct sto_req_context *req_ctx)
 {
-	sto_req_step_next(req, 0);
+	return SPDK_CONTAINEROF(req_ctx, struct sto_req, ctx);
 }
 
-int sto_req_add_action(struct sto_req *req, enum sto_req_action_type type,
-		       sto_req_action_t action_fn, sto_req_action_t rollback_fn);
-
-static inline int
-sto_req_add_step(struct sto_req *req, const struct sto_req_step *step)
+static inline void *
+sto_req_get_priv(struct sto_req *req)
 {
-	enum sto_req_action_type action_map[STO_REQ_STEP_CNT] = {
-		[STO_REQ_STEP_SINGLE] = STO_REQ_ACTION_NORMAL,
-		[STO_REQ_STEP_CONSTRUCTOR] = STO_REQ_ACTION_CONSTRUCTOR,
-		[STO_REQ_STEP_TERMINATOR] = STO_REQ_ACTION_CNT,
-	};
-
-	assert(step->type <= SPDK_COUNTOF(action_map));
-
-	return sto_req_add_action(req, action_map[step->type], step->action_fn, step->rollback_fn);
+	return req->type.priv;
 }
 
-int sto_req_add_steps(struct sto_req *req, const struct sto_req_step *steps);
-
-static inline void
-sto_req_step_done(void *priv, int rc)
+static inline void *
+sto_req_get_params(struct sto_req *req)
 {
-	struct sto_req *req = priv;
-
-	sto_req_step_next(req, rc);
+	return req->type.params;
 }
 
 static inline void
-sto_req_done(struct sto_req *req)
+sto_req_done(void *cb_arg, int rc)
 {
+	struct sto_req *req = cb_arg;
 	struct sto_req_context *req_ctx = &req->ctx;
+
+	if (spdk_unlikely(rc)) {
+		sto_err(req_ctx->err_ctx, rc);
+	}
 
 	req_ctx->done(req_ctx->priv);
 }

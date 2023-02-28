@@ -348,9 +348,9 @@ sto_core_req_exec_done(void *priv)
 static void
 sto_core_req_exec(struct sto_core_req *core_req)
 {
-	struct sto_req *req = STO_REQ(core_req->req_ctx);
+	struct sto_req *req = sto_req_from_ctx(core_req->req_ctx);
 
-	sto_req_step_start(req);
+	sto_req_run(req);
 }
 
 static void
@@ -372,7 +372,7 @@ sto_core_req_response(struct sto_core_req *core_req, struct spdk_json_write_ctx 
 		return;
 	}
 
-	req = STO_REQ(core_req->req_ctx);
+	req = sto_req_from_ctx(core_req->req_ctx);
 	req->type.response(req, w);
 
 	return;
@@ -382,7 +382,7 @@ void
 sto_core_req_free(struct sto_core_req *core_req)
 {
 	if (core_req->req_ctx) {
-		struct sto_req *req = STO_REQ(core_req->req_ctx);
+		struct sto_req *req = sto_req_from_ctx(core_req->req_ctx);
 
 		sto_req_free(req);
 		core_req->req_ctx = NULL;
