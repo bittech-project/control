@@ -7,6 +7,7 @@
 #include "sto_core.h"
 #include "sto_subsystem.h"
 #include "sto_module.h"
+#include "sto_err.h"
 
 #include <sto_server.h>
 
@@ -27,6 +28,8 @@ control_parse_arg(int ch, char *arg)
 	return 0;
 }
 
+static void control_shutdown(int rc);
+
 static void
 control_core_init_done(void *cb_arg, int rc)
 {
@@ -40,15 +43,7 @@ control_core_init_done(void *cb_arg, int rc)
 	return;
 
 out_err:
-	spdk_app_stop(rc);
-}
-
-static void
-control_core_fini_done(void *cb_arg)
-{
-	sto_client_close();
-
-	spdk_app_stop(0);
+	control_shutdown(rc);
 }
 
 /*
@@ -70,9 +65,25 @@ control_start(void *arg1)
 }
 
 static void
-control_shutdown(void)
+control_core_fini_done(void *cb_arg)
 {
-	sto_core_fini(control_core_fini_done, NULL);
+	int rc = PTR_ERR(cb_arg);
+
+	sto_client_close();
+
+	spdk_app_stop(rc);
+}
+
+static void
+control_shutdown(int rc)
+{
+	sto_core_fini(control_core_fini_done, ERR_PTR(rc));
+}
+
+static void
+control_shutdown_cb(void)
+{
+	control_shutdown(0);
 }
 
 int
@@ -100,7 +111,7 @@ main(int argc, char **argv)
 		exit(rc);
 	}
 
-	opts.shutdown_cb = control_shutdown;
+	opts.shutdown_cb = control_shutdown_cb;
 
 	/*
 	 * spdk_app_start() will initialize the SPDK framework, call control_start(),
