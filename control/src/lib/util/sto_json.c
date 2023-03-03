@@ -158,23 +158,37 @@ __json_write_stdout(void *cb_ctx, const void *data, size_t size)
 }
 
 void
-sto_json_print(const struct spdk_json_val *values)
+sto_json_print(const char *fmt, const struct spdk_json_val *values, ...)
 {
 	struct json_write_buf buf = {};
 	struct spdk_json_write_ctx *w;
+	va_list fmt_args;
+	char *log_s;
+
+	va_start(fmt_args, values);
+	log_s = spdk_vsprintf_alloc(fmt, fmt_args);
+	va_end(fmt_args);
+
+	if (spdk_unlikely(!log_s)) {
+		SPDK_ERRLOG("Failed to alloc format string for log string\n");
+		return;
+	}
 
 	w = spdk_json_write_begin(__json_write_stdout,
 				  &buf, SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE);
 	if (spdk_unlikely(!w)) {
 		SPDK_ERRLOG("Failed to alloc SPDK JSON write context\n");
-		return;
+		goto out;
 	}
 
 	spdk_json_write_val(w, values);
 
 	spdk_json_write_end(w);
 
-	SPDK_ERRLOG("JSON: \n%s\n", buf.data);
+	SPDK_ERRLOG("%s [JSON]: \n%s\n", log_s, buf.data);
+
+out:
+	free(log_s);
 }
 
 struct spdk_json_val *

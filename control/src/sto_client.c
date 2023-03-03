@@ -114,7 +114,7 @@ jsonrpc_client_response(struct sto_jsonrpc_client *client,
 
 	/* Check for error response */
 	if (response->error != NULL) {
-		sto_json_print(response->error);
+		sto_json_print("Client response error", response->error);
 		rc = -EFAULT;
 	}
 

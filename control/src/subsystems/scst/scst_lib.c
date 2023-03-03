@@ -266,8 +266,7 @@ read_attrs_done(void *cb_arg, struct sto_tree_node *tree_root, int rc)
 		goto out;
 	}
 
-	SPDK_ERRLOG("GLEB: Print SCST attributes\n");
-	sto_json_print(ctx->json->values);
+	sto_json_print("Print SCST attributes", ctx->json->values);
 
 out:
 	ctx->cb_fn(ctx->cb_arg, rc);
