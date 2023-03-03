@@ -201,7 +201,7 @@ sto_json_parse_buf(void *buf, size_t size)
 
 	rc = spdk_json_parse(buf, size, NULL, 0, &end, 0);
 	if (spdk_unlikely(rc < 0)) {
-		SPDK_NOTICELOG("Parsing JSON failed (%zd)\n", rc);
+		SPDK_NOTICELOG("Counting JSON failed (%zd)\n", rc);
 		return ERR_PTR(rc);
 	}
 
@@ -296,13 +296,13 @@ sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted,
 
 	rc = dump(priv, w);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to dump user info to JSON ctx\n");
+		SPDK_ERRLOG("Failed to dump user info to JSON context\n");
 		goto free_ctx;
 	}
 
 	rc = spdk_json_write_end(w);
 	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to write json context\n");
+		SPDK_ERRLOG("Failed to write end for JSON context\n");
 		goto free_ctx;
 	}
 
