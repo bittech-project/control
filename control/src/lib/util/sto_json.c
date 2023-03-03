@@ -6,6 +6,137 @@
 #include "sto_json.h"
 #include "sto_err.h"
 
+static int
+json_ctx_parse_buf(struct sto_json_ctx *ctx)
+{
+	struct spdk_json_val *values;
+
+	values = sto_json_parse_buf(ctx->buf, ctx->size);
+	if (IS_ERR(values)) {
+		SPDK_ERRLOG("Failed to parse buf for JSON context\n");
+		return PTR_ERR(values);
+	}
+
+	ctx->values = values;
+
+	return 0;
+}
+
+static int
+json_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
+{
+	struct sto_json_ctx *ctx = cb_ctx;
+
+	ctx->buf = calloc(1, size);
+	if (spdk_unlikely(!ctx->buf)) {
+		SPDK_ERRLOG("Failed to alloc buf: size=%zu\n", size);
+		return -ENOMEM;
+	}
+
+	ctx->size = size;
+
+	memcpy(ctx->buf, data, size);
+
+	return json_ctx_parse_buf(ctx);
+}
+
+int
+sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted,
+		  void *priv, sto_json_ctx_dump_t dump)
+{
+	struct spdk_json_write_ctx *w;
+	uint32_t flags = formatted ? SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE : 0;
+	int rc = 0;
+
+	w = spdk_json_write_begin(json_ctx_write_cb, ctx, flags);
+	if (spdk_unlikely(!w)) {
+		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
+		return -ENOMEM;
+	}
+
+	rc = dump(priv, w);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to dump user info to JSON context\n");
+		goto free_ctx;
+	}
+
+	rc = spdk_json_write_end(w);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to write end for JSON context\n");
+		goto free_ctx;
+	}
+
+	return 0;
+
+free_ctx:
+	sto_json_ctx_destroy(ctx);
+
+	return rc;
+}
+
+void
+sto_json_ctx_destroy(struct sto_json_ctx *ctx)
+{
+	free((struct spdk_json_val *) ctx->values);
+	free(ctx->buf);
+}
+
+bool
+sto_json_iter_next(struct sto_json_iter *iter)
+{
+	const struct spdk_json_val *values;
+	int val_len;
+
+	if (iter->len < 2) {
+		return false;
+	}
+
+	values = sto_json_iter_ptr(iter);
+
+	val_len = 1 + spdk_json_val_len(&values[1]);
+
+	iter->offset += val_len;
+	iter->len -= val_len;
+
+	return true;
+}
+
+const struct spdk_json_val *
+sto_json_iter_cut_tail(const struct sto_json_iter *iter)
+{
+	const struct spdk_json_val *values;
+	struct spdk_json_val *obj;
+	uint32_t size;
+	int i;
+
+	values = sto_json_iter_ptr(iter);
+	if (!values) {
+		SPDK_NOTICELOG("Next JSON object len is equal zero\n");
+		return NULL;
+	}
+
+	SPDK_NOTICELOG("Start parse JSON for next object: len=%u\n", iter->len);
+
+	size = iter->len + 2;
+
+	obj = calloc(size, sizeof(struct spdk_json_val));
+	if (spdk_unlikely(!obj)) {
+		SPDK_ERRLOG("Failed to alloc next JSON object: size=%u\n", size);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	obj->type = SPDK_JSON_VAL_OBJECT_BEGIN;
+	obj->len = iter->len;
+
+	for (i = 1; i <= iter->len + 1; i++) {
+		obj[i].start = values[i - 1].start;
+		obj[i].len = values[i - 1].len;
+		obj[i].type = values[i - 1].type;
+	}
+
+	return obj;
+}
+
 int
 sto_json_iter_decode_name(const struct sto_json_iter *iter, char **value)
 {
@@ -82,60 +213,53 @@ sto_json_iter_decode_str_field(const struct sto_json_iter *iter,
 	return 0;
 }
 
-bool
-sto_json_iter_next(struct sto_json_iter *iter)
+void
+sto_json_async_iter_start(struct spdk_json_val *json,
+			  struct sto_json_async_iter_ops ops,
+			  sto_generic_cb cb_fn, void *cb_arg)
 {
-	const struct spdk_json_val *values;
-	int val_len;
+	struct sto_json_async_iter *iter;
 
-	if (iter->len < 2) {
-		return false;
+	iter = calloc(1, sizeof(*iter));
+	if (spdk_unlikely(!iter)) {
+		SPDK_ERRLOG("Failed to create SCST json dev iter\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
-	values = sto_json_iter_ptr(iter);
+	iter->json = json;
+	iter->ops = ops;
 
-	val_len = 1 + spdk_json_val_len(&values[1]);
+	iter->cb_fn = cb_fn;
+	iter->cb_arg = cb_arg;
 
-	iter->offset += val_len;
-	iter->len -= val_len;
-
-	return true;
+	sto_json_async_iter_next(iter, 0);
 }
 
-const struct spdk_json_val *
-sto_json_iter_cut_tail(const struct sto_json_iter *iter)
+void
+sto_json_async_iter_finish(struct sto_json_async_iter *iter, int rc)
 {
-	const struct spdk_json_val *values;
-	struct spdk_json_val *obj;
-	uint32_t size;
-	int i;
+	iter->cb_fn(iter->cb_arg, rc);
+	free(iter);
+}
 
-	values = sto_json_iter_ptr(iter);
-	if (!values) {
-		SPDK_NOTICELOG("Next JSON object len is equal zero\n");
-		return NULL;
+void
+sto_json_async_iter_next(struct sto_json_async_iter *iter, int rc)
+{
+	struct sto_json_async_iter_ops *ops = &iter->ops;
+
+	if (rc) {
+		sto_json_async_iter_finish(iter, rc);
+		return;
 	}
 
-	SPDK_NOTICELOG("Start parse JSON for next object: len=%u\n", iter->len);
-
-	size = iter->len + 2;
-
-	obj = calloc(size, sizeof(struct spdk_json_val));
-	if (spdk_unlikely(!obj)) {
-		SPDK_ERRLOG("Failed to alloc next JSON object: size=%u\n", size);
-		return ERR_PTR(-ENOMEM);
+	iter->object = ops->next_fn(iter->json, iter->object);
+	if (!iter->object) {
+		sto_json_async_iter_finish(iter, 0);
+		return;
 	}
 
-	obj->type = SPDK_JSON_VAL_OBJECT_BEGIN;
-	obj->len = iter->len;
-
-	for (i = 1; i <= iter->len + 1; i++) {
-		obj[i].start = values[i - 1].start;
-		obj[i].len = values[i - 1].len;
-		obj[i].type = values[i - 1].type;
-	}
-
-	return obj;
+	ops->iterate_fn(iter, iter->object);
 }
 
 struct json_write_buf {
@@ -244,79 +368,4 @@ sto_find_match_str(const char *key, const char *strings[])
 	}
 
 	return false;
-}
-
-static int
-json_ctx_parse_buf(struct sto_json_ctx *ctx)
-{
-	struct spdk_json_val *values;
-
-	values = sto_json_parse_buf(ctx->buf, ctx->size);
-	if (IS_ERR(values)) {
-		SPDK_ERRLOG("Failed to parse buf for JSON context\n");
-		return PTR_ERR(values);
-	}
-
-	ctx->values = values;
-
-	return 0;
-}
-
-static int
-json_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
-{
-	struct sto_json_ctx *ctx = cb_ctx;
-
-	ctx->buf = calloc(1, size);
-	if (spdk_unlikely(!ctx->buf)) {
-		SPDK_ERRLOG("Failed to alloc buf: size=%zu\n", size);
-		return -ENOMEM;
-	}
-
-	ctx->size = size;
-
-	memcpy(ctx->buf, data, size);
-
-	return json_ctx_parse_buf(ctx);
-}
-
-int
-sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted,
-		  void *priv, sto_json_ctx_dump_t dump)
-{
-	struct spdk_json_write_ctx *w;
-	uint32_t flags = formatted ? SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE : 0;
-	int rc = 0;
-
-	w = spdk_json_write_begin(json_ctx_write_cb, ctx, flags);
-	if (spdk_unlikely(!w)) {
-		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
-		return -ENOMEM;
-	}
-
-	rc = dump(priv, w);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to dump user info to JSON context\n");
-		goto free_ctx;
-	}
-
-	rc = spdk_json_write_end(w);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to write end for JSON context\n");
-		goto free_ctx;
-	}
-
-	return 0;
-
-free_ctx:
-	sto_json_ctx_destroy(ctx);
-
-	return rc;
-}
-
-void
-sto_json_ctx_destroy(struct sto_json_ctx *ctx)
-{
-	free((struct spdk_json_val *) ctx->values);
-	free(ctx->buf);
 }
