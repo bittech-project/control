@@ -16,15 +16,13 @@ sto_write_req_params_deinit(void *params_ptr)
 	free(params->data);
 }
 
-static int
+static void
 sto_write_req_exec(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
 	struct sto_write_req_params *params = sto_req_get_params(req);
 
 	sto_rpc_writefile(params->file, 0, params->data, sto_pipeline_step_done, pipe);
-
-	return 0;
 }
 
 const struct sto_req_properties sto_write_req_properties = {
@@ -56,7 +54,7 @@ sto_read_req_params_deinit(void *params_ptr)
 	free((char *) params->file);
 }
 
-static int
+static void
 sto_read_req_exec(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
@@ -65,8 +63,6 @@ sto_read_req_exec(struct sto_pipeline *pipe)
 
 	sto_rpc_readfile_buf(params->file, params->size,
 			     sto_pipeline_step_done, pipe, &priv->buf);
-
-	return 0;
 }
 
 static void
@@ -109,7 +105,7 @@ sto_readlink_req_priv_deinit(void *priv_ptr)
 	free(priv->buf);
 }
 
-static int
+static void
 sto_readlink_req_exec(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
@@ -117,8 +113,6 @@ sto_readlink_req_exec(struct sto_pipeline *pipe)
 	struct sto_readlink_req_params *params = sto_req_get_params(req);
 
 	sto_rpc_readlink(params->file, sto_pipeline_step_done, pipe, &priv->buf);
-
-	return 0;
 }
 
 static void
@@ -162,7 +156,7 @@ sto_readdir_req_priv_deinit(void *priv_ptr)
 	sto_dirents_free(&priv->dirents);
 }
 
-static int
+static void
 sto_readdir_req_exec(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
@@ -170,8 +164,6 @@ sto_readdir_req_exec(struct sto_pipeline *pipe)
 	struct sto_readdir_req_params *params = sto_req_get_params(req);
 
 	sto_rpc_readdir(params->dirpath, sto_pipeline_step_done, pipe, &priv->dirents);
-
-	return 0;
 }
 
 static void
@@ -219,7 +211,7 @@ sto_tree_req_priv_deinit(void *priv_ptr)
 	sto_tree_free(&priv->tree_root);
 }
 
-static int
+static void
 sto_tree_req_exec(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
@@ -228,8 +220,6 @@ sto_tree_req_exec(struct sto_pipeline *pipe)
 
 	sto_tree_buf(params->dirpath, params->depth, params->only_dirs,
 		     sto_pipeline_step_done, pipe, &priv->tree_root);
-
-	return 0;
 }
 
 static void

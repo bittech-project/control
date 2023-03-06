@@ -9,28 +9,7 @@
 
 #define STO_PL_CONSTRUCTOR_FINISHED INT_MAX
 
-enum sto_pipeline_action_type {
-	STO_PL_ACTION_NORMAL,
-	STO_PL_ACTION_ROLLBACK,
-	STO_PL_ACTION_CONSTRUCTOR,
-	STO_PL_ACTION_DESTRUCTOR,
-	STO_PL_ACTION_CNT,
-};
-
-struct sto_pipeline;
-
-typedef int (*sto_pipeline_action_t)(struct sto_pipeline *pipe);
-
-struct sto_pipeline_action {
-	sto_pipeline_action_t fn;
-
-	void *priv;
-	void (*priv_free)(void *priv);
-
-	int (*execute)(struct sto_pipeline_action *action, struct sto_pipeline *pipe);
-
-	TAILQ_ENTRY(sto_pipeline_action) list;
-};
+struct sto_pipeline_action;
 TAILQ_HEAD(sto_pipeline_action_list, sto_pipeline_action);
 
 typedef void (*sto_pipeline_ctx_deinit_t)(void *ctx);
@@ -64,6 +43,9 @@ struct sto_pipeline {
 	void *cb_arg;
 };
 
+typedef void (*sto_pipeline_action_t)(struct sto_pipeline *pipe);
+typedef int (*sto_pipeline_action_ret_t)(struct sto_pipeline *pipe);
+
 enum sto_pipeline_step_type {
 	STO_PL_STEP_SINGLE,
 	STO_PL_STEP_CONSTRUCTOR,
@@ -74,22 +56,34 @@ enum sto_pipeline_step_type {
 struct sto_pipeline_step {
 	enum sto_pipeline_step_type type;
 
-	sto_pipeline_action_t action_fn;
-	sto_pipeline_action_t rollback_fn;
+	union {
+		struct {
+			sto_pipeline_action_t action_fn;
+			sto_pipeline_action_t rollback_fn;
+		} single;
+
+		struct {
+			sto_pipeline_action_ret_t action_fn;
+			sto_pipeline_action_ret_t rollback_fn;
+		} constructor;
+
+		struct {
+		} terminator;
+	} u;
 };
 
-#define STO_PL_STEP(_action_fn, _rollback_fn)	\
-	{					\
-		.type = STO_PL_STEP_SINGLE,	\
-		.action_fn = _action_fn,	\
-		.rollback_fn = _rollback_fn,	\
+#define STO_PL_STEP(_action_fn, _rollback_fn)		\
+	{						\
+		.type = STO_PL_STEP_SINGLE,		\
+		.u.single.action_fn = _action_fn,	\
+		.u.single.rollback_fn = _rollback_fn,	\
 	}
 
 #define STO_PL_STEP_CONSTRUCTOR(_constructor_fn, _destructor_fn)	\
 	{								\
 		.type = STO_PL_STEP_CONSTRUCTOR,			\
-		.action_fn = _constructor_fn,				\
-		.rollback_fn = _destructor_fn,				\
+		.u.constructor.action_fn = _constructor_fn,		\
+		.u.constructor.rollback_fn = _destructor_fn,		\
 	}
 
 #define STO_PL_STEP_TERMINATOR()		\
@@ -160,9 +154,6 @@ sto_pipeline_step_done(void *cb_arg, int rc)
 {
 	sto_pipeline_step_next(cb_arg, rc);
 }
-
-int sto_pipeline_add_action(struct sto_pipeline *pipe, enum sto_pipeline_action_type type,
-			    sto_pipeline_action_t action_fn, sto_pipeline_action_t rollback_fn);
 
 int sto_pipeline_add_step(struct sto_pipeline *pipe, const struct sto_pipeline_step *step);
 int sto_pipeline_add_steps(struct sto_pipeline *pipe, const struct sto_pipeline_step *steps);

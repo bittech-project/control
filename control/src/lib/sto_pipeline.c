@@ -9,6 +9,195 @@
 
 #define STO_PL_ACTION_POLL_PERIOD	1000 /* 1ms */
 
+enum sto_pipeline_action_type {
+	STO_PL_ACTION_SINGLE,
+	STO_PL_ACTION_CONSTRUCTOR,
+	STO_PL_ACTION_CNT,
+};
+
+struct sto_pipeline_action_hndl {
+	enum sto_pipeline_action_type type;
+	union {
+		struct {
+			sto_pipeline_action_t fn;
+		} single;
+
+		struct {
+			sto_pipeline_action_ret_t fn;
+		} constructor;
+	} u;
+};
+
+struct sto_pipeline_action {
+	struct sto_pipeline_action_hndl hndl;
+	struct sto_pipeline_action *rollback;
+
+	struct sto_pipeline *pipe;
+
+	TAILQ_ENTRY(sto_pipeline_action) list;
+};
+
+static struct sto_pipeline_action *
+pipeline_action_alloc(struct sto_pipeline *pipe, struct sto_pipeline_action_hndl *hndl)
+{
+	struct sto_pipeline_action *action;
+
+	action = calloc(1, sizeof(*action));
+	if (spdk_unlikely(!action)) {
+		SPDK_ERRLOG("Failed to alloc action\n");
+		return NULL;
+	}
+
+	action->hndl = *hndl;
+	action->pipe = pipe;
+
+	return action;
+}
+
+static void pipeline_action_free(struct sto_pipeline_action *action);
+
+static struct sto_pipeline_action *
+pipeline_action_create(struct sto_pipeline *pipe, const struct sto_pipeline_step *step)
+{
+	struct sto_pipeline_action *action;
+	struct sto_pipeline_action_hndl hndl = {}, rollback_hndl = {}, *rollback_hndl_ptr = NULL;
+
+	switch (step->type) {
+	case STO_PL_STEP_SINGLE:
+		hndl.type = STO_PL_ACTION_SINGLE;
+		hndl.u.single.fn = step->u.single.action_fn;
+
+		if (step->u.single.rollback_fn) {
+			rollback_hndl.type = STO_PL_ACTION_SINGLE;
+			rollback_hndl.u.single.fn = step->u.single.rollback_fn;
+
+			rollback_hndl_ptr = &rollback_hndl;
+		}
+		break;
+	case STO_PL_STEP_CONSTRUCTOR:
+		hndl.type = STO_PL_ACTION_CONSTRUCTOR;
+		hndl.u.constructor.fn = step->u.constructor.action_fn;
+
+		if (step->u.constructor.rollback_fn) {
+			rollback_hndl.type = STO_PL_ACTION_CONSTRUCTOR;
+			rollback_hndl.u.constructor.fn = step->u.constructor.rollback_fn;
+
+			rollback_hndl_ptr = &rollback_hndl;
+		}
+		break;
+	default:
+		SPDK_ERRLOG("Failed to process pipeline step with typed %d\n",
+			    step->type);
+		return NULL;
+	}
+
+	action = pipeline_action_alloc(pipe, &hndl);
+	if (spdk_unlikely(!action)) {
+		SPDK_ERRLOG("Failed to alloc action for step\n");
+		return NULL;
+	}
+
+	if (rollback_hndl_ptr) {
+		action->rollback = pipeline_action_alloc(pipe, rollback_hndl_ptr);
+		if (spdk_unlikely(!action->rollback)) {
+			SPDK_ERRLOG("Failed to alloc rollback for step\n");
+			goto free_action;
+		}
+	}
+
+	return action;
+
+free_action:
+	pipeline_action_free(action);
+
+	return NULL;
+}
+
+static void
+pipeline_action_free(struct sto_pipeline_action *action)
+{
+	if (action->rollback) {
+		pipeline_action_free(action->rollback);
+		action->rollback = NULL;
+	}
+
+	free(action);
+}
+
+static void
+pipeline_action_manage_rollback(struct sto_pipeline_action *action)
+{
+	struct sto_pipeline *pipe = action->pipe;
+
+	if (spdk_likely(pipe->rollback)) {
+		return;
+	}
+
+	if (pipe->cur_rollback) {
+		TAILQ_INSERT_HEAD(&pipe->rollback_stack, pipe->cur_rollback, list);
+		pipe->cur_rollback = NULL;
+	}
+
+	if (action->rollback) {
+		pipe->cur_rollback = action->rollback;
+		action->rollback = NULL;
+	}
+}
+
+static void
+pipeline_single_action_execute(struct sto_pipeline_action *action)
+{
+	struct sto_pipeline *pipe = action->pipe;
+
+	pipeline_action_manage_rollback(action);
+
+	action->hndl.u.single.fn(pipe);
+
+	pipeline_action_free(action);
+}
+
+static void
+pipeline_constructor_action_execute(struct sto_pipeline_action *action)
+{
+	struct sto_pipeline *pipe = action->pipe;
+	int rc = 0;
+
+	pipeline_action_manage_rollback(action);
+
+	rc = action->hndl.u.constructor.fn(pipe);
+
+	switch (rc) {
+	case 0:
+		TAILQ_INSERT_HEAD(&pipe->action_queue, action, list);
+		break;
+	case STO_PL_CONSTRUCTOR_FINISHED:
+		rc = 0;
+		/* fallthrough */
+	default:
+		pipeline_action_free(action);
+		sto_pipeline_step_next(pipe, rc);
+		break;
+	};
+}
+
+static void
+pipeline_action_execute(struct sto_pipeline_action *action)
+{
+	switch (action->hndl.type) {
+	case STO_PL_ACTION_SINGLE:
+		pipeline_single_action_execute(action);
+		break;
+	case STO_PL_ACTION_CONSTRUCTOR:
+		pipeline_constructor_action_execute(action);
+		break;
+	default:
+		SPDK_ERRLOG("Invalid type of action %d for pipeline %p\n",
+			    action->hndl.type, action->pipe);
+		assert(0);
+		break;
+	};
+}
+
 static int pipeline_action_poll(void *ctx);
 
 struct sto_pipeline_engine *
@@ -123,7 +312,6 @@ out:
 }
 
 static void pipeline_action_list_free(struct sto_pipeline_action_list *actions);
-static void pipeline_action_free(struct sto_pipeline_action *action);
 
 void
 sto_pipeline_deinit(struct sto_pipeline *pipe)
@@ -214,203 +402,6 @@ pipeline_done(struct sto_pipeline *pipe)
 	}
 }
 
-static int
-pipeline_action_execute(struct sto_pipeline_action *action, struct sto_pipeline *pipe)
-{
-	int rc = 0;
-
-	if (pipe->cur_rollback) {
-		TAILQ_INSERT_HEAD(&pipe->rollback_stack, pipe->cur_rollback, list);
-	}
-
-	pipe->cur_rollback = action->priv;
-	action->priv = NULL;
-
-	rc = action->fn(pipe);
-
-	pipeline_action_free(action);
-
-	return rc;
-}
-
-static void
-pipeline_action_priv_free(void *priv)
-{
-	struct sto_pipeline_action *rollback = priv;
-
-	pipeline_action_free(rollback);
-}
-
-static int
-pipeline_rollback_execute(struct sto_pipeline_action *action, struct sto_pipeline *pipe)
-{
-	int rc = 0;
-
-	rc = action->fn(pipe);
-
-	pipeline_action_free(action);
-
-	return rc;
-}
-
-static int
-pipeline_constructor_execute(struct sto_pipeline_action *constructor, struct sto_pipeline *pipe)
-{
-	int rc = 0;
-
-	if (pipe->cur_rollback) {
-		TAILQ_INSERT_HEAD(&pipe->rollback_stack, pipe->cur_rollback, list);
-		pipe->cur_rollback = NULL;
-	}
-
-	if (constructor->priv) {
-		pipe->cur_rollback = constructor->priv;
-		constructor->priv = NULL;
-	}
-
-	rc = constructor->fn(pipe);
-
-	switch (rc) {
-	case 0:
-		TAILQ_INSERT_HEAD(&pipe->action_queue, constructor, list);
-		break;
-	case STO_PL_CONSTRUCTOR_FINISHED:
-		sto_pipeline_step_next(pipe, 0);
-		rc = 0;
-		/* fallthrough */
-	default:
-		pipeline_action_free(constructor);
-		break;
-	};
-
-	return rc;
-}
-
-static void
-pipeline_constructor_priv_free(void *priv)
-{
-	struct sto_pipeline_action *destructor = priv;
-
-	pipeline_action_free(destructor);
-}
-
-static int
-pipeline_destructor_execute(struct sto_pipeline_action *destructor, struct sto_pipeline *pipe)
-{
-	int rc = 0;
-
-	rc = destructor->fn(pipe);
-
-	switch (rc) {
-	case 0:
-		TAILQ_INSERT_HEAD(&pipe->action_queue, destructor, list);
-		break;
-	case STO_PL_CONSTRUCTOR_FINISHED:
-		sto_pipeline_step_next(pipe, 0);
-		rc = 0;
-		/* fallthrough */
-	default:
-		pipeline_action_free(destructor);
-		break;
-	};
-
-	return rc;
-}
-
-static struct sto_pipeline_action *
-pipeline_action_alloc(enum sto_pipeline_action_type type,
-		      sto_pipeline_action_t action_fn, sto_pipeline_action_t rollback_fn)
-{
-	struct sto_pipeline_action *action;
-
-	assert(action_fn);
-
-	action = calloc(1, sizeof(*action));
-	if (spdk_unlikely(!action)) {
-		SPDK_ERRLOG("Failed to alloc action\n");
-		return NULL;
-	}
-
-	action->fn = action_fn;
-
-	switch (type) {
-	case STO_PL_ACTION_NORMAL:
-		action->execute = pipeline_action_execute;
-
-		if (!rollback_fn) {
-			break;
-		}
-
-		action->priv = pipeline_action_alloc(STO_PL_ACTION_ROLLBACK, rollback_fn, NULL);
-		if (spdk_unlikely(!action->priv)) {
-			SPDK_ERRLOG("Failed to alloc priv for action\n");
-			goto free_action;
-		}
-
-		action->priv_free = pipeline_action_priv_free;
-
-		break;
-	case STO_PL_ACTION_ROLLBACK:
-		action->execute = pipeline_rollback_execute;
-		break;
-	case STO_PL_ACTION_CONSTRUCTOR:
-		action->execute = pipeline_constructor_execute;
-
-		if (!rollback_fn) {
-			break;
-		}
-
-		action->priv = pipeline_action_alloc(STO_PL_ACTION_DESTRUCTOR, rollback_fn, NULL);
-		if (spdk_unlikely(!action->priv)) {
-			SPDK_ERRLOG("Failed to alloc priv for constructor\n");
-			goto free_action;
-		}
-
-		action->priv_free = pipeline_constructor_priv_free;
-
-		break;
-	case STO_PL_ACTION_DESTRUCTOR:
-		action->execute = pipeline_destructor_execute;
-		break;
-	default:
-		SPDK_ERRLOG("Unknown action type %d\n", type);
-		goto free_action;
-	}
-
-	return action;
-
-free_action:
-	free(action);
-
-	return NULL;
-}
-
-static void
-pipeline_action_free(struct sto_pipeline_action *action)
-{
-	if (action->priv && action->priv_free) {
-		action->priv_free(action->priv);
-	}
-
-	free(action);
-}
-
-int
-sto_pipeline_add_action(struct sto_pipeline *pipe, enum sto_pipeline_action_type type,
-			sto_pipeline_action_t action_fn, sto_pipeline_action_t rollback_fn)
-{
-	struct sto_pipeline_action *action;
-
-	action = pipeline_action_alloc(type, action_fn, rollback_fn);
-	if (spdk_unlikely(!action)) {
-		return -ENOMEM;
-	}
-
-	TAILQ_INSERT_TAIL(&pipe->action_queue, action, list);
-
-	return 0;
-}
-
 static void
 pipeline_action_list_free(struct sto_pipeline_action_list *actions)
 {
@@ -426,15 +417,16 @@ pipeline_action_list_free(struct sto_pipeline_action_list *actions)
 int
 sto_pipeline_add_step(struct sto_pipeline *pipe, const struct sto_pipeline_step *step)
 {
-	static enum sto_pipeline_action_type action_map[STO_PL_STEP_CNT] = {
-		[STO_PL_STEP_SINGLE] = STO_PL_ACTION_NORMAL,
-		[STO_PL_STEP_CONSTRUCTOR] = STO_PL_ACTION_CONSTRUCTOR,
-		[STO_PL_STEP_TERMINATOR] = STO_PL_ACTION_CNT,
-	};
+	struct sto_pipeline_action *action;
 
-	assert(step->type <= SPDK_COUNTOF(action_map));
+	action = pipeline_action_create(pipe, step);
+	if (spdk_unlikely(!action)) {
+		return -ENOMEM;
+	}
 
-	return sto_pipeline_add_action(pipe, action_map[step->type], step->action_fn, step->rollback_fn);
+	TAILQ_INSERT_TAIL(&pipe->action_queue, action, list);
+
+	return 0;
 }
 
 int
@@ -498,7 +490,6 @@ static void
 pipeline_action(struct sto_pipeline *pipe)
 {
 	struct sto_pipeline_action *action;
-	int rc = 0;
 
 	if (spdk_unlikely(pipe->error)) {
 		goto finish;
@@ -509,20 +500,12 @@ pipeline_action(struct sto_pipeline *pipe)
 		goto finish;
 	}
 
-	rc = action->execute(action, pipe);
-	if (spdk_unlikely(rc)) {
-		SPDK_ERRLOG("Failed to action for pipeline[%p]\n", pipe);
-
-		pipe->error = rc;
-		goto finish;
-	}
+	pipeline_action_execute(action);
 
 	return;
 
 finish:
 	pipeline_action_finish(pipe);
-
-	return;
 }
 
 static int

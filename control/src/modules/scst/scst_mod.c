@@ -9,44 +9,36 @@
 #include "sto_rpc_subprocess.h"
 #include "sto_err.h"
 
-static int
+static void
 iscsi_start_daemon(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Start iscsi-scstd\n");
 
 	sto_rpc_subprocess_fmt("iscsi-scstd -p 3260", sto_pipeline_step_done, pipe, NULL);
-
-	return 0;
 }
 
-static int
+static void
 iscsi_stop_daemon(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Stop iscsi-scstd\n");
 
 	sto_rpc_subprocess_fmt("pkill iscsi-scstd", sto_pipeline_step_done, pipe, NULL);
-
-	return 0;
 }
 
-static int
+static void
 iscsi_modprobe(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Modprobe iscsi-scst\n");
 
 	sto_rpc_subprocess_fmt("modprobe %s", sto_pipeline_step_done, pipe, NULL, "iscsi-scst");
-
-	return 0;
 }
 
-static int
+static void
 iscsi_rmmod(struct sto_pipeline *pipe)
 {
 	SPDK_ERRLOG("GLEB: Rmmod iscsi-scst\n");
 
 	sto_rpc_subprocess_fmt("rmmod %s", sto_pipeline_step_done, pipe, NULL, "iscsi-scst");
-
-	return 0;
 }
 
 const struct sto_req_properties sto_iscsi_init_req_properties = {
@@ -67,17 +59,21 @@ const struct sto_req_properties sto_iscsi_deinit_req_properties = {
 	}
 };
 
-static int
+static void
 scst_dev_open(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
 	struct sto_json_head_raw *head = sto_json_subsystem_head_raw("scst", "dev_open");
+	int rc;
 
 	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("device", "gleb"));
 	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("handler", "vdisk_blockio"));
 	STO_JSON_HEAD_RAW_ADD_SINGLE(head, STO_JSON_PARAM_RAW_STR("attributes", "filename=/dev/ram0"));
 
-	return sto_req_core_submit(req, NULL, head);
+	rc = sto_req_core_submit(req, NULL, head);
+	if (spdk_unlikely(rc)) {
+		sto_pipeline_step_next(pipe, rc);
+	}
 }
 
 const struct sto_req_properties scst_dev_over_iscsi_req_properties = {
