@@ -24,13 +24,9 @@ sto_control_rpc_done(struct sto_core_req *core_req)
 static void
 sto_control_rpc(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
-	struct sto_core_args args = {
-		.priv = request,
-		.done = sto_control_rpc_done,
-	};
 	int rc;
 
-	rc = sto_core_process(params, &args);
+	rc = sto_core_process(params, sto_control_rpc_done, request);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to start core process\n");
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));

@@ -45,14 +45,9 @@ const char *sto_core_req_state_name(enum sto_core_req_state state);
 
 void sto_core_req_free(struct sto_core_req *req);
 
-struct sto_core_args {
-	void *priv;
-	sto_core_req_done_t done;
-};
-
-int sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args);
+int sto_core_process(const struct spdk_json_val *params, sto_core_req_done_t done, void *priv);
 int sto_core_process_raw(const struct sto_json_head_raw *head,
-			 struct sto_core_args *args);
+			 sto_core_req_done_t done, void *priv);
 
 static inline void
 sto_core_req_set_state(struct sto_core_req *req, enum sto_core_req_state new_state)

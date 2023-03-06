@@ -99,7 +99,8 @@ sto_core_submit_req(struct sto_core_req *core_req)
 }
 
 static int
-__sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args, bool internal)
+core_process(const struct spdk_json_val *params, sto_core_req_done_t done,
+	     void *priv, bool internal)
 {
 	struct sto_core_req *req;
 
@@ -109,7 +110,7 @@ __sto_core_process(const struct spdk_json_val *params, struct sto_core_args *arg
 		return -ENOMEM;
 	}
 
-	sto_core_req_init_cb(req, args->done, args->priv);
+	sto_core_req_init_cb(req, done, priv);
 
 	sto_core_submit_req(req);
 
@@ -117,16 +118,16 @@ __sto_core_process(const struct spdk_json_val *params, struct sto_core_args *arg
 }
 
 int
-sto_core_process(const struct spdk_json_val *params, struct sto_core_args *args)
+sto_core_process(const struct spdk_json_val *params, sto_core_req_done_t done, void *priv)
 {
-	return __sto_core_process(params, args, false);
+	return core_process(params, done, priv, false);
 }
 
 struct sto_core_ctx {
 	struct sto_json_ctx json_ctx;
 
-	void *user_priv;
 	sto_core_req_done_t user_done;
+	void *user_priv;
 };
 
 static void sto_core_ctx_free(struct sto_core_ctx *ctx);
@@ -148,7 +149,7 @@ core_ctx_dump_head(void *priv, struct spdk_json_write_ctx *w)
 
 static struct sto_core_ctx *
 sto_core_ctx_alloc(const struct sto_json_head_raw *head,
-		   struct sto_core_args *args)
+		   sto_core_req_done_t done, void *priv)
 {
 	struct sto_core_ctx *ctx;
 	int rc;
@@ -165,8 +166,8 @@ sto_core_ctx_alloc(const struct sto_json_head_raw *head,
 		goto free_ctx;
 	}
 
-	ctx->user_priv = args->priv;
-	ctx->user_done = args->done;
+	ctx->user_done = done;
+	ctx->user_priv = priv;
 
 	return ctx;
 
@@ -196,22 +197,18 @@ sto_core_process_raw_done(struct sto_core_req *core_req)
 
 int
 sto_core_process_raw(const struct sto_json_head_raw *head,
-		     struct sto_core_args *args)
+		     sto_core_req_done_t done, void *priv)
 {
 	struct sto_core_ctx *ctx;
-	struct sto_core_args __args = {};
 	int rc = 0;
 
-	ctx = sto_core_ctx_alloc(head, args);
+	ctx = sto_core_ctx_alloc(head, done, priv);
 	if (spdk_unlikely(!ctx)) {
 		SPDK_ERRLOG("Failed to alloc component context\n");
 		return -ENOMEM;
 	}
 
-	__args.priv = ctx;
-	__args.done = sto_core_process_raw_done;
-
-	rc = __sto_core_process(ctx->json_ctx.values, &__args, true);
+	rc = core_process(ctx->json_ctx.values, sto_core_process_raw_done, ctx, true);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to core process json\n");
 		goto free_ctx;

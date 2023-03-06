@@ -170,12 +170,7 @@ int
 sto_req_core_submit(struct sto_req *req, sto_core_req_done_t done,
 		    const struct sto_json_head_raw *head)
 {
-	struct sto_core_args args = {
-		.priv = req,
-		.done = done ?: sto_req_core_done,
-	};
-
-	return sto_core_process_raw(head, &args);
+	return sto_core_process_raw(head, done ?: sto_req_core_done, req);
 }
 
 int
