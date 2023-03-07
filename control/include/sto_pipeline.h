@@ -35,6 +35,7 @@ struct sto_pipeline {
 	struct sto_pipeline_action *cur_rollback;
 
 	struct sto_pipeline_action_list action_queue;
+	struct sto_pipeline_action_list action_queue_todo;
 	struct sto_pipeline_action_list rollback_stack;
 
 	TAILQ_ENTRY(sto_pipeline) list;
@@ -155,7 +156,15 @@ sto_pipeline_step_done(void *cb_arg, int rc)
 	sto_pipeline_step_next(cb_arg, rc);
 }
 
-int sto_pipeline_add_step(struct sto_pipeline *pipe, const struct sto_pipeline_step *step);
 int sto_pipeline_add_steps(struct sto_pipeline *pipe, const struct sto_pipeline_step *steps);
+
+int __sto_pipeline_insert_step(struct sto_pipeline *pipe, const struct sto_pipeline_step *step);
+
+#define sto_pipeline_insert_step(_pipe, _step)	\
+	__sto_pipeline_insert_step(_pipe, &(const struct sto_pipeline_step) _step)
+
+#define sto_pipeline_queue_step(_pipe, _step)	\
+	sto_pipeline_step_next(_pipe, __sto_pipeline_insert_step(_pipe, &(const struct sto_pipeline_step) _step))
+
 
 #endif /* _STO_PIPELINE_H_ */

@@ -289,6 +289,7 @@ sto_pipeline_init(struct sto_pipeline *pipe, const struct sto_pipeline_propertie
 	int rc;
 
 	TAILQ_INIT(&pipe->action_queue);
+	TAILQ_INIT(&pipe->action_queue_todo);
 	TAILQ_INIT(&pipe->rollback_stack);
 
 	if (!properties) {
@@ -323,6 +324,7 @@ sto_pipeline_deinit(struct sto_pipeline *pipe)
 	}
 
 	pipeline_action_list_free(&pipe->action_queue);
+	pipeline_action_list_free(&pipe->action_queue_todo);
 	pipeline_action_list_free(&pipe->rollback_stack);
 }
 
@@ -415,7 +417,27 @@ pipeline_action_list_free(struct sto_pipeline_action_list *actions)
 }
 
 int
-sto_pipeline_add_step(struct sto_pipeline *pipe, const struct sto_pipeline_step *step)
+sto_pipeline_add_steps(struct sto_pipeline *pipe, const struct sto_pipeline_step *steps)
+{
+	const struct sto_pipeline_step *step;
+
+	for (step = steps; step && step->type != STO_PL_STEP_TERMINATOR; step++) {
+		struct sto_pipeline_action *action;
+
+		action = pipeline_action_create(pipe, step);
+		if (spdk_unlikely(!action)) {
+			SPDK_ERRLOG("Failed to create action\n");
+			return -ENOMEM;
+		}
+
+		TAILQ_INSERT_TAIL(&pipe->action_queue, action, list);
+	}
+
+	return 0;
+}
+
+int
+__sto_pipeline_insert_step(struct sto_pipeline *pipe, const struct sto_pipeline_step *step)
 {
 	struct sto_pipeline_action *action;
 
@@ -424,24 +446,7 @@ sto_pipeline_add_step(struct sto_pipeline *pipe, const struct sto_pipeline_step 
 		return -ENOMEM;
 	}
 
-	TAILQ_INSERT_TAIL(&pipe->action_queue, action, list);
-
-	return 0;
-}
-
-int
-sto_pipeline_add_steps(struct sto_pipeline *pipe, const struct sto_pipeline_step *steps)
-{
-	const struct sto_pipeline_step *step;
-	int rc;
-
-	for (step = steps; step && step->type != STO_PL_STEP_TERMINATOR; step++) {
-		rc = sto_pipeline_add_step(pipe, step);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Failed to add step\n");
-			return rc;
-		}
-	}
+	TAILQ_INSERT_HEAD(&pipe->action_queue_todo, action, list);
 
 	return 0;
 }
@@ -464,6 +469,24 @@ pipeline_next_action(struct sto_pipeline *pipe)
 	}
 
 	return action;
+}
+
+static void
+pipeline_check_actions_todo(struct sto_pipeline *pipe)
+{
+	struct sto_pipeline_action_list action_queue_todo = TAILQ_HEAD_INITIALIZER(action_queue_todo);
+	struct sto_pipeline_action *action, *tmp;
+
+	if (TAILQ_EMPTY(&pipe->action_queue_todo)) {
+		return;
+	}
+
+	TAILQ_SWAP(&action_queue_todo, &pipe->action_queue_todo, sto_pipeline_action, list);
+
+	TAILQ_FOREACH_REVERSE_SAFE(action, &action_queue_todo, sto_pipeline_action_list, list, tmp) {
+		TAILQ_REMOVE(&action_queue_todo, action, list);
+		TAILQ_INSERT_HEAD(&pipe->action_queue, action, list);
+	}
 }
 
 static void
@@ -501,6 +524,8 @@ pipeline_action(struct sto_pipeline *pipe)
 	}
 
 	pipeline_action_execute(action);
+
+	pipeline_check_actions_todo(pipe);
 
 	return;
 
