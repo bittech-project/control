@@ -19,11 +19,11 @@ struct sto_pipeline_action_hndl {
 	enum sto_pipeline_action_type type;
 	union {
 		struct {
-			sto_pipeline_action_t fn;
+			sto_pl_action_basic_t fn;
 		} basic;
 
 		struct {
-			sto_pipeline_action_ret_t fn;
+			sto_pl_action_constructor_t fn;
 		} constructor;
 	} u;
 };

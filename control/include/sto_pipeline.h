@@ -43,8 +43,8 @@ struct sto_pipeline {
 	void *cb_arg;
 };
 
-typedef void (*sto_pipeline_action_t)(struct sto_pipeline *pipe);
-typedef int (*sto_pipeline_action_ret_t)(struct sto_pipeline *pipe);
+typedef void (*sto_pl_action_basic_t)(struct sto_pipeline *pipe);
+typedef int (*sto_pl_action_constructor_t)(struct sto_pipeline *pipe);
 
 enum sto_pipeline_step_type {
 	STO_PL_STEP_BASIC,
@@ -58,13 +58,13 @@ struct sto_pipeline_step {
 
 	union {
 		struct {
-			sto_pipeline_action_t action_fn;
-			sto_pipeline_action_t rollback_fn;
+			sto_pl_action_basic_t action_fn;
+			sto_pl_action_basic_t rollback_fn;
 		} basic;
 
 		struct {
-			sto_pipeline_action_ret_t action_fn;
-			sto_pipeline_action_ret_t rollback_fn;
+			sto_pl_action_constructor_t action_fn;
+			sto_pl_action_constructor_t rollback_fn;
 		} constructor;
 
 		struct {
