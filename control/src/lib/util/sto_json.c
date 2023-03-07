@@ -76,6 +76,78 @@ out_err:
 	return rc;
 }
 
+struct sto_json_async_ctx {
+	struct sto_json_ctx *json_ctx;
+	struct spdk_json_write_ctx *w;
+
+	sto_generic_cb cb_fn;
+	void *cb_arg;
+};
+
+static inline void
+sto_json_async_ctx_done(struct sto_json_async_ctx *ctx, int rc)
+{
+	ctx->cb_fn(ctx->cb_arg, rc);
+	free(ctx);
+}
+
+static void
+json_ctx_async_write_done(void *cb_arg, int rc)
+{
+	struct sto_json_async_ctx *ctx = cb_arg;
+	struct sto_json_ctx *json_ctx = ctx->json_ctx;
+
+	if (spdk_unlikely(spdk_json_write_end(ctx->w))) {
+		SPDK_ERRLOG("Failed to write end for JSON context\n");
+		rc = rc ?: -EINVAL;
+	}
+
+	if (spdk_unlikely(rc)) {
+		goto out_err;
+	}
+
+out:
+	sto_json_async_ctx_done(ctx, rc);
+
+	return;
+
+out_err:
+	sto_json_ctx_destroy(json_ctx);
+	goto out;
+}
+
+void
+sto_json_ctx_async_write(struct sto_json_ctx *json_ctx, bool formatted,
+			 sto_json_ctx_async_write_cb_t write_cb, void *cb_ctx,
+			 sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_json_async_ctx *ctx;
+	struct spdk_json_write_ctx *w;
+	uint32_t flags = formatted ? SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE : 0;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to allod sto_json_async_ctx\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	ctx->cb_fn = cb_fn;
+	ctx->cb_arg = cb_arg;
+
+	w = spdk_json_write_begin(json_ctx_write_cb, json_ctx, flags);
+	if (spdk_unlikely(!w)) {
+		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
+		sto_json_async_ctx_done(ctx, -ENOMEM);
+		return;
+	}
+
+	ctx->json_ctx = json_ctx;
+	ctx->w = w;
+
+	write_cb(cb_ctx, w, json_ctx_async_write_done, ctx);
+}
+
 void
 sto_json_ctx_destroy(struct sto_json_ctx *json_ctx)
 {

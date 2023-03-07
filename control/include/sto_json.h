@@ -6,8 +6,6 @@
 
 #include "sto_async.h"
 
-typedef int (*sto_json_ctx_write_cb_t)(void *cb_ctx, struct spdk_json_write_ctx *w);
-
 struct sto_json_ctx {
 	void *buf;
 	size_t size;
@@ -15,8 +13,18 @@ struct sto_json_ctx {
 	const struct spdk_json_val *values;
 };
 
+typedef int (*sto_json_ctx_write_cb_t)(void *cb_ctx, struct spdk_json_write_ctx *w);
+
 int sto_json_ctx_write(struct sto_json_ctx *json_ctx, bool formatted,
 		       sto_json_ctx_write_cb_t write_cb, void *cb_ctx);
+
+typedef void (*sto_json_ctx_async_write_cb_t)(void *cb_ctx, struct spdk_json_write_ctx *w,
+					      sto_generic_cb cb_fn, void *cb_arg);
+
+void sto_json_ctx_async_write(struct sto_json_ctx *json_ctx, bool formatted,
+			      sto_json_ctx_async_write_cb_t write_cb, void *cb_ctx,
+			      sto_generic_cb cb_fn, void *cb_arg);
+
 int sto_json_ctx_parse(struct sto_json_ctx *json_ctx);
 void sto_json_ctx_destroy(struct sto_json_ctx *json_ctx);
 
