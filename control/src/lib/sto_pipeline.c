@@ -10,7 +10,7 @@
 #define STO_PL_ACTION_POLL_PERIOD	1000 /* 1ms */
 
 enum sto_pipeline_action_type {
-	STO_PL_ACTION_SINGLE,
+	STO_PL_ACTION_BASIC,
 	STO_PL_ACTION_CONSTRUCTOR,
 	STO_PL_ACTION_CNT,
 };
@@ -20,7 +20,7 @@ struct sto_pipeline_action_hndl {
 	union {
 		struct {
 			sto_pipeline_action_t fn;
-		} single;
+		} basic;
 
 		struct {
 			sto_pipeline_action_ret_t fn;
@@ -63,13 +63,13 @@ pipeline_action_create(struct sto_pipeline *pipe, const struct sto_pipeline_step
 	struct sto_pipeline_action_hndl hndl = {}, rollback_hndl = {}, *rollback_hndl_ptr = NULL;
 
 	switch (step->type) {
-	case STO_PL_STEP_SINGLE:
-		hndl.type = STO_PL_ACTION_SINGLE;
-		hndl.u.single.fn = step->u.single.action_fn;
+	case STO_PL_STEP_BASIC:
+		hndl.type = STO_PL_ACTION_BASIC;
+		hndl.u.basic.fn = step->u.basic.action_fn;
 
-		if (step->u.single.rollback_fn) {
-			rollback_hndl.type = STO_PL_ACTION_SINGLE;
-			rollback_hndl.u.single.fn = step->u.single.rollback_fn;
+		if (step->u.basic.rollback_fn) {
+			rollback_hndl.type = STO_PL_ACTION_BASIC;
+			rollback_hndl.u.basic.fn = step->u.basic.rollback_fn;
 
 			rollback_hndl_ptr = &rollback_hndl;
 		}
@@ -145,13 +145,13 @@ pipeline_action_manage_rollback(struct sto_pipeline_action *action)
 }
 
 static void
-pipeline_single_action_execute(struct sto_pipeline_action *action)
+pipeline_basic_action_execute(struct sto_pipeline_action *action)
 {
 	struct sto_pipeline *pipe = action->pipe;
 
 	pipeline_action_manage_rollback(action);
 
-	action->hndl.u.single.fn(pipe);
+	action->hndl.u.basic.fn(pipe);
 
 	pipeline_action_free(action);
 }
@@ -184,8 +184,8 @@ static void
 pipeline_action_execute(struct sto_pipeline_action *action)
 {
 	switch (action->hndl.type) {
-	case STO_PL_ACTION_SINGLE:
-		pipeline_single_action_execute(action);
+	case STO_PL_ACTION_BASIC:
+		pipeline_basic_action_execute(action);
 		break;
 	case STO_PL_ACTION_CONSTRUCTOR:
 		pipeline_constructor_action_execute(action);

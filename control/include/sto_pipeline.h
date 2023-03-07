@@ -47,7 +47,7 @@ typedef void (*sto_pipeline_action_t)(struct sto_pipeline *pipe);
 typedef int (*sto_pipeline_action_ret_t)(struct sto_pipeline *pipe);
 
 enum sto_pipeline_step_type {
-	STO_PL_STEP_SINGLE,
+	STO_PL_STEP_BASIC,
 	STO_PL_STEP_CONSTRUCTOR,
 	STO_PL_STEP_TERMINATOR,
 	STO_PL_STEP_CNT,
@@ -60,7 +60,7 @@ struct sto_pipeline_step {
 		struct {
 			sto_pipeline_action_t action_fn;
 			sto_pipeline_action_t rollback_fn;
-		} single;
+		} basic;
 
 		struct {
 			sto_pipeline_action_ret_t action_fn;
@@ -74,9 +74,9 @@ struct sto_pipeline_step {
 
 #define STO_PL_STEP(_action_fn, _rollback_fn)		\
 	{						\
-		.type = STO_PL_STEP_SINGLE,		\
-		.u.single.action_fn = _action_fn,	\
-		.u.single.rollback_fn = _rollback_fn,	\
+		.type = STO_PL_STEP_BASIC,		\
+		.u.basic.action_fn = _action_fn,	\
+		.u.basic.rollback_fn = _rollback_fn,	\
 	}
 
 #define STO_PL_STEP_CONSTRUCTOR(_constructor_fn, _destructor_fn)	\
