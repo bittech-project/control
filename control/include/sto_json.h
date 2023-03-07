@@ -98,7 +98,7 @@ struct sto_json_async_iter {
 };
 
 void sto_json_async_iter_start(struct spdk_json_val *json,
-			       struct sto_json_async_iter_ops ops,
+			       struct sto_json_async_iter_ops *ops,
 			       sto_generic_cb cb_fn, void *cb_arg);
 
 void sto_json_async_iter_next(struct sto_json_async_iter *iter, int rc);

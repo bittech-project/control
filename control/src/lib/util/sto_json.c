@@ -289,7 +289,7 @@ sto_json_iter_decode_str_field(const struct sto_json_iter *iter,
 
 void
 sto_json_async_iter_start(struct spdk_json_val *json,
-			  struct sto_json_async_iter_ops ops,
+			  struct sto_json_async_iter_ops *ops,
 			  sto_generic_cb cb_fn, void *cb_arg)
 {
 	struct sto_json_async_iter *iter;
@@ -302,7 +302,7 @@ sto_json_async_iter_start(struct spdk_json_val *json,
 	}
 
 	iter->json = json;
-	iter->ops = ops;
+	iter->ops = *ops;
 
 	iter->cb_fn = cb_fn;
 	iter->cb_arg = cb_arg;
