@@ -231,9 +231,9 @@ scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write_ctx 
 }
 
 static int
-scst_serialize_attrs_cb(void *priv, struct spdk_json_write_ctx *w)
+scst_write_attrs_cb(void *cb_ctx, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_node *attrs_node = priv;
+	struct sto_tree_node *attrs_node = cb_ctx;
 
 	spdk_json_write_object_begin(w);
 
@@ -260,7 +260,7 @@ read_attrs_done(void *cb_arg, struct sto_tree_node *tree_root, int rc)
 		goto out;
 	}
 
-	rc = sto_json_ctx_dump(ctx->json, true, (void *) tree_root, scst_serialize_attrs_cb);
+	rc = sto_json_ctx_write(ctx->json, true, scst_write_attrs_cb, (void *) tree_root);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to dump SCST dev attributes\n");
 		goto out;

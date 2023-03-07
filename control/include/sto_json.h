@@ -6,7 +6,7 @@
 
 #include "sto_async.h"
 
-typedef int (*sto_json_ctx_dump_t)(void *priv, struct spdk_json_write_ctx *w);
+typedef int (*sto_json_ctx_write_cb_t)(void *cb_ctx, struct spdk_json_write_ctx *w);
 
 struct sto_json_ctx {
 	void *buf;
@@ -15,9 +15,10 @@ struct sto_json_ctx {
 	const struct spdk_json_val *values;
 };
 
-int sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted,
-		      void *priv, sto_json_ctx_dump_t dump);
-void sto_json_ctx_destroy(struct sto_json_ctx *ctx);
+int sto_json_ctx_write(struct sto_json_ctx *json_ctx, bool formatted,
+		       sto_json_ctx_write_cb_t write_cb, void *cb_ctx);
+int sto_json_ctx_parse(struct sto_json_ctx *json_ctx);
+void sto_json_ctx_destroy(struct sto_json_ctx *json_ctx);
 
 struct sto_json_iter {
 	const struct spdk_json_val *values;
@@ -101,7 +102,7 @@ sto_json_async_iterate_done(void *cb_arg, int rc)
 	sto_json_async_iter_next(cb_arg, rc);
 }
 
-struct spdk_json_val *sto_json_parse_buf(void *buf, size_t size);
+struct spdk_json_val *sto_json_parse(void *buf, size_t size);
 void sto_json_print(const char *fmt, const struct spdk_json_val *values, ...);
 
 static inline struct spdk_json_val *

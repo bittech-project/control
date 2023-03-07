@@ -133,9 +133,9 @@ struct sto_core_ctx {
 static void sto_core_ctx_free(struct sto_core_ctx *ctx);
 
 static int
-core_ctx_dump_head(void *priv, struct spdk_json_write_ctx *w)
+core_ctx_write_head_cb(void *cb_ctx, struct spdk_json_write_ctx *w)
 {
-	const struct sto_json_head_raw *head = priv;
+	const struct sto_json_head_raw *head = cb_ctx;
 	int rc = 0;
 
 	spdk_json_write_object_begin(w);
@@ -160,7 +160,7 @@ sto_core_ctx_alloc(const struct sto_json_head_raw *head,
 		return NULL;
 	}
 
-	rc = sto_json_ctx_dump(&ctx->json_ctx, false, (void *) head, core_ctx_dump_head);
+	rc = sto_json_ctx_write(&ctx->json_ctx, false, core_ctx_write_head_cb, (void *) head);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to dump STO JSON head\n");
 		goto free_ctx;

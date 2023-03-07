@@ -6,18 +6,18 @@
 #include "sto_json.h"
 #include "sto_err.h"
 
-static int
-json_ctx_parse_buf(struct sto_json_ctx *ctx)
+int
+sto_json_ctx_parse(struct sto_json_ctx *json_ctx)
 {
 	struct spdk_json_val *values;
 
-	values = sto_json_parse_buf(ctx->buf, ctx->size);
+	values = sto_json_parse(json_ctx->buf, json_ctx->size);
 	if (IS_ERR(values)) {
 		SPDK_ERRLOG("Failed to parse buf for JSON context\n");
 		return PTR_ERR(values);
 	}
 
-	ctx->values = values;
+	json_ctx->values = values;
 
 	return 0;
 }
@@ -25,60 +25,62 @@ json_ctx_parse_buf(struct sto_json_ctx *ctx)
 static int
 json_ctx_write_cb(void *cb_ctx, const void *data, size_t size)
 {
-	struct sto_json_ctx *ctx = cb_ctx;
+	struct sto_json_ctx *json_ctx = cb_ctx;
 
-	ctx->buf = calloc(1, size);
-	if (spdk_unlikely(!ctx->buf)) {
+	json_ctx->buf = calloc(1, size);
+	if (spdk_unlikely(!json_ctx->buf)) {
 		SPDK_ERRLOG("Failed to alloc buf: size=%zu\n", size);
 		return -ENOMEM;
 	}
 
-	ctx->size = size;
+	json_ctx->size = size;
 
-	memcpy(ctx->buf, data, size);
+	memcpy(json_ctx->buf, data, size);
 
-	return json_ctx_parse_buf(ctx);
+	return sto_json_ctx_parse(json_ctx);
 }
 
 int
-sto_json_ctx_dump(struct sto_json_ctx *ctx, bool formatted,
-		  void *priv, sto_json_ctx_dump_t dump)
+sto_json_ctx_write(struct sto_json_ctx *json_ctx, bool formatted,
+		   sto_json_ctx_write_cb_t write_cb, void *cb_ctx)
 {
 	struct spdk_json_write_ctx *w;
 	uint32_t flags = formatted ? SPDK_JSON_PARSE_FLAG_DECODE_IN_PLACE : 0;
 	int rc = 0;
 
-	w = spdk_json_write_begin(json_ctx_write_cb, ctx, flags);
+	w = spdk_json_write_begin(json_ctx_write_cb, json_ctx, flags);
 	if (spdk_unlikely(!w)) {
 		SPDK_ERRLOG("Failed to alloc SPDK json write context\n");
 		return -ENOMEM;
 	}
 
-	rc = dump(priv, w);
+	rc = write_cb(cb_ctx, w);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to dump user info to JSON context\n");
-		goto free_ctx;
 	}
 
-	rc = spdk_json_write_end(w);
-	if (spdk_unlikely(rc)) {
+	if (spdk_unlikely(spdk_json_write_end(w))) {
 		SPDK_ERRLOG("Failed to write end for JSON context\n");
-		goto free_ctx;
+		rc = rc ?: -EINVAL;
+	}
+
+	if (spdk_unlikely(rc)) {
+		goto out_err;
 	}
 
 	return 0;
 
-free_ctx:
-	sto_json_ctx_destroy(ctx);
+out_err:
+	sto_json_ctx_destroy(json_ctx);
 
 	return rc;
 }
 
 void
-sto_json_ctx_destroy(struct sto_json_ctx *ctx)
+sto_json_ctx_destroy(struct sto_json_ctx *json_ctx)
 {
-	free((struct spdk_json_val *) ctx->values);
-	free(ctx->buf);
+	free((struct spdk_json_val *) json_ctx->values);
+	free(json_ctx->buf);
 }
 
 bool
@@ -316,7 +318,7 @@ out:
 }
 
 struct spdk_json_val *
-sto_json_parse_buf(void *buf, size_t size)
+sto_json_parse(void *buf, size_t size)
 {
 	struct spdk_json_val *values;
 	void *end;
