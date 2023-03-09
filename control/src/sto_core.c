@@ -1,16 +1,21 @@
+#include "sto_core.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/thread.h>
 #include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
-#include <spdk/string.h>
+#include <spdk/queue.h>
 
-#include "sto_core.h"
 #include "sto_json.h"
 #include "sto_component.h"
 #include "sto_req.h"
-#include "sto_hash.h"
 #include "sto_err.h"
+#include "sto_lib.h"
+
+struct spdk_json_write_ctx;
+struct sto_shash;
 
 #define STO_CORE_REQ_POLL_PERIOD	1000 /* 1ms */
 

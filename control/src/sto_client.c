@@ -1,17 +1,21 @@
+#include "sto_client.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/thread.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/string.h>
+#include <spdk/json.h>
+#include <spdk/jsonrpc.h>
+#include <spdk/queue.h>
+#include <spdk/util.h>
 
 #include "sto_json.h"
-#include "sto_client.h"
 #include "sto_err.h"
 #include "sto_hash.h"
 
 #define STO_JSONRPC_CLIENT_MAX_CONNS	64
 #define STO_JSONRPC_CLIENT_POLL_PERIOD	100
-
-struct sto_jsonrpc_client_req;
 
 struct sto_jsonrpc_client_entry {
 	struct spdk_jsonrpc_client *rpc_client;

@@ -1,7 +1,7 @@
+#include <spdk/stdinc.h>
 #include <spdk/json.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
-#include <spdk/string.h>
 
 #include "sto_exec.h"
 #include "sto_srv_fs.h"

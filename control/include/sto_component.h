@@ -1,6 +1,7 @@
 #ifndef _STO_COMPONENT_H_
 #define _STO_COMPONENT_H_
 
+#include <spdk/stdinc.h>
 #include <spdk/queue.h>
 
 struct sto_json_iter;

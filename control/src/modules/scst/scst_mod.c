@@ -1,13 +1,13 @@
-#include <spdk/json.h>
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
-#include <spdk/string.h>
 
 #include "sto_module.h"
-#include "sto_json.h"
 #include "sto_generic_req.h"
 #include "sto_rpc_subprocess.h"
-#include "sto_err.h"
+#include "sto_lib.h"
+#include "sto_pipeline.h"
+#include "sto_req.h"
 
 static void
 iscsi_start_daemon(struct sto_pipeline *pipe)

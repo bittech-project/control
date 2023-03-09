@@ -1,10 +1,13 @@
+#include <spdk/stdinc.h>
 #include <spdk/rpc.h>
-#include <spdk/util.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
-#include <spdk/string.h>
+#include <spdk/jsonrpc.h>
 
 #include "sto_core.h"
+
+struct spdk_json_val;
+struct spdk_jsonrpc_request;
 
 static void
 sto_control_rpc_done(struct sto_core_req *core_req)

@@ -1,11 +1,15 @@
-#include <spdk/json.h>
-#include <spdk/log.h>
-#include <spdk/likely.h>
-#include <spdk/string.h>
-
 #include "sto_generic_req.h"
+
+#include <spdk/stdinc.h>
+#include <spdk/json.h>
+
 #include "sto_req.h"
 #include "sto_rpc_aio.h"
+#include "sto_pipeline.h"
+#include "sto_rpc_readdir.h"
+#include "sto_tree.h"
+
+struct spdk_json_write_ctx;
 
 static void
 sto_write_req_params_deinit(void *params_ptr)

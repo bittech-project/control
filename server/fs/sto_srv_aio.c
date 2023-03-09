@@ -1,3 +1,4 @@
+#include <spdk/stdinc.h>
 #include <spdk/json.h>
 #include <spdk/util.h>
 #include <spdk/likely.h>
@@ -5,6 +6,7 @@
 #include "sto_exec.h"
 #include "sto_srv_fs.h"
 #include "sto_srv_aio.h"
+#include "sto_async.h"
 
 struct sto_srv_writefile_params {
 	char *filepath;

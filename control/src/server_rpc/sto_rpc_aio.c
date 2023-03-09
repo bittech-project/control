@@ -1,9 +1,16 @@
+#include "sto_rpc_aio.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
+#include <spdk/json.h>
+#include <spdk/jsonrpc.h>
 
 #include "sto_client.h"
-#include "sto_rpc_aio.h"
+#include "sto_async.h"
+
+struct spdk_json_write_ctx;
 
 struct sto_rpc_writefile_info {
 	int returncode;

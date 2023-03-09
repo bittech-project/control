@@ -1,11 +1,15 @@
-#include <spdk/thread.h>
-#include <spdk/json.h>
+#include "sto_req.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
-#include <spdk/string.h>
 
-#include "sto_req.h"
 #include "sto_err.h"
+#include "sto_core.h"
+#include "sto_lib.h"
+#include "sto_pipeline.h"
+
+struct sto_json_iter;
 
 static struct sto_pipeline_engine *g_req_engine;
 

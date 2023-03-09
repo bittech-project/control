@@ -1,7 +1,10 @@
+#include "sto_component.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
+#include <spdk/queue.h>
 
-#include "sto_component.h"
 #include "sto_json.h"
 #include "sto_err.h"
 

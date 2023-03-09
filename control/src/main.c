@@ -1,15 +1,15 @@
+#include <spdk/stdinc.h>
 #include <spdk/event.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
+#include <sto_server.h>
+
+#include <sto_server.h>
 
 #include "sto_version.h"
 #include "sto_client.h"
 #include "sto_core.h"
-#include "sto_subsystem.h"
-#include "sto_module.h"
 #include "sto_err.h"
-
-#include <sto_server.h>
 
 /*
  * Usage function for printing parameters that are specific to this application

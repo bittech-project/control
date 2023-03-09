@@ -1,12 +1,15 @@
+#include <spdk/stdinc.h>
 #include <spdk/json.h>
-#include <spdk/util.h>
 #include <spdk/likely.h>
+#include <spdk/jsonrpc.h>
 
 #include "sto_rpc.h"
 #include "sto_srv_fs.h"
 #include "sto_srv_aio.h"
 #include "sto_srv_readdir.h"
 #include "sto_srv_subprocess.h"
+
+struct spdk_jsonrpc_request;
 
 static void
 sto_srv_writefile_rpc_done(void *priv, int rc)

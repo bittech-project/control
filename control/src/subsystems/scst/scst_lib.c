@@ -1,12 +1,18 @@
+#include <spdk/stdinc.h>
 #include <spdk/likely.h>
 #include <spdk/log.h>
 #include <spdk/string.h>
+#include <spdk/json.h>
 
 #include "sto_async.h"
 #include "sto_rpc_aio.h"
 #include "sto_tree.h"
+#include "sto_inode.h"
+#include "sto_json.h"
 
 #include "scst.h"
+
+struct spdk_json_write_ctx;
 
 static char *
 scst_available_attrs_line(char **lines, const char *prefix)

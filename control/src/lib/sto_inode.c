@@ -1,12 +1,16 @@
+#include "sto_inode.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/json.h>
-#include <spdk/util.h>
 #include <spdk/string.h>
 
 #include "sto_rpc_aio.h"
 #include "sto_tree.h"
-#include "sto_inode.h"
+#include "sto_rpc_readdir.h"
+
+struct spdk_json_write_ctx;
 
 static struct sto_inode *sto_file_inode_create(void);
 static struct sto_inode *sto_dir_inode_create(void);

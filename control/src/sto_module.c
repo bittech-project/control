@@ -1,12 +1,14 @@
-#include <spdk/string.h>
+#include "sto_module.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/likely.h>
 #include <spdk/log.h>
+#include <spdk/queue.h>
 
-#include "sto_module.h"
 #include "sto_lib.h"
-#include "sto_json.h"
 #include "sto_component.h"
 #include "sto_err.h"
+#include "sto_hash.h"
 
 TAILQ_HEAD(sto_module_list, sto_module);
 static struct sto_module_list g_modules = TAILQ_HEAD_INITIALIZER(g_modules);

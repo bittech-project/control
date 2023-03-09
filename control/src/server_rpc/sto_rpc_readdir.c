@@ -1,11 +1,17 @@
+#include "sto_rpc_readdir.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
+#include <spdk/json.h>
+#include <spdk/jsonrpc.h>
 
 #include "sto_json.h"
-#include "sto_lib.h"
 #include "sto_client.h"
-#include "sto_rpc_readdir.h"
+#include "sto_async.h"
+
+struct spdk_json_write_ctx;
 
 static const struct spdk_json_object_decoder sto_dirent_decoders[] = {
 	{"name", offsetof(struct sto_dirent, name), spdk_json_decode_string},

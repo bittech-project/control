@@ -1,8 +1,8 @@
 #ifndef _STO_CLIENT_H_
 #define _STO_CLIENT_H_
 
-#include <spdk/queue.h>
-#include <spdk/jsonrpc.h>
+struct spdk_json_write_ctx;
+struct spdk_jsonrpc_client_response;
 
 #define STO_LOCAL_SERVER_ADDR "/var/tmp/sto_server.sock"
 

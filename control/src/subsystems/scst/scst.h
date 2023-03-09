@@ -4,6 +4,8 @@
 #include "sto_async.h"
 #include "sto_json.h"
 
+struct sto_tree_node;
+
 #define SCST_ROOT "/sys/kernel/scst_tgt"
 
 /* Root-level */

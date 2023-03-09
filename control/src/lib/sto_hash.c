@@ -1,10 +1,12 @@
+#include "sto_hash.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/util.h>
+#include <spdk/queue.h>
 
 #include <rte_jhash.h>
-
-#include "sto_hash.h"
 
 struct sto_bucket_table {
 	uint32_t nr_of_buckets;

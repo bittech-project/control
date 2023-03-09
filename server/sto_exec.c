@@ -1,6 +1,7 @@
-#include <spdk/likely.h>
-
 #include "sto_exec.h"
+
+#include <spdk/stdinc.h>
+#include <spdk/likely.h>
 
 void
 sto_exec_init_ctx(struct sto_exec_ctx *exec_ctx, struct sto_exec_ops *ops, void *priv)

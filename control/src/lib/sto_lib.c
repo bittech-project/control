@@ -1,13 +1,17 @@
+#include "sto_lib.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
-#include "sto_lib.h"
 #include "sto_component.h"
 #include "sto_hash.h"
 #include "sto_json.h"
 #include "sto_err.h"
+
+struct spdk_json_write_ctx;
 
 void
 sto_err(struct sto_err_context *err, int rc)

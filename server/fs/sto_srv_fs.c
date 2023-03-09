@@ -1,9 +1,12 @@
+#include <spdk/stdinc.h>
 #include <spdk/json.h>
-#include <spdk/util.h>
 #include <spdk/likely.h>
 #include <spdk/string.h>
+#include <spdk/queue.h>
 
 #include "sto_srv_fs.h"
+
+struct spdk_json_write_ctx;
 
 struct sto_srv_dirent *
 sto_srv_dirent_alloc(const char *name)

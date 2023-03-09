@@ -1,11 +1,11 @@
+#include "sto_srv_subprocess.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/json.h>
 #include <spdk/likely.h>
-#include <spdk/stdinc.h>
 #include <spdk/util.h>
-#include <spdk/string.h>
 
 #include "sto_exec.h"
-#include "sto_srv_subprocess.h"
 
 static int sto_srv_subprocess_exec(void *arg);
 static void sto_srv_subprocess_exec_done(void *arg, int rc);

@@ -1,9 +1,17 @@
+#include "sto_rpc_subprocess.h"
+
+#include <spdk/stdinc.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/string.h>
+#include <spdk/json.h>
+#include <spdk/jsonrpc.h>
+#include <spdk/util.h>
 
 #include "sto_client.h"
-#include "sto_rpc_subprocess.h"
+#include "sto_async.h"
+
+struct spdk_json_write_ctx;
 
 struct sto_rpc_subprocess_info {
 	int returncode;

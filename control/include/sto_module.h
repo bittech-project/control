@@ -1,6 +1,7 @@
 #ifndef _STO_MODULE_H_
 #define _STO_MODULE_H_
 
+#include <spdk/stdinc.h>
 #include <spdk/queue.h>
 
 #include "sto_hash.h"

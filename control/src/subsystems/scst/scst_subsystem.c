@@ -1,12 +1,18 @@
+#include <spdk/stdinc.h>
 #include <spdk/json.h>
 #include <spdk/log.h>
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
+#include "scst.h"
+
 #include "sto_generic_req.h"
 #include "sto_subsystem.h"
+#include "sto_inode.h"
+#include "sto_lib.h"
+#include "sto_tree.h"
 
-#include "scst.h"
+struct spdk_json_write_ctx;
 
 static int
 scst_parse_attributes(char *attributes, char **data)

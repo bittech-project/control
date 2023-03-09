@@ -2,6 +2,7 @@
 #define _STO_ASYNC_H_
 
 #include <spdk/stdinc.h>
+#include <spdk/likely.h>
 
 typedef void (*sto_generic_cb)(void *cb_arg, int rc);
 
