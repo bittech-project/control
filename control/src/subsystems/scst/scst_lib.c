@@ -111,11 +111,10 @@ read_available_attrs_done(void *priv, char *buf, int rc)
 	scst_available_attrs_print(*ctx->available_attrs);
 
 out:
-	free(buf);
-
 	ctx->cb_fn(ctx->cb_arg, rc);
-
 	free(ctx);
+
+	free(buf);
 }
 
 void
@@ -276,11 +275,9 @@ read_attrs_done(void *cb_arg, struct sto_tree_node *tree_root, int rc)
 
 out:
 	ctx->cb_fn(ctx->cb_arg, rc);
-
-	sto_tree_free(tree_root);
 	free(ctx);
 
-	return;
+	sto_tree_free(tree_root);
 }
 
 void
@@ -300,6 +297,4 @@ scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct 
 	ctx->json = json;
 
 	sto_tree(dirpath, 1, false, read_attrs_done, ctx);
-
-	return;
 }

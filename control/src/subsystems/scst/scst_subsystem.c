@@ -1123,4 +1123,41 @@ static const struct sto_ops scst_ops[] = {
 
 static const struct sto_op_table scst_op_table = STO_OP_TABLE_INITIALIZER(scst_ops);
 
-STO_SUBSYSTEM_REGISTER(scst, &scst_op_table, NULL);
+static void
+scst_subsystem_init_done(void *cb_arg, int rc)
+{
+	SPDK_ERRLOG("SCST subsystem init done: rc=%d\n", rc);
+
+	sto_subsystem_init_next(rc);
+}
+
+static void
+scst_subsystem_init(void)
+{
+	SPDK_ERRLOG("SCST subsystem init start\n");
+
+	scst_init(scst_subsystem_init_done, NULL);
+}
+
+static void
+scst_subsystem_fini_done(void *cb_arg, int rc)
+{
+	SPDK_ERRLOG("SCST subsystem fini done: rc=%d\n", rc);
+
+	sto_subsystem_fini_next();
+}
+
+static void
+scst_subsystem_fini(void)
+{
+	SPDK_ERRLOG("SCST subsystem fini start\n");
+
+	scst_fini(scst_subsystem_fini_done, NULL);
+}
+
+static struct sto_subsystem_ops scst_subsystem_ops = {
+	.init = scst_subsystem_init,
+	.fini = scst_subsystem_fini,
+};
+
+STO_SUBSYSTEM_REGISTER(scst, &scst_op_table, &scst_subsystem_ops);

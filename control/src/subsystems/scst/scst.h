@@ -5,6 +5,7 @@
 #include "sto_json.h"
 
 struct sto_tree_node;
+struct sto_pipeline_properties;
 
 #define SCST_ROOT "/sys/kernel/scst_tgt"
 
@@ -104,5 +105,11 @@ void scst_available_attrs_destroy(char **available_attrs);
 
 void scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write_ctx *w);
 void scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
+
+void scst_pipeline(const struct sto_pipeline_properties *properties,
+		   sto_generic_cb cb_fn, void *cb_arg, void *priv);
+
+void scst_init(sto_generic_cb cb_fn, void *cb_arg);
+void scst_fini(sto_generic_cb cb_fn, void *cb_arg);
 
 #endif /* _SCST_H_ */
