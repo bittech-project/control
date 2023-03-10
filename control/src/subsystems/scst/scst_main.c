@@ -25,9 +25,7 @@ struct scst_device {
 	TAILQ_ENTRY(scst_device) list;
 };
 
-static struct scst_device *scst_device_alloc(struct scst_device_handler *handler, const char *name);
 static void scst_device_free(struct scst_device *device);
-static struct scst_device *scst_device_create(const char *handler_name, const char *device_name);
 static void scst_device_destroy(struct scst_device *device);
 
 struct scst_device_handler {
@@ -41,10 +39,7 @@ struct scst_device_handler {
 	TAILQ_ENTRY(scst_device_handler) list;
 };
 
-static struct scst_device_handler *scst_device_handler_alloc(const char *handler_name);
 static void scst_device_handler_free(struct scst_device_handler *handler);
-static struct scst_device *scst_device_handler_find(struct scst_device_handler *handler,
-						    const char *device_name);
 
 struct scst {
 	const char *sys_path;
@@ -57,153 +52,12 @@ struct scst {
 
 static struct scst *g_scst;
 
+static struct scst_device_handler *scst_get_device_handler(const char *handler_name);
+static void scst_put_device_handler(struct scst_device_handler *handler);
+static int scst_add_device(const char *handler_name, const char *device_name);
+static int scst_remove_device(const char *handler_name, const char *device_name);
+static struct scst_device *scst_find_device(const char *handler_name, const char *device_name);
 
-static struct scst *
-scst_create(void)
-{
-	struct scst *scst;
-
-	scst = calloc(1, sizeof(*scst));
-	if (spdk_unlikely(!scst)) {
-		SPDK_ERRLOG("Failed to alloc SCST instance\n");
-		return NULL;
-	}
-
-	scst->sys_path = SCST_ROOT;
-
-	scst->config_path = strdup(SCST_DEF_CONFIG_PATH);
-	if (spdk_unlikely(!scst->config_path)) {
-		SPDK_ERRLOG("Failed to strdup config path for SCST\n");
-		goto free_scst;
-	}
-
-	scst->engine = sto_pipeline_engine_create("SCST subsystem");
-	if (spdk_unlikely(!scst->engine)) {
-		SPDK_ERRLOG("Cann't create the SCST engine\n");
-		goto free_config_path;
-	}
-
-	TAILQ_INIT(&scst->handler_list);
-
-	return scst;
-
-free_config_path:
-	free((char *) scst->config_path);
-
-free_scst:
-	free(scst);
-
-	return NULL;
-}
-
-static void
-scst_destroy(struct scst *scst)
-{
-	sto_pipeline_engine_destroy(scst->engine);
-	free((char *) scst->config_path);
-	free(scst);
-}
-
-static struct scst_device_handler *
-scst_find_device_handler(struct scst *scst, const char *handler_name)
-{
-	struct scst_device_handler *handler;
-
-	TAILQ_FOREACH(handler, &scst->handler_list, list) {
-		if (!strcmp(handler_name, handler->name)) {
-			return handler;
-		}
-	}
-
-	return NULL;
-}
-
-static struct scst_device_handler *
-scst_get_device_handler(const char *handler_name)
-{
-	struct scst *scst = g_scst;
-	struct scst_device_handler *handler;
-
-	handler = scst_find_device_handler(scst, handler_name);
-	if (!handler) {
-		handler = scst_device_handler_alloc(handler_name);
-		if (spdk_unlikely(!handler)) {
-			SPDK_ERRLOG("Failed to alloc %s handler\n",
-				    handler_name);
-			return NULL;
-		}
-
-		TAILQ_INSERT_TAIL(&scst->handler_list, handler, list);
-	}
-
-	handler->ref_cnt++;
-
-	return handler;
-}
-
-static void
-scst_put_device_handler(struct scst_device_handler *handler)
-{
-	struct scst *scst = g_scst;
-	int ref_cnt = --handler->ref_cnt;
-
-	assert(ref_cnt >= 0);
-
-	if (ref_cnt == 0) {
-		TAILQ_REMOVE(&scst->handler_list, handler, list);
-		scst_device_handler_free(handler);
-	}
-}
-
-static struct scst_device *
-scst_find_device(const char *handler_name, const char *device_name)
-{
-	struct scst *scst = g_scst;
-	struct scst_device_handler *handler;
-
-	handler = scst_find_device_handler(scst, handler_name);
-	if (spdk_unlikely(!handler)) {
-		return NULL;
-	}
-
-	return scst_device_handler_find(handler, device_name);
-}
-
-static int
-scst_add_device(const char *handler_name, const char *device_name)
-{
-	struct scst_device *device;
-
-	if (scst_find_device(handler_name, device_name)) {
-		SPDK_ERRLOG("SCST device %s is already exist\n", device_name);
-		return -EEXIST;
-	}
-
-	device = scst_device_create(handler_name, device_name);
-	if (spdk_unlikely(!device)) {
-		SPDK_ERRLOG("Failed to create `%s` SCST device\n", device_name);
-		return -ENOMEM;
-	}
-
-	return 0;
-}
-
-static int
-scst_remove_device(const char *handler_name, const char *device_name)
-{
-	struct scst_device *device;
-
-	device = scst_find_device(handler_name, device_name);
-	if (spdk_unlikely(!device)) {
-		SPDK_ERRLOG("Failed to find `%s` SCST device to remove\n",
-			    device_name);
-		return -ENOENT;
-	}
-
-	scst_device_destroy(device);
-
-	return 0;
-}
 
 static struct scst_device_handler *
 scst_device_handler_alloc(const char *handler_name)
@@ -552,6 +406,153 @@ void
 scst_device_close(struct scst_device_close_params *params, sto_generic_cb cb_fn, void *cb_arg)
 {
 	scst_pipeline(&scst_device_close_properties, cb_fn, cb_arg, params);
+}
+
+static struct scst *
+scst_create(void)
+{
+	struct scst *scst;
+
+	scst = calloc(1, sizeof(*scst));
+	if (spdk_unlikely(!scst)) {
+		SPDK_ERRLOG("Failed to alloc SCST instance\n");
+		return NULL;
+	}
+
+	scst->sys_path = SCST_ROOT;
+
+	scst->config_path = strdup(SCST_DEF_CONFIG_PATH);
+	if (spdk_unlikely(!scst->config_path)) {
+		SPDK_ERRLOG("Failed to strdup config path for SCST\n");
+		goto free_scst;
+	}
+
+	scst->engine = sto_pipeline_engine_create("SCST subsystem");
+	if (spdk_unlikely(!scst->engine)) {
+		SPDK_ERRLOG("Cann't create the SCST engine\n");
+		goto free_config_path;
+	}
+
+	TAILQ_INIT(&scst->handler_list);
+
+	return scst;
+
+free_config_path:
+	free((char *) scst->config_path);
+
+free_scst:
+	free(scst);
+
+	return NULL;
+}
+
+static void
+scst_destroy(struct scst *scst)
+{
+	sto_pipeline_engine_destroy(scst->engine);
+	free((char *) scst->config_path);
+	free(scst);
+}
+
+static struct scst_device_handler *
+scst_find_device_handler(struct scst *scst, const char *handler_name)
+{
+	struct scst_device_handler *handler;
+
+	TAILQ_FOREACH(handler, &scst->handler_list, list) {
+		if (!strcmp(handler_name, handler->name)) {
+			return handler;
+		}
+	}
+
+	return NULL;
+}
+
+static struct scst_device_handler *
+scst_get_device_handler(const char *handler_name)
+{
+	struct scst *scst = g_scst;
+	struct scst_device_handler *handler;
+
+	handler = scst_find_device_handler(scst, handler_name);
+	if (!handler) {
+		handler = scst_device_handler_alloc(handler_name);
+		if (spdk_unlikely(!handler)) {
+			SPDK_ERRLOG("Failed to alloc %s handler\n",
+				    handler_name);
+			return NULL;
+		}
+
+		TAILQ_INSERT_TAIL(&scst->handler_list, handler, list);
+	}
+
+	handler->ref_cnt++;
+
+	return handler;
+}
+
+static void
+scst_put_device_handler(struct scst_device_handler *handler)
+{
+	struct scst *scst = g_scst;
+	int ref_cnt = --handler->ref_cnt;
+
+	assert(ref_cnt >= 0);
+
+	if (ref_cnt == 0) {
+		TAILQ_REMOVE(&scst->handler_list, handler, list);
+		scst_device_handler_free(handler);
+	}
+}
+
+static struct scst_device *
+scst_find_device(const char *handler_name, const char *device_name)
+{
+	struct scst *scst = g_scst;
+	struct scst_device_handler *handler;
+
+	handler = scst_find_device_handler(scst, handler_name);
+	if (spdk_unlikely(!handler)) {
+		return NULL;
+	}
+
+	return scst_device_handler_find(handler, device_name);
+}
+
+static int
+scst_add_device(const char *handler_name, const char *device_name)
+{
+	struct scst_device *device;
+
+	if (scst_find_device(handler_name, device_name)) {
+		SPDK_ERRLOG("SCST device %s is already exist\n", device_name);
+		return -EEXIST;
+	}
+
+	device = scst_device_create(handler_name, device_name);
+	if (spdk_unlikely(!device)) {
+		SPDK_ERRLOG("Failed to create `%s` SCST device\n", device_name);
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int
+scst_remove_device(const char *handler_name, const char *device_name)
+{
+	struct scst_device *device;
+
+	device = scst_find_device(handler_name, device_name);
+	if (spdk_unlikely(!device)) {
+		SPDK_ERRLOG("Failed to find `%s` SCST device to remove\n",
+			    device_name);
+		return -ENOENT;
+	}
+
+	scst_device_destroy(device);
+
+	return 0;
 }
 
 void
