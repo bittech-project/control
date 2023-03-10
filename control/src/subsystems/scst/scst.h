@@ -106,6 +106,40 @@ void scst_available_attrs_destroy(char **available_attrs);
 void scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write_ctx *w);
 void scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
 
+struct scst_device_open_params {
+	char *handler_name;
+	char *device_name;
+	char *attributes;
+};
+
+static inline void
+scst_device_open_params_deinit(void *params_ptr)
+{
+	struct scst_device_open_params *params = params_ptr;
+
+	free(params->handler_name);
+	free(params->device_name);
+	free(params->attributes);
+}
+
+void scst_device_open(struct scst_device_open_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
+struct scst_device_close_params {
+	char *handler_name;
+	char *device_name;
+};
+
+static inline void
+scst_device_close_params_deinit(void *params_ptr)
+{
+	struct scst_device_close_params *params = params_ptr;
+
+	free(params->handler_name);
+	free(params->device_name);
+}
+
+void scst_device_close(struct scst_device_close_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
 void scst_pipeline(const struct sto_pipeline_properties *properties,
 		   sto_generic_cb cb_fn, void *cb_arg, void *priv);
 

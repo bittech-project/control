@@ -204,82 +204,115 @@ scst_driver_list_constructor(void *arg1, const void *arg2)
 	return 0;
 }
 
-struct scst_dev_open_params {
+struct dev_open_ops_params {
 	char *device;
 	char *handler;
 	char *attributes;
 };
 
-static const struct sto_ops_param_dsc scst_dev_open_params_descriptors[] = {
-	STO_OPS_PARAM_STR(device, struct scst_dev_open_params, "SCST device name"),
-	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "SCST handler name"),
-	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_dev_open_params, "SCST device attributes <p=v,...>"),
+static const struct sto_ops_param_dsc dev_open_ops_params_descriptors[] = {
+	STO_OPS_PARAM_STR(device, struct dev_open_ops_params, "SCST device name"),
+	STO_OPS_PARAM_STR(handler, struct dev_open_ops_params, "SCST handler name"),
+	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct dev_open_ops_params, "SCST device attributes <p=v,...>"),
 };
 
-static const struct sto_ops_params_properties scst_dev_open_params_properties =
-	STO_OPS_PARAMS_INITIALIZER(scst_dev_open_params_descriptors, struct scst_dev_open_params);
+static const struct sto_ops_params_properties dev_open_ops_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(dev_open_ops_params_descriptors, struct dev_open_ops_params);
 
 static int
-scst_dev_open_constructor(void *arg1, const void *arg2)
+dev_open_req_constructor(void *arg1, const void *arg2)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_dev_open_params *ops_params = arg2;
-	char *data;
+	struct scst_device_open_params *req_params = arg1;
+	const struct dev_open_ops_params *ops_params = arg2;
 
-	req_params->file = scst_handler_mgmt(ops_params->handler);
-	if (spdk_unlikely(!req_params->file)) {
+	req_params->device_name = strdup(ops_params->device);
+	if (spdk_unlikely(!req_params->device_name)) {
 		return -ENOMEM;
 	}
 
-	data = spdk_sprintf_alloc("add_device %s", ops_params->device);
-	if (spdk_unlikely(!data)) {
+	req_params->handler_name = strdup(ops_params->handler);
+	if (spdk_unlikely(!req_params->handler_name)) {
 		return -ENOMEM;
 	}
 
 	if (ops_params->attributes) {
-		int rc = scst_parse_attributes(ops_params->attributes, &data);
-		if (spdk_unlikely(rc)) {
-			free(data);
-			return rc;
-		}
+		return scst_parse_attributes(ops_params->attributes, &req_params->attributes);
 	}
-
-	req_params->data = data;
 
 	return 0;
 }
 
-struct scst_dev_close_params {
+static void
+dev_open_req_step(struct sto_pipeline *pipe)
+{
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_device_open_params *params = sto_req_get_params(req);
+
+	scst_device_open(params, sto_pipeline_step_done, pipe);
+}
+
+const struct sto_req_properties dev_open_req_properties = {
+	.params_size = sizeof(struct scst_device_open_params),
+	.params_deinit_fn = scst_device_open_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(dev_open_req_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
+
+struct dev_close_ops_params {
 	char *device;
 	char *handler;
 };
 
-static const struct sto_ops_param_dsc scst_dev_close_params_descriptors[] = {
-	STO_OPS_PARAM_STR(device, struct scst_dev_open_params, "SCST device name"),
-	STO_OPS_PARAM_STR(handler, struct scst_dev_open_params, "SCST handler name"),
+static const struct sto_ops_param_dsc dev_close_ops_params_descriptors[] = {
+	STO_OPS_PARAM_STR(device, struct dev_close_ops_params, "SCST device name"),
+	STO_OPS_PARAM_STR(handler, struct dev_close_ops_params, "SCST handler name"),
 };
 
-static const struct sto_ops_params_properties scst_dev_close_params_properties =
-	STO_OPS_PARAMS_INITIALIZER(scst_dev_close_params_descriptors, struct scst_dev_close_params);
+static const struct sto_ops_params_properties dev_close_ops_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(dev_close_ops_params_descriptors, struct dev_close_ops_params);
 
 static int
-scst_dev_close_constructor(void *arg1, const void *arg2)
+dev_close_req_constructor(void *arg1, const void *arg2)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_dev_open_params *ops_params = arg2;
+	struct scst_device_close_params *req_params = arg1;
+	const struct dev_close_ops_params *ops_params = arg2;
 
-	req_params->file = scst_handler_mgmt(ops_params->handler);
-	if (spdk_unlikely(!req_params->file)) {
+	req_params->device_name = strdup(ops_params->device);
+	if (spdk_unlikely(!req_params->device_name)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("del_device %s", ops_params->device);
-	if (spdk_unlikely(!req_params->data)) {
+	req_params->handler_name = strdup(ops_params->handler);
+	if (spdk_unlikely(!req_params->handler_name)) {
 		return -ENOMEM;
 	}
 
 	return 0;
 }
+
+static void
+dev_close_req_step(struct sto_pipeline *pipe)
+{
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_device_close_params *params = sto_req_get_params(req);
+
+	scst_device_close(params, sto_pipeline_step_done, pipe);
+}
+
+const struct sto_req_properties dev_close_req_properties = {
+	.params_size = sizeof(struct scst_device_close_params),
+	.params_deinit_fn = scst_device_close_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(dev_close_req_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
 
 struct scst_dev_resync_params {
 	char *device;
@@ -949,16 +982,16 @@ static const struct sto_ops scst_ops[] = {
 	{
 		.name = "dev_open",
 		.description = "Adds a new device using handler <handler>",
-		.params_properties = &scst_dev_open_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_dev_open_constructor,
+		.params_properties = &dev_open_ops_params_properties,
+		.req_properties = &dev_open_req_properties,
+		.req_params_constructor = dev_open_req_constructor,
 	},
 	{
 		.name = "dev_close",
 		.description = "Closes a device belonging to handler <handler>",
-		.params_properties = &scst_dev_close_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_dev_close_constructor,
+		.params_properties = &dev_close_ops_params_properties,
+		.req_properties = &dev_close_req_properties,
+		.req_params_constructor = dev_close_req_constructor,
 	},
 	{
 		.name = "dev_resync",

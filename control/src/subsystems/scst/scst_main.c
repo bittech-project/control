@@ -253,6 +253,16 @@ scst_device_handler_free(struct scst_device_handler *handler)
 	free(handler);
 }
 
+static void
+scst_device_handler_destroy(struct scst_device_handler *handler)
+{
+	struct scst_device *device, *tmp;
+
+	TAILQ_FOREACH_SAFE(device, &handler->device_list, list, tmp) {
+		scst_device_destroy(device);
+	}
+}
+
 static struct scst_device *
 scst_device_handler_find(struct scst_device_handler *handler, const char *device_name)
 {
@@ -265,16 +275,6 @@ scst_device_handler_find(struct scst_device_handler *handler, const char *device
 	}
 
 	return NULL;
-}
-
-static void
-scst_device_handler_destroy(struct scst_device_handler *handler)
-{
-	struct scst_device *device, *tmp;
-
-	TAILQ_FOREACH_SAFE(device, &handler->device_list, list, tmp) {
-		scst_device_destroy(device);
-	}
 }
 
 static struct scst_device *
@@ -356,6 +356,202 @@ scst_device_destroy(struct scst_device *device)
 	scst_put_device_handler(handler);
 
 	scst_device_free(device);
+}
+
+static struct sto_rpc_writefile_args *
+device_open_create_args(const char *handler_name, const char *device_name, const char *attributes)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = calloc(1, sizeof(*args));
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to alloc writefile args\n");
+		return NULL;
+	}
+
+	args->filepath = scst_handler_mgmt(handler_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("add_device %s", device_name);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	if (attributes) {
+		char *tmp;
+
+		tmp = spdk_sprintf_append_realloc(args->buf, " %s", attributes);
+		if (spdk_unlikely(!tmp)) {
+			SPDK_ERRLOG("Failed to realloc writefile args buf\n");
+			goto out_err;
+		}
+
+		args->buf = tmp;
+	}
+
+	return args;
+
+out_err:
+	sto_rpc_writefile_args_free(args);
+
+	return NULL;
+}
+
+static void
+device_open(const char *handler_name, const char *device_name, const char *attributes,
+	    sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = device_open_create_args(handler_name, device_name, attributes);
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to create writefile args for `device_open`\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST device open, filepath[%s], buf[%s]\n", args->filepath, args->buf);
+
+	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+}
+
+static struct sto_rpc_writefile_args *
+device_close_create_args(const char *handler_name, const char *device_name)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = calloc(1, sizeof(*args));
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to alloc writefile args\n");
+		return NULL;
+	}
+
+	args->filepath = scst_handler_mgmt(handler_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("del_device %s", device_name);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	return args;
+
+out_err:
+	sto_rpc_writefile_args_free(args);
+
+	return NULL;
+}
+
+static void
+device_close(const char *handler_name, const char *device_name,
+	     sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = device_close_create_args(handler_name, device_name);
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to create writefile args for `device_close`\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST device close, filepath[%s], data[%s]\n", args->filepath, args->buf);
+
+	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+}
+
+static void
+device_open_step(struct sto_pipeline *pipe)
+{
+	struct scst_device_open_params *params = sto_pipeline_get_priv(pipe);
+
+	if (scst_find_device(params->handler_name, params->device_name)) {
+		sto_pipeline_step_next(pipe, -EEXIST);
+		return;
+	}
+
+	device_open(params->handler_name, params->device_name, params->attributes,
+		    sto_pipeline_step_done, pipe);
+}
+
+static void
+device_open_rollback_step(struct sto_pipeline *pipe)
+{
+	struct scst_device_open_params *params = sto_pipeline_get_priv(pipe);
+
+	device_close(params->handler_name, params->device_name, sto_pipeline_step_done, pipe);
+}
+
+static void
+device_open_save_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_device_open_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_add_device(params->handler_name, params->device_name);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_device_open_properties = {
+	.steps = {
+		STO_PL_STEP(device_open_step, device_open_rollback_step),
+		STO_PL_STEP(device_open_save_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_device_open(struct scst_device_open_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_device_open_properties, cb_fn, cb_arg, params);
+}
+
+static void
+device_close_step(struct sto_pipeline *pipe)
+{
+	struct scst_device_close_params *params = sto_pipeline_get_priv(pipe);
+
+	if (!scst_find_device(params->handler_name, params->device_name)) {
+		sto_pipeline_step_next(pipe, -ENOENT);
+		return;
+	}
+
+	device_close(params->handler_name, params->device_name, sto_pipeline_step_done, pipe);
+}
+
+static void
+device_close_save_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_device_open_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_remove_device(params->handler_name, params->device_name);
+	assert(!rc);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_device_close_properties = {
+	.steps = {
+		STO_PL_STEP(device_close_step, NULL),
+		STO_PL_STEP(device_close_save_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_device_close(struct scst_device_close_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_device_close_properties, cb_fn, cb_arg, params);
 }
 
 void
