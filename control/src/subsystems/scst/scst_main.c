@@ -11,6 +11,7 @@
 #include "sto_pipeline.h"
 #include "sto_err.h"
 #include "sto_rpc_aio.h"
+#include "sto_tree.h"
 
 #define SCST_DEF_CONFIG_PATH "/etc/control.scst.json"
 
@@ -170,34 +171,6 @@ scst_device_free(struct scst_device *device)
 	free((char *) device->path);
 	free((char *) device->name);
 	free(device);
-}
-
-static struct scst_device *
-scst_device_create(const char *handler_name, const char *device_name)
-{
-	struct scst_device_handler *handler;
-	struct scst_device *device;
-
-	handler = scst_get_device_handler(handler_name);
-	if (spdk_unlikely(!handler)) {
-		SPDK_ERRLOG("Failed to get %s handler\n", handler_name);
-		return NULL;
-	}
-
-	device = scst_device_alloc(handler, device_name);
-	if (spdk_unlikely(!device)) {
-		SPDK_ERRLOG("Failed to alloc %s SCST device\n", device_name);
-		goto put_handler;
-	}
-
-	TAILQ_INSERT_TAIL(&handler->device_list, device, list);
-
-	return device;
-
-put_handler:
-	scst_put_device_handler(handler);
-
-	return NULL;
 }
 
 static void
@@ -522,6 +495,7 @@ scst_find_device(const char *handler_name, const char *device_name)
 static int
 scst_add_device(const char *handler_name, const char *device_name)
 {
+	struct scst_device_handler *handler;
 	struct scst_device *device;
 
 	if (scst_find_device(handler_name, device_name)) {
@@ -529,13 +503,29 @@ scst_add_device(const char *handler_name, const char *device_name)
 		return -EEXIST;
 	}
 
-	device = scst_device_create(handler_name, device_name);
-	if (spdk_unlikely(!device)) {
-		SPDK_ERRLOG("Failed to create `%s` SCST device\n", device_name);
+	handler = scst_get_device_handler(handler_name);
+	if (spdk_unlikely(!handler)) {
+		SPDK_ERRLOG("Failed to get %s handler\n", handler_name);
 		return -ENOMEM;
 	}
 
+	device = scst_device_alloc(handler, device_name);
+	if (spdk_unlikely(!device)) {
+		SPDK_ERRLOG("Failed to alloc %s SCST device\n", device_name);
+		goto put_handler;
+	}
+
+	TAILQ_INSERT_TAIL(&handler->device_list, device, list);
+
+	SPDK_ERRLOG("SCST device %s handler [%s] was added\n",
+		    device->name, handler->name);
+
 	return 0;
+
+put_handler:
+	scst_put_device_handler(handler);
+
+	return -ENOMEM;
 }
 
 static int
@@ -555,6 +545,317 @@ scst_remove_device(const char *handler_name, const char *device_name)
 	return 0;
 }
 
+static void
+device_dumps_json(struct sto_tree_node *device_lnk_node, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *device_node;
+
+	device_node = sto_tree_node_resolv_lnk(device_lnk_node);
+	if (spdk_unlikely(!device_node)) {
+		SPDK_ERRLOG("Failed to resolve device %s link\n",
+			    device_lnk_node->inode->name);
+		return;
+	}
+
+	spdk_json_write_name(w, device_lnk_node->inode->name);
+
+	spdk_json_write_object_begin(w);
+
+	scst_serialize_attrs(device_node, w);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
+handler_dumps_json(struct sto_tree_node *handler, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *device_node, *mgmt_node;
+
+	mgmt_node = sto_tree_node_find(handler, "mgmt");
+	if (spdk_unlikely(!mgmt_node)) {
+		SPDK_ERRLOG("Failed to find 'mgmt' for handler %s\n",
+			    handler->inode->name);
+		return;
+	}
+
+	spdk_json_write_name(w, handler->inode->name);
+
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_array_begin(w, "devices");
+
+	STO_TREE_FOREACH_TYPE(device_node, handler, STO_INODE_TYPE_LNK) {
+		spdk_json_write_object_begin(w);
+		device_dumps_json(device_node, w);
+		spdk_json_write_object_end(w);
+	}
+
+	spdk_json_write_array_end(w);
+
+	spdk_json_write_object_end(w);
+}
+
+static bool
+handler_list_is_empty(struct sto_tree_node *handler_list_node)
+{
+	struct sto_tree_node *handler_node;
+
+	if (sto_tree_node_first_child_type(handler_list_node, STO_INODE_TYPE_DIR) == NULL) {
+		return true;
+	}
+
+	STO_TREE_FOREACH_TYPE(handler_node, handler_list_node, STO_INODE_TYPE_DIR) {
+		if (sto_tree_node_first_child_type(handler_node, STO_INODE_TYPE_LNK) != NULL) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void
+handler_list_dumps_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *handler_list_node, *handler_node;
+
+	handler_list_node = sto_tree_node_find(tree_root, "handlers");
+
+	if (!handler_list_node || handler_list_is_empty(handler_list_node)) {
+		return;
+	}
+
+	spdk_json_write_named_array_begin(w, "handlers");
+
+	STO_TREE_FOREACH_TYPE(handler_node, handler_list_node, STO_INODE_TYPE_DIR) {
+		if (sto_tree_node_first_child_type(handler_node, STO_INODE_TYPE_LNK) == NULL) {
+			continue;
+		}
+
+		spdk_json_write_object_begin(w);
+		handler_dumps_json(handler_node, w);
+		spdk_json_write_object_end(w);
+	}
+
+	spdk_json_write_array_end(w);
+}
+
+static int
+dumps_json_write_cb(void *cb_ctx, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *tree_root = cb_ctx;
+
+	spdk_json_write_object_begin(w);
+
+	handler_list_dumps_json(tree_root, w);
+
+	spdk_json_write_object_end(w);
+
+	return 0;
+}
+
+struct dumps_json_ctx {
+	struct sto_json_ctx *json;
+
+	sto_generic_cb cb_fn;
+	void *cb_arg;
+};
+
+static void
+dumps_json(void *cb_arg, struct sto_tree_node *tree_root, int rc)
+{
+	struct dumps_json_ctx *ctx = cb_arg;
+
+	if (spdk_unlikely(rc)) {
+		rc = -ENOENT;
+		goto out;
+	}
+
+	rc = sto_json_ctx_write(ctx->json, true, dumps_json_write_cb, (void *) tree_root);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to dump SCST dev attributes\n");
+		goto out;
+	}
+
+	sto_json_print("Print dumped SCST configuration", ctx->json->values);
+
+out:
+	ctx->cb_fn(ctx->cb_arg, rc);
+	free(ctx);
+
+	sto_tree_free(tree_root);
+}
+
+void
+scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json)
+{
+	struct scst *scst = g_scst;
+	struct dumps_json_ctx *ctx;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to alloc context to dumps JSON\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	ctx->json = json;
+
+	ctx->cb_fn = cb_fn;
+	ctx->cb_arg = cb_arg;
+
+	sto_tree(scst->sys_path, 0, false, dumps_json, ctx);
+}
+
+static struct spdk_json_val *
+device_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
+{
+	if (!object) {
+		struct spdk_json_val *device_arr = sto_json_value(spdk_json_object_first(json));
+		int rc = 0;
+
+		rc = spdk_json_find_array(device_arr, "devices", NULL, &device_arr);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Could not find devices array from JSON\n");
+			return NULL;
+		}
+
+		return spdk_json_array_first(device_arr);
+	}
+
+	return spdk_json_next(object);
+}
+
+static struct spdk_json_val *
+handler_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
+{
+	if (!object) {
+		struct spdk_json_val *handler_arr = json;
+		int rc;
+
+		rc = spdk_json_find_array(handler_arr, "handlers", NULL, &handler_arr);
+		if (rc) {
+			SPDK_ERRLOG("Could not find handlers array from JSON\n");
+			return NULL;
+		}
+
+		return spdk_json_array_first(handler_arr);
+	}
+
+	return spdk_json_next(object);
+}
+
+static void
+device_load_json(struct sto_json_async_iter *iter, struct spdk_json_val *device)
+{
+	struct spdk_json_val *handler = iter->json;
+	char *handler_name = NULL, *device_name = NULL;
+	int rc = 0;
+
+	if (spdk_json_decode_string(spdk_json_object_first(handler), &handler_name)) {
+		SPDK_ERRLOG("Failed to decode handler name\n");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (spdk_json_decode_string(spdk_json_object_first(device), &device_name)) {
+		SPDK_ERRLOG("Failed to decode device name\n");
+		rc = -EINVAL;
+		goto free_handler_name;
+	}
+
+	rc = scst_add_device(handler_name, device_name);
+
+	free(device_name);
+
+free_handler_name:
+	free(handler_name);
+
+out:
+	sto_json_async_iter_next(iter, rc);
+}
+
+static void
+handler_load_json(struct sto_json_async_iter *iter, struct spdk_json_val *handler)
+{
+	struct sto_json_async_iter_ops ops = {
+		.iterate_fn = device_load_json,
+		.next_fn = device_json_iter_next,
+	};
+
+	sto_json_async_iter_start(handler, &ops, sto_json_async_iterate_done, iter);
+}
+
+static void
+handler_list_load_json_step(struct sto_pipeline *pipe)
+{
+	struct spdk_json_val *json = sto_pipeline_get_priv(pipe);
+	struct sto_json_async_iter_ops ops = {
+		.iterate_fn = handler_load_json,
+		.next_fn = handler_json_iter_next,
+	};
+
+	sto_json_async_iter_start(json, &ops, sto_pipeline_step_done, pipe);
+}
+
+static const struct sto_pipeline_properties load_json_properties = {
+	.steps = {
+		STO_PL_STEP(handler_list_load_json_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+static void
+scst_load_json(struct spdk_json_val *json, sto_generic_cb cb_fn, void *cb_arg)
+{
+	sto_json_print("SCST load json", json);
+	scst_pipeline(&load_json_properties, cb_fn, cb_arg, json);
+}
+
+struct scan_system_ctx {
+	struct sto_json_ctx json;
+};
+
+static void
+scan_system_ctx_deinit(void *ctx_ptr)
+{
+	struct scan_system_ctx *ctx = ctx_ptr;
+
+	sto_json_ctx_destroy(&ctx->json);
+}
+
+static void
+scan_system_dumps_json_step(struct sto_pipeline *pipe)
+{
+	struct scan_system_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	scst_dumps_json(sto_pipeline_step_done, pipe, &ctx->json);
+}
+
+static void
+scan_system_parse_json_step(struct sto_pipeline *pipe)
+{
+	struct scan_system_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	scst_load_json((struct spdk_json_val *) ctx->json.values, sto_pipeline_step_done, pipe);
+}
+
+static const struct sto_pipeline_properties scst_scan_system_properties = {
+	.ctx_size = sizeof(struct scan_system_ctx),
+	.ctx_deinit_fn = scan_system_ctx_deinit,
+
+	.steps = {
+		STO_PL_STEP(scan_system_dumps_json_step, NULL),
+		STO_PL_STEP(scan_system_parse_json_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_scan_system(sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_scan_system_properties, cb_fn, cb_arg, NULL);
+}
+
 void
 scst_pipeline(const struct sto_pipeline_properties *properties,
 	      sto_generic_cb cb_fn, void *cb_arg, void *priv)
@@ -564,28 +865,53 @@ scst_pipeline(const struct sto_pipeline_properties *properties,
 	sto_pipeline_alloc_and_run(scst->engine, properties, cb_fn, cb_arg, priv);
 }
 
+static void
+init_scan_system_done(void *cb_arg, int rc)
+{
+	struct sto_generic_cpl *cpl = cb_arg;
+
+	if (rc && rc != -ENOENT) {
+		SPDK_ERRLOG("Failed to scan system, rc=%d\n", rc);
+		goto out;
+	}
+
+	rc = 0;
+
+	SPDK_ERRLOG("SCST has been successfully scanned\n");
+
+out:
+	sto_generic_call_cpl(cpl, rc);
+}
+
 void
 scst_init(sto_generic_cb cb_fn, void *cb_arg)
 {
+	struct sto_generic_cpl *cpl;
 	struct scst *scst;
-	int rc = 0;
 
 	if (g_scst) {
 		SPDK_ERRLOG("FAILED: SCST has already been initialized\n");
-		rc = -EINVAL;
-		goto out;
+		cb_fn(cb_arg, -EINVAL);
+		return;
+	}
+
+	cpl = sto_generic_cpl_alloc(cb_fn, cb_arg);
+	if (spdk_unlikely(!cpl)) {
+		SPDK_ERRLOG("Failed to alloc generic completion\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
 	}
 
 	scst = scst_create();
 	if (spdk_unlikely(!scst)) {
-		SPDK_ERRLOG("Faild to create SCST\n");
-		rc = -ENOMEM;
-		goto out;
+		SPDK_ERRLOG("Failed to create SCST instance\n");
+		sto_generic_call_cpl(cpl, -ENOMEM);
+		return;
 	}
 
 	g_scst = scst;
-out:
-	cb_fn(cb_arg, rc);
+
+	scst_scan_system(init_scan_system_done, cpl);
 }
 
 void

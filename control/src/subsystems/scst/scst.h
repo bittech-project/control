@@ -143,6 +143,9 @@ void scst_device_close(struct scst_device_close_params *params, sto_generic_cb c
 void scst_pipeline(const struct sto_pipeline_properties *properties,
 		   sto_generic_cb cb_fn, void *cb_arg, void *priv);
 
+void scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
+void scst_scan_system(sto_generic_cb cb_fn, void *cb_arg);
+
 void scst_init(sto_generic_cb cb_fn, void *cb_arg);
 void scst_fini(sto_generic_cb cb_fn, void *cb_arg);
 

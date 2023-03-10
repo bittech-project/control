@@ -47,126 +47,73 @@ out:
 	return rc;
 }
 
-static void
-scst_snapshot_dev_info_json(struct sto_tree_node *dev_lnk_node, struct spdk_json_write_ctx *w)
-{
-	struct sto_tree_node *dev_node;
-
-	dev_node = sto_tree_node_resolv_lnk(dev_lnk_node);
-	if (spdk_unlikely(!dev_node)) {
-		SPDK_ERRLOG("Failed to resolve device %s link\n",
-			    dev_lnk_node->inode->name);
-		return;
-	}
-
-	spdk_json_write_name(w, dev_lnk_node->inode->name);
-
-	spdk_json_write_object_begin(w);
-
-	scst_serialize_attrs(dev_node, w);
-
-	spdk_json_write_object_end(w);
-}
+struct snapshot_req_params {
+	char *dirpath;
+};
 
 static void
-scst_snapshot_handler_info_json(struct sto_tree_node *dh_node, struct spdk_json_write_ctx *w)
+snapshot_req_params_deinit(void *params_ptr)
 {
-	struct sto_tree_node *dev_node, *mgmt_node;
+	struct snapshot_req_params *params = params_ptr;
 
-	mgmt_node = sto_tree_node_find(dh_node, "mgmt");
-	if (spdk_unlikely(!mgmt_node)) {
-		SPDK_ERRLOG("Failed to find 'mgmt' for handler %s\n",
-			    dh_node->inode->name);
-		return;
-	}
-
-	spdk_json_write_name(w, dh_node->inode->name);
-
-	spdk_json_write_object_begin(w);
-
-	spdk_json_write_named_array_begin(w, "devices");
-
-	STO_TREE_FOREACH_TYPE(dev_node, dh_node, STO_INODE_TYPE_LNK) {
-		spdk_json_write_object_begin(w);
-		scst_snapshot_dev_info_json(dev_node, w);
-		spdk_json_write_object_end(w);
-	}
-
-	spdk_json_write_array_end(w);
-
-	spdk_json_write_object_end(w);
+	free(params->dirpath);
 }
 
-static bool
-scst_snapshot_handlers_is_empty(struct sto_tree_node *handlers_node)
-{
-	struct sto_tree_node *dh_node;
-
-	if (sto_tree_node_first_child_type(handlers_node, STO_INODE_TYPE_DIR) == NULL) {
-		return true;
-	}
-
-	STO_TREE_FOREACH_TYPE(dh_node, handlers_node, STO_INODE_TYPE_DIR) {
-		if (sto_tree_node_first_child_type(dh_node, STO_INODE_TYPE_LNK) != NULL) {
-			return false;
-		}
-	}
-
-	return true;
-}
+struct snapshot_req_priv {
+	struct sto_json_ctx json;
+};
 
 static void
-scst_snapshot_handlers_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
+snapshot_req_priv_deinit(void *priv_ptr)
 {
-	struct sto_tree_node *handlers_node, *dh_node;
+	struct snapshot_req_priv *priv = priv_ptr;
 
-	SPDK_ERRLOG("GLEB: SCST config handlers info json\n");
-
-	handlers_node = sto_tree_node_find(tree_root, "handlers");
-
-	if (!handlers_node || scst_snapshot_handlers_is_empty(handlers_node)) {
-		return;
-	}
-
-	spdk_json_write_named_array_begin(w, "handlers");
-
-	STO_TREE_FOREACH_TYPE(dh_node, handlers_node, STO_INODE_TYPE_DIR) {
-		if (sto_tree_node_first_child_type(dh_node, STO_INODE_TYPE_LNK) == NULL) {
-			continue;
-		}
-
-		spdk_json_write_object_begin(w);
-		scst_snapshot_handler_info_json(dh_node, w);
-		spdk_json_write_object_end(w);
-	}
-
-	spdk_json_write_array_end(w);
-}
-
-static void
-scst_snapshot_info_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
-{
-	spdk_json_write_object_begin(w);
-
-	scst_snapshot_handlers_info_json(tree_root, w);
-
-	spdk_json_write_object_end(w);
+	sto_json_ctx_destroy(&priv->json);
 }
 
 static int
-scst_snapshot_constructor(void *arg1, const void *arg2)
+snapshot_req_constructor(void *arg1, const void *arg2)
 {
-	struct sto_tree_req_params *req_params = arg1;
+	struct snapshot_req_params *req_params = arg1;
 
 	req_params->dirpath = spdk_sprintf_alloc("%s", SCST_ROOT);
 	if (spdk_unlikely(!req_params->dirpath)) {
 		return -ENOMEM;
 	}
 
-	req_params->info_json = scst_snapshot_info_json;
-
 	return 0;
 }
+
+static void
+snapshot_step(struct sto_pipeline *pipe)
+{
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct snapshot_req_priv *priv = sto_req_get_priv(req);
+
+	scst_dumps_json(sto_pipeline_step_done, pipe, &priv->json);
+}
+
+static void
+snapshot_response(struct sto_req *req, struct spdk_json_write_ctx *w)
+{
+	struct snapshot_req_priv *priv = sto_req_get_priv(req);
+
+	spdk_json_write_val(w, priv->json.values);
+}
+
+const struct sto_req_properties snapshot_req_properties = {
+	.params_size = sizeof(struct snapshot_req_params),
+	.params_deinit_fn = snapshot_req_params_deinit,
+
+	.priv_size = sizeof(struct snapshot_req_priv),
+	.priv_deinit_fn = snapshot_req_priv_deinit,
+
+	.response = snapshot_response,
+	.steps = {
+		STO_PL_STEP(snapshot_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
 
 static int
 scst_handler_list_constructor(void *arg1, const void *arg2)
@@ -964,8 +911,8 @@ static const struct sto_ops scst_ops[] = {
 	{
 		.name = "snapshot",
 		.description = "Dump the current SCST state to stdout",
-		.req_properties = &sto_tree_req_properties,
-		.req_params_constructor = scst_snapshot_constructor,
+		.req_properties = &snapshot_req_properties,
+		.req_params_constructor = snapshot_req_constructor,
 	},
 	{
 		.name = "handler_list",
