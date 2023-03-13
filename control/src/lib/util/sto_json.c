@@ -155,7 +155,10 @@ void
 sto_json_ctx_destroy(struct sto_json_ctx *json_ctx)
 {
 	free((struct spdk_json_val *) json_ctx->values);
+	json_ctx->values = NULL;
+
 	free(json_ctx->buf);
+	json_ctx->buf = NULL;
 }
 
 bool

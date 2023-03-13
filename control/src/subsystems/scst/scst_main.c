@@ -15,6 +15,18 @@
 
 #define SCST_DEF_CONFIG_PATH "/etc/control.scst.json"
 
+struct scst_json_ctx {
+	struct sto_json_ctx json;
+};
+
+static inline void
+scst_json_ctx_deinit(void *ctx_ptr)
+{
+	struct scst_json_ctx *ctx = ctx_ptr;
+
+	sto_json_ctx_destroy(&ctx->json);
+}
+
 struct scst_device_handler;
 
 struct scst_device {
@@ -58,6 +70,13 @@ static void scst_put_device_handler(struct scst_device_handler *handler);
 static int scst_add_device(const char *handler_name, const char *device_name);
 static int scst_remove_device(const char *handler_name, const char *device_name);
 static struct scst_device *scst_find_device(const char *handler_name, const char *device_name);
+static void scst_write_config(sto_generic_cb cb_fn, void *cb_arg);
+
+static inline void
+scst_write_config_step(struct sto_pipeline *pipe)
+{
+	scst_write_config(sto_pipeline_step_done, pipe);
+}
 
 
 static struct scst_device_handler *
@@ -132,6 +151,13 @@ scst_device_handler_find(struct scst_device_handler *handler, const char *device
 	return NULL;
 }
 
+static inline struct scst_device_handler *
+scst_device_handler_next(struct scst_device_handler *handler)
+{
+	struct scst *scst = g_scst;
+	return !handler ? TAILQ_FIRST(&scst->handler_list) : TAILQ_NEXT(handler, list);
+}
+
 static struct scst_device *
 scst_device_alloc(struct scst_device_handler *handler, const char *name)
 {
@@ -183,6 +209,12 @@ scst_device_destroy(struct scst_device *device)
 	scst_put_device_handler(handler);
 
 	scst_device_free(device);
+}
+
+static inline struct scst_device *
+scst_device_next(struct scst_device_handler *handler, struct scst_device *device)
+{
+	return !device ? TAILQ_FIRST(&handler->device_list) : TAILQ_NEXT(device, list);
 }
 
 static struct sto_rpc_writefile_args *
@@ -318,7 +350,7 @@ device_open_rollback_step(struct sto_pipeline *pipe)
 }
 
 static void
-device_open_save_cfg_step(struct sto_pipeline *pipe)
+device_open_cfg_step(struct sto_pipeline *pipe)
 {
 	struct scst_device_open_params *params = sto_pipeline_get_priv(pipe);
 	int rc;
@@ -328,10 +360,23 @@ device_open_save_cfg_step(struct sto_pipeline *pipe)
 	sto_pipeline_step_next(pipe, rc);
 }
 
+static void
+device_open_cfg_rollback_step(struct sto_pipeline *pipe)
+{
+	struct scst_device_open_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_remove_device(params->handler_name, params->device_name);
+	assert(!rc);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
 static const struct sto_pipeline_properties scst_device_open_properties = {
 	.steps = {
 		STO_PL_STEP(device_open_step, device_open_rollback_step),
-		STO_PL_STEP(device_open_save_cfg_step, NULL),
+		STO_PL_STEP(device_open_cfg_step, device_open_cfg_rollback_step),
+		STO_PL_STEP(scst_write_config_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
 	},
 };
@@ -356,7 +401,7 @@ device_close_step(struct sto_pipeline *pipe)
 }
 
 static void
-device_close_save_cfg_step(struct sto_pipeline *pipe)
+device_close_cfg_step(struct sto_pipeline *pipe)
 {
 	struct scst_device_open_params *params = sto_pipeline_get_priv(pipe);
 	int rc;
@@ -370,7 +415,8 @@ device_close_save_cfg_step(struct sto_pipeline *pipe)
 static const struct sto_pipeline_properties scst_device_close_properties = {
 	.steps = {
 		STO_PL_STEP(device_close_step, NULL),
-		STO_PL_STEP(device_close_save_cfg_step, NULL),
+		STO_PL_STEP(device_close_cfg_step, NULL),
+		STO_PL_STEP(scst_write_config_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
 	},
 };
@@ -797,7 +843,7 @@ handler_list_load_json_step(struct sto_pipeline *pipe)
 	sto_json_async_iter_start(json, &ops, sto_pipeline_step_done, pipe);
 }
 
-static const struct sto_pipeline_properties load_json_properties = {
+static const struct sto_pipeline_properties scst_load_json_properties = {
 	.steps = {
 		STO_PL_STEP(handler_list_load_json_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
@@ -808,25 +854,13 @@ static void
 scst_load_json(struct spdk_json_val *json, sto_generic_cb cb_fn, void *cb_arg)
 {
 	sto_json_print("SCST load json", json);
-	scst_pipeline(&load_json_properties, cb_fn, cb_arg, json);
-}
-
-struct scan_system_ctx {
-	struct sto_json_ctx json;
-};
-
-static void
-scan_system_ctx_deinit(void *ctx_ptr)
-{
-	struct scan_system_ctx *ctx = ctx_ptr;
-
-	sto_json_ctx_destroy(&ctx->json);
+	scst_pipeline(&scst_load_json_properties, cb_fn, cb_arg, json);
 }
 
 static void
 scan_system_dumps_json_step(struct sto_pipeline *pipe)
 {
-	struct scan_system_ctx *ctx = sto_pipeline_get_ctx(pipe);
+	struct scst_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
 
 	scst_dumps_json(sto_pipeline_step_done, pipe, &ctx->json);
 }
@@ -834,14 +868,14 @@ scan_system_dumps_json_step(struct sto_pipeline *pipe)
 static void
 scan_system_parse_json_step(struct sto_pipeline *pipe)
 {
-	struct scan_system_ctx *ctx = sto_pipeline_get_ctx(pipe);
+	struct scst_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
 
 	scst_load_json((struct spdk_json_val *) ctx->json.values, sto_pipeline_step_done, pipe);
 }
 
 static const struct sto_pipeline_properties scst_scan_system_properties = {
-	.ctx_size = sizeof(struct scan_system_ctx),
-	.ctx_deinit_fn = scan_system_ctx_deinit,
+	.ctx_size = sizeof(struct scst_json_ctx),
+	.ctx_deinit_fn = scst_json_ctx_deinit,
 
 	.steps = {
 		STO_PL_STEP(scan_system_dumps_json_step, NULL),
@@ -854,6 +888,190 @@ void
 scst_scan_system(sto_generic_cb cb_fn, void *cb_arg)
 {
 	scst_pipeline(&scst_scan_system_properties, cb_fn, cb_arg, NULL);
+}
+
+struct info_json_ctx {
+	struct scst_device_handler *handler;
+	struct scst_device *device;
+};
+
+static void
+info_json_start_step(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+
+	spdk_json_write_object_begin(w);
+
+	sto_pipeline_step_next(pipe, 0);
+}
+
+static void
+device_read_attrs_done(void *cb_arg, struct sto_json_ctx *json, int rc)
+{
+	struct sto_pipeline *pipe = cb_arg;
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	struct spdk_json_val *it;
+
+	if (spdk_unlikely(rc)) {
+		goto out;
+	}
+
+	spdk_json_write_name(w, ctx->device->name);
+
+	spdk_json_write_object_begin(w);
+	for (it = spdk_json_object_first((struct spdk_json_val *) json->values);
+	     it != NULL;
+	     it = spdk_json_next(it)) {
+
+		spdk_json_write_val(w, it);
+		if (it->type == SPDK_JSON_VAL_NAME) {
+			spdk_json_write_val(w, sto_json_value(it));
+		}
+	}
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+
+out:
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static void
+device_json_constructor(struct sto_pipeline *pipe)
+{
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	scst_read_attrs(ctx->device->path, device_read_attrs_done, pipe);
+}
+
+static int
+device_list_json_constructor(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	ctx->device = scst_device_next(ctx->handler, ctx->device);
+	if (ctx->device) {
+		spdk_json_write_object_begin(w);
+
+		sto_pipeline_queue_step(pipe, STO_PL_STEP(device_json_constructor, NULL));
+		return 0;
+	}
+
+	spdk_json_write_array_end(w);
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+
+	return STO_PL_CONSTRUCTOR_FINISHED;
+}
+
+static int
+handler_list_json_constructor(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	ctx->handler = scst_device_handler_next(ctx->handler);
+	if (ctx->handler) {
+		spdk_json_write_object_begin(w);
+
+		spdk_json_write_name(w, ctx->handler->name);
+		spdk_json_write_object_begin(w);
+		spdk_json_write_named_array_begin(w, "devices");
+
+		sto_pipeline_queue_step(pipe, STO_PL_STEP_CONSTRUCTOR(device_list_json_constructor, NULL));
+		return 0;
+	}
+
+	spdk_json_write_array_end(w);
+
+	return STO_PL_CONSTRUCTOR_FINISHED;
+}
+
+static void
+info_json_handler_list_step(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct scst *scst = g_scst;
+	int rc = 0;
+
+	if (TAILQ_EMPTY(&scst->handler_list)) {
+		goto out;
+	}
+
+	spdk_json_write_named_array_begin(w, "handlers");
+
+	rc = sto_pipeline_insert_step(pipe, STO_PL_STEP_CONSTRUCTOR(handler_list_json_constructor, NULL));
+
+out:
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static void
+info_json_end_step(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+
+	spdk_json_write_object_end(w);
+
+	sto_pipeline_step_next(pipe, 0);
+}
+
+static const struct sto_pipeline_properties scst_info_json_properties = {
+	.ctx_size = sizeof(struct info_json_ctx),
+
+	.steps = {
+		STO_PL_STEP(info_json_start_step, NULL),
+		STO_PL_STEP(info_json_handler_list_step, NULL),
+		STO_PL_STEP(info_json_end_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+static void
+scst_info_json(void *cb_ctx, struct spdk_json_write_ctx *w,
+	       sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_info_json_properties, cb_fn, cb_arg, w);
+}
+
+static void
+write_config_dumps_step(struct sto_pipeline *pipe)
+{
+	struct scst_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	sto_json_ctx_async_write(&ctx->json, true, scst_info_json, NULL,
+				 sto_pipeline_step_done, pipe);
+}
+
+static void
+write_config_save_step(struct sto_pipeline *pipe)
+{
+	struct scst_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+	struct scst *scst = g_scst;
+
+	sto_rpc_writefile(scst->config_path, O_CREAT | O_TRUNC | O_SYNC,
+			  ctx->json.buf, sto_pipeline_step_done, pipe);
+}
+
+static const struct sto_pipeline_properties scst_write_config_properties = {
+	.ctx_size = sizeof(struct scst_json_ctx),
+	.ctx_deinit_fn = scst_json_ctx_deinit,
+
+	.steps = {
+		STO_PL_STEP(write_config_dumps_step, NULL),
+		STO_PL_STEP(write_config_save_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+static void
+scst_write_config(sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_write_config_properties, cb_fn, cb_arg, NULL);
 }
 
 void

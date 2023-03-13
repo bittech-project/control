@@ -114,9 +114,9 @@ struct spdk_json_val *sto_json_parse(void *buf, size_t size);
 void sto_json_print(const char *fmt, const struct spdk_json_val *values, ...);
 
 static inline struct spdk_json_val *
-sto_json_value(struct spdk_json_val *key)
+sto_json_value(const struct spdk_json_val *key)
 {
-	return key->type == SPDK_JSON_VAL_NAME ? key + 1 : NULL;
+	return key->type == SPDK_JSON_VAL_NAME ? (struct spdk_json_val *) key + 1 : NULL;
 }
 
 bool sto_find_match_str(const char *key, const char *strings[]);

@@ -250,10 +250,10 @@ scst_write_attrs_cb(void *cb_ctx, struct spdk_json_write_ctx *w)
 }
 
 struct read_attrs_ctx {
-	struct sto_json_ctx *json;
+	struct sto_json_ctx json;
 
+	scst_read_attrs_done_t cb_fn;
 	void *cb_arg;
-	sto_generic_cb cb_fn;
 };
 
 static void
@@ -265,36 +265,37 @@ read_attrs_done(void *cb_arg, struct sto_tree_node *tree_root, int rc)
 		goto out;
 	}
 
-	rc = sto_json_ctx_write(ctx->json, true, scst_write_attrs_cb, (void *) tree_root);
+	rc = sto_json_ctx_write(&ctx->json, true, scst_write_attrs_cb, (void *) tree_root);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to dump SCST dev attributes\n");
 		goto out;
 	}
 
-	sto_json_print("Print SCST attributes", ctx->json->values);
+	sto_json_print("Print SCST attributes", ctx->json.values);
 
 out:
-	ctx->cb_fn(ctx->cb_arg, rc);
+	ctx->cb_fn(ctx->cb_arg, &ctx->json, rc);
+
+	sto_json_ctx_destroy(&ctx->json);
 	free(ctx);
 
 	sto_tree_free(tree_root);
 }
 
 void
-scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json)
+scst_read_attrs(const char *dirpath, scst_read_attrs_done_t cb_fn, void *cb_arg)
 {
 	struct read_attrs_ctx *ctx;
 
 	ctx = calloc(1, sizeof(*ctx));
 	if (spdk_unlikely(!ctx)) {
 		SPDK_ERRLOG("Failed to alloc dev read attrs ctx\n");
-		cb_fn(cb_arg, -ENOMEM);
+		cb_fn(cb_arg, NULL, -ENOMEM);
 		return;
 	}
 
 	ctx->cb_fn = cb_fn;
 	ctx->cb_arg = cb_arg;
-	ctx->json = json;
 
 	sto_tree(dirpath, 1, false, read_attrs_done, ctx);
 }

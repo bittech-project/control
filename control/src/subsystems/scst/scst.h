@@ -104,7 +104,9 @@ bool scst_available_attrs_find(char **available_attrs, char *attr);
 void scst_available_attrs_destroy(char **available_attrs);
 
 void scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write_ctx *w);
-void scst_read_attrs(const char *dirpath, sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
+
+typedef void (*scst_read_attrs_done_t)(void *cb_arg, struct sto_json_ctx *json, int rc);
+void scst_read_attrs(const char *dirpath, scst_read_attrs_done_t cb_fn, void *cb_arg);
 
 struct scst_device_open_params {
 	char *handler_name;
