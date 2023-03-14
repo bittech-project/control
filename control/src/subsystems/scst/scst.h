@@ -3,6 +3,7 @@
 
 #include "sto_async.h"
 #include "sto_json.h"
+#include "sto_pipeline.h"
 
 struct sto_tree_node;
 struct sto_pipeline_properties;
@@ -108,45 +109,37 @@ void scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write
 typedef void (*scst_read_attrs_done_t)(void *cb_arg, struct sto_json_ctx *json, int rc);
 void scst_read_attrs(const char *dirpath, scst_read_attrs_done_t cb_fn, void *cb_arg);
 
-struct scst_device_open_params {
+struct scst_device_params {
 	char *handler_name;
 	char *device_name;
 	char *attributes;
 };
 
 static inline void
-scst_device_open_params_deinit(void *params_ptr)
+scst_device_params_deinit(void *params_ptr)
 {
-	struct scst_device_open_params *params = params_ptr;
+	struct scst_device_params *params = params_ptr;
 
 	free(params->handler_name);
 	free(params->device_name);
 	free(params->attributes);
 }
 
-void scst_device_open(struct scst_device_open_params *params, sto_generic_cb cb_fn, void *cb_arg);
-
-struct scst_device_close_params {
-	char *handler_name;
-	char *device_name;
-};
-
-static inline void
-scst_device_close_params_deinit(void *params_ptr)
-{
-	struct scst_device_close_params *params = params_ptr;
-
-	free(params->handler_name);
-	free(params->device_name);
-}
-
-void scst_device_close(struct scst_device_close_params *params, sto_generic_cb cb_fn, void *cb_arg);
-
-void scst_pipeline(const struct sto_pipeline_properties *properties,
-		   sto_generic_cb cb_fn, void *cb_arg, void *priv);
+void scst_device_open(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
+void scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
 
 void scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
 void scst_scan_system(sto_generic_cb cb_fn, void *cb_arg);
+void scst_write_config(sto_generic_cb cb_fn, void *cb_arg);
+
+static inline void
+scst_write_config_step(struct sto_pipeline *pipe)
+{
+	scst_write_config(sto_pipeline_step_done, pipe);
+}
+
+void scst_pipeline(const struct sto_pipeline_properties *properties,
+		   sto_generic_cb cb_fn, void *cb_arg, void *priv);
 
 void scst_init(sto_generic_cb cb_fn, void *cb_arg);
 void scst_fini(sto_generic_cb cb_fn, void *cb_arg);

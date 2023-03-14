@@ -169,7 +169,7 @@ static const struct sto_ops_params_properties dev_open_ops_params_properties =
 static int
 dev_open_req_constructor(void *arg1, const void *arg2)
 {
-	struct scst_device_open_params *req_params = arg1;
+	struct scst_device_params *req_params = arg1;
 	const struct dev_open_ops_params *ops_params = arg2;
 
 	req_params->device_name = strdup(ops_params->device);
@@ -189,22 +189,25 @@ dev_open_req_constructor(void *arg1, const void *arg2)
 	return 0;
 }
 
+static void dev_close_req_step(struct sto_pipeline *pipe);
+
 static void
 dev_open_req_step(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
-	struct scst_device_open_params *params = sto_req_get_params(req);
+	struct scst_device_params *params = sto_req_get_params(req);
 
 	scst_device_open(params, sto_pipeline_step_done, pipe);
 }
 
 const struct sto_req_properties dev_open_req_properties = {
-	.params_size = sizeof(struct scst_device_open_params),
-	.params_deinit_fn = scst_device_open_params_deinit,
+	.params_size = sizeof(struct scst_device_params),
+	.params_deinit_fn = scst_device_params_deinit,
 
 	.response = sto_dummy_req_response,
 	.steps = {
-		STO_PL_STEP(dev_open_req_step, NULL),
+		STO_PL_STEP(dev_open_req_step, dev_close_req_step),
+		STO_PL_STEP(scst_write_config_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
 	}
 };
@@ -225,7 +228,7 @@ static const struct sto_ops_params_properties dev_close_ops_params_properties =
 static int
 dev_close_req_constructor(void *arg1, const void *arg2)
 {
-	struct scst_device_close_params *req_params = arg1;
+	struct scst_device_params *req_params = arg1;
 	const struct dev_close_ops_params *ops_params = arg2;
 
 	req_params->device_name = strdup(ops_params->device);
@@ -245,18 +248,19 @@ static void
 dev_close_req_step(struct sto_pipeline *pipe)
 {
 	struct sto_req *req = sto_pipeline_get_priv(pipe);
-	struct scst_device_close_params *params = sto_req_get_params(req);
+	struct scst_device_params *params = sto_req_get_params(req);
 
 	scst_device_close(params, sto_pipeline_step_done, pipe);
 }
 
 const struct sto_req_properties dev_close_req_properties = {
-	.params_size = sizeof(struct scst_device_close_params),
-	.params_deinit_fn = scst_device_close_params_deinit,
+	.params_size = sizeof(struct scst_device_params),
+	.params_deinit_fn = scst_device_params_deinit,
 
 	.response = sto_dummy_req_response,
 	.steps = {
 		STO_PL_STEP(dev_close_req_step, NULL),
+		STO_PL_STEP(scst_write_config_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
 	}
 };
