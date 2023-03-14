@@ -189,8 +189,6 @@ dev_open_req_constructor(void *arg1, const void *arg2)
 	return 0;
 }
 
-static void dev_close_req_step(struct sto_pipeline *pipe);
-
 static void
 dev_open_req_step(struct sto_pipeline *pipe)
 {
@@ -199,6 +197,8 @@ dev_open_req_step(struct sto_pipeline *pipe)
 
 	scst_device_open(params, sto_pipeline_step_done, pipe);
 }
+
+static void dev_close_req_step(struct sto_pipeline *pipe);
 
 const struct sto_req_properties dev_open_req_properties = {
 	.params_size = sizeof(struct scst_device_params),

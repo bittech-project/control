@@ -138,6 +138,8 @@ scst_write_config_step(struct sto_pipeline *pipe)
 	scst_write_config(sto_pipeline_step_done, pipe);
 }
 
+void scst_restore_config(sto_generic_cb cb_fn, void *cb_arg);
+
 void scst_pipeline(const struct sto_pipeline_properties *properties,
 		   sto_generic_cb cb_fn, void *cb_arg, void *priv);
 
