@@ -78,27 +78,24 @@ sto_json_str_field_destroy(struct sto_json_str_field *field)
 
 struct sto_json_async_iter;
 
-typedef void (*sto_json_async_iterate_t)(struct sto_json_async_iter *iter, struct spdk_json_val *object);
+typedef void (*sto_json_async_iterate_t)(struct sto_json_async_iter *iter);
 typedef struct spdk_json_val *(*sto_json_async_iter_next_t)(struct spdk_json_val *json,
 							    struct spdk_json_val *object);
 
-struct sto_json_async_iter_ops {
-	sto_json_async_iterate_t iterate_fn;
-	sto_json_async_iter_next_t next_fn;
-};
-
-struct sto_json_async_iter {
+struct sto_json_async_iter_opts {
 	struct spdk_json_val *json;
 
-	struct spdk_json_val *object;
-	struct sto_json_async_iter_ops ops;
+	sto_json_async_iterate_t iterate_fn;
+	sto_json_async_iter_next_t next_fn;
 
-	sto_generic_cb cb_fn;
-	void *cb_arg;
+	void *priv;
 };
 
-void sto_json_async_iter_start(struct spdk_json_val *json,
-			       struct sto_json_async_iter_ops *ops,
+struct spdk_json_val *sto_json_async_iter_get_json(struct sto_json_async_iter *iter);
+void *sto_json_async_iter_get_priv(struct sto_json_async_iter *iter);
+struct spdk_json_val *sto_json_async_iter_get_object(struct sto_json_async_iter *iter);
+
+void sto_json_async_iter_start(struct sto_json_async_iter_opts *opts,
 			       sto_generic_cb cb_fn, void *cb_arg);
 
 void sto_json_async_iter_next(struct sto_json_async_iter *iter, int rc);

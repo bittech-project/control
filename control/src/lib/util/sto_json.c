@@ -293,9 +293,35 @@ sto_json_iter_decode_str_field(const struct sto_json_iter *iter,
 	return 0;
 }
 
+struct sto_json_async_iter {
+	struct sto_json_async_iter_opts opts;
+
+	struct spdk_json_val *object;
+
+	sto_generic_cb cb_fn;
+	void *cb_arg;
+};
+
+struct spdk_json_val *
+sto_json_async_iter_get_json(struct sto_json_async_iter *iter)
+{
+	return iter->opts.json;
+}
+
+void *
+sto_json_async_iter_get_priv(struct sto_json_async_iter *iter)
+{
+	return iter->opts.priv;
+}
+
+struct spdk_json_val *
+sto_json_async_iter_get_object(struct sto_json_async_iter *iter)
+{
+	return iter->object;
+}
+
 void
-sto_json_async_iter_start(struct spdk_json_val *json,
-			  struct sto_json_async_iter_ops *ops,
+sto_json_async_iter_start(struct sto_json_async_iter_opts *opts,
 			  sto_generic_cb cb_fn, void *cb_arg)
 {
 	struct sto_json_async_iter *iter;
@@ -307,8 +333,7 @@ sto_json_async_iter_start(struct spdk_json_val *json,
 		return;
 	}
 
-	iter->json = json;
-	iter->ops = *ops;
+	iter->opts = *opts;
 
 	iter->cb_fn = cb_fn;
 	iter->cb_arg = cb_arg;
@@ -326,20 +351,20 @@ sto_json_async_iter_finish(struct sto_json_async_iter *iter, int rc)
 void
 sto_json_async_iter_next(struct sto_json_async_iter *iter, int rc)
 {
-	struct sto_json_async_iter_ops *ops = &iter->ops;
+	struct sto_json_async_iter_opts *opts = &iter->opts;
 
 	if (rc) {
 		sto_json_async_iter_finish(iter, rc);
 		return;
 	}
 
-	iter->object = ops->next_fn(iter->json, iter->object);
+	iter->object = opts->next_fn(opts->json, iter->object);
 	if (!iter->object) {
 		sto_json_async_iter_finish(iter, 0);
 		return;
 	}
 
-	ops->iterate_fn(iter, iter->object);
+	opts->iterate_fn(iter);
 }
 
 struct json_write_buf {

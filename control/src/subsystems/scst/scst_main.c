@@ -791,9 +791,10 @@ handler_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 }
 
 static void
-device_load_json(struct sto_json_async_iter *iter, struct spdk_json_val *device)
+device_load_json(struct sto_json_async_iter *iter)
 {
-	struct spdk_json_val *handler = iter->json;
+	struct spdk_json_val *handler = sto_json_async_iter_get_json(iter);
+	struct spdk_json_val *device = sto_json_async_iter_get_object(iter);
 	char *handler_name = NULL, *device_name = NULL;
 	int rc = 0;
 
@@ -821,26 +822,27 @@ out:
 }
 
 static void
-handler_load_json(struct sto_json_async_iter *iter, struct spdk_json_val *handler)
+handler_load_json(struct sto_json_async_iter *iter)
 {
-	struct sto_json_async_iter_ops ops = {
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_json_async_iter_get_object(iter),
 		.iterate_fn = device_load_json,
 		.next_fn = device_json_iter_next,
 	};
 
-	sto_json_async_iter_start(handler, &ops, sto_json_async_iterate_done, iter);
+	sto_json_async_iter_start(&opts, sto_json_async_iterate_done, iter);
 }
 
 static void
 handler_list_load_json_step(struct sto_pipeline *pipe)
 {
-	struct spdk_json_val *json = sto_pipeline_get_priv(pipe);
-	struct sto_json_async_iter_ops ops = {
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_pipeline_get_priv(pipe),
 		.iterate_fn = handler_load_json,
 		.next_fn = handler_json_iter_next,
 	};
 
-	sto_json_async_iter_start(json, &ops, sto_pipeline_step_done, pipe);
+	sto_json_async_iter_start(&opts, sto_pipeline_step_done, pipe);
 }
 
 static const struct sto_pipeline_properties scst_load_json_properties = {
