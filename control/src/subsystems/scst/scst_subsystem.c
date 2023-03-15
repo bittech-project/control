@@ -573,56 +573,87 @@ scst_tgrp_del_tgt_constructor(void *arg1, const void *arg2)
 	return 0;
 }
 
-struct scst_target_params {
+struct target_ops_params {
 	char *target;
 	char *driver;
 };
 
-static const struct sto_ops_param_dsc scst_target_params_descriptors[] = {
-	STO_OPS_PARAM_STR(target, struct scst_target_params, "SCST target name"),
-	STO_OPS_PARAM_STR(driver, struct scst_target_params, "SCST target driver name"),
+static const struct sto_ops_param_dsc target_ops_params_descriptors[] = {
+	STO_OPS_PARAM_STR(target, struct target_ops_params, "SCST target name"),
+	STO_OPS_PARAM_STR(driver, struct target_ops_params, "SCST target driver name"),
 };
 
-static const struct sto_ops_params_properties scst_target_params_properties =
-	STO_OPS_PARAMS_INITIALIZER(scst_target_params_descriptors, struct scst_target_params);
+static const struct sto_ops_params_properties target_ops_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(target_ops_params_descriptors, struct target_ops_params);
 
 static int
-scst_target_add_constructor(void *arg1, const void *arg2)
+target_add_req_constructor(void *arg1, const void *arg2)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_target_params *ops_params = arg2;
+	struct scst_target_params *req_params = arg1;
+	const struct target_ops_params *ops_params = arg2;
 
-	req_params->file = scst_target_driver_mgmt(ops_params->driver);
-	if (spdk_unlikely(!req_params->file)) {
+	req_params->driver_name = strdup(ops_params->driver);
+	if (spdk_unlikely(!req_params->driver_name)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("add_target %s", ops_params->target);
-	if (spdk_unlikely(!req_params->data)) {
+	req_params->target_name = strdup(ops_params->target);
+	if (spdk_unlikely(!req_params->target_name)) {
 		return -ENOMEM;
 	}
 
 	return 0;
 }
 
-static int
-scst_target_del_constructor(void *arg1, const void *arg2)
+static void
+target_add_req_step(struct sto_pipeline *pipe)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_target_params *ops_params = arg2;
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_target_params *params = sto_req_get_params(req);
 
-	req_params->file = scst_target_driver_mgmt(ops_params->driver);
-	if (spdk_unlikely(!req_params->file)) {
-		return -ENOMEM;
-	}
-
-	req_params->data = spdk_sprintf_alloc("del_target %s", ops_params->target);
-	if (spdk_unlikely(!req_params->data)) {
-		return -ENOMEM;
-	}
-
-	return 0;
+	scst_target_add(params, sto_pipeline_step_done, pipe);
 }
+
+static void target_del_req_step(struct sto_pipeline *pipe);
+
+const struct sto_req_properties target_add_req_properties = {
+	.params_size = sizeof(struct scst_target_params),
+	.params_deinit_fn = scst_target_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(target_add_req_step, target_del_req_step),
+		STO_PL_STEP(scst_write_config_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
+
+static int
+target_del_req_constructor(void *arg1, const void *arg2)
+{
+	return target_add_req_constructor(arg1, arg2);
+}
+
+static void
+target_del_req_step(struct sto_pipeline *pipe)
+{
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_target_params *params = sto_req_get_params(req);
+
+	scst_target_del(params, sto_pipeline_step_done, pipe);
+}
+
+const struct sto_req_properties target_del_req_properties = {
+	.params_size = sizeof(struct scst_target_params),
+	.params_deinit_fn = scst_target_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(target_del_req_step, NULL),
+		STO_PL_STEP(scst_write_config_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
 
 struct scst_target_list_params {
 	char *driver;
@@ -665,7 +696,7 @@ static int
 scst_target_enable_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	const struct scst_target_params *ops_params = arg2;
+	const struct target_ops_params *ops_params = arg2;
 
 	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
 				  ops_params->driver, ops_params->target, "enabled");
@@ -685,7 +716,7 @@ static int
 scst_target_disable_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	const struct scst_target_params *ops_params = arg2;
+	const struct target_ops_params *ops_params = arg2;
 
 	req_params->file = spdk_sprintf_alloc("%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
 					      ops_params->driver, ops_params->target, "enabled");
@@ -1029,16 +1060,16 @@ static const struct sto_ops scst_ops[] = {
 	{
 		.name = "target_add",
 		.description = "Add a dynamic target to a capable driver",
-		.params_properties = &scst_target_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_target_add_constructor,
+		.params_properties = &target_ops_params_properties,
+		.req_properties = &target_add_req_properties,
+		.req_params_constructor = target_add_req_constructor,
 	},
 	{
 		.name = "target_del",
 		.description = "Remove a dynamic target from a driver",
-		.params_properties = &scst_target_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_target_del_constructor,
+		.params_properties = &target_ops_params_properties,
+		.req_properties = &target_del_req_properties,
+		.req_params_constructor = target_del_req_constructor,
 	},
 	{
 		.name = "target_list",
@@ -1050,14 +1081,14 @@ static const struct sto_ops scst_ops[] = {
 	{
 		.name = "target_enable",
 		.description = "Enable target mode for a given driver & target",
-		.params_properties = &scst_target_params_properties,
+		.params_properties = &target_ops_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_target_enable_constructor,
 	},
 	{
 		.name = "target_disable",
 		.description = "Disable target mode for a given driver & target",
-		.params_properties = &scst_target_params_properties,
+		.params_properties = &target_ops_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_target_disable_constructor,
 	},

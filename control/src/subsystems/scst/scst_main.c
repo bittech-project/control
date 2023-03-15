@@ -15,6 +15,8 @@
 
 #define SCST_DEF_CONFIG_PATH "/etc/control.scst.json"
 
+#define SCST_TARGET_DRIVER_PATH SCST_ROOT "/" SCST_TARGETS
+
 struct scst_json_ctx {
 	struct sto_json_ctx json;
 };
@@ -30,10 +32,10 @@ scst_json_ctx_deinit(void *ctx_ptr)
 struct scst_device_handler;
 
 struct scst_device {
-	struct scst_device_handler *handler;
-
 	const char *name;
 	const char *path;
+
+	struct scst_device_handler *handler;
 
 	TAILQ_ENTRY(scst_device) list;
 };
@@ -44,7 +46,6 @@ static void scst_device_destroy(struct scst_device *device);
 struct scst_device_handler {
 	const char *name;
 	const char *path;
-	const char *mgmt_path;
 
 	TAILQ_HEAD(, scst_device) device_list;
 	int ref_cnt;
@@ -54,6 +55,30 @@ struct scst_device_handler {
 
 static void scst_device_handler_free(struct scst_device_handler *handler);
 
+struct scst_target {
+	const char *name;
+	const char *path;
+
+	struct scst_target_driver *driver;
+
+	TAILQ_ENTRY(scst_target) list;
+};
+
+static void scst_target_free(struct scst_target *target);
+static void scst_target_destroy(struct scst_target *target);
+
+struct scst_target_driver {
+	const char *name;
+	const char *path;
+
+	TAILQ_HEAD(, scst_target) target_list;
+	int ref_cnt;
+
+	TAILQ_ENTRY(scst_target_driver) list;
+};
+
+static void scst_target_driver_free(struct scst_target_driver *driver);
+
 struct scst {
 	const char *sys_path;
 	const char *config_path;
@@ -61,15 +86,20 @@ struct scst {
 	struct sto_pipeline_engine *engine;
 
 	TAILQ_HEAD(, scst_device_handler) handler_list;
+	TAILQ_HEAD(, scst_target_driver) driver_list;
 };
 
 static struct scst *g_scst;
 
-static struct scst_device_handler *scst_get_device_handler(const char *handler_name);
 static void scst_put_device_handler(struct scst_device_handler *handler);
 static int scst_add_device(const char *handler_name, const char *device_name);
 static int scst_remove_device(const char *handler_name, const char *device_name);
 static struct scst_device *scst_find_device(const char *handler_name, const char *device_name);
+
+static void scst_put_target_driver(struct scst_target_driver *driver);
+static int scst_add_target(const char *driver_name, const char *target_name);
+static int scst_remove_target(const char *driver_name, const char *target_name);
+static struct scst_target *scst_find_target(const char *driver_name, const char *target_name);
 
 
 static struct spdk_json_val *
@@ -110,6 +140,44 @@ handler_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 	return spdk_json_next(object);
 }
 
+static struct spdk_json_val *
+target_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
+{
+	if (!object) {
+		struct spdk_json_val *target_arr = sto_json_value(spdk_json_object_first(json));
+		int rc = 0;
+
+		rc = spdk_json_find_array(target_arr, "targets", NULL, &target_arr);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Could not find targets array from JSON\n");
+			return NULL;
+		}
+
+		return spdk_json_array_first(target_arr);
+	}
+
+	return spdk_json_next(object);
+}
+
+static struct spdk_json_val *
+driver_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
+{
+	if (!object) {
+		struct spdk_json_val *driver_arr = json;
+		int rc;
+
+		rc = spdk_json_find_array(driver_arr, "drivers", NULL, &driver_arr);
+		if (rc) {
+			SPDK_ERRLOG("Could not find drivers array from JSON\n");
+			return NULL;
+		}
+
+		return spdk_json_array_first(driver_arr);
+	}
+
+	return spdk_json_next(object);
+}
+
 static struct scst_device_handler *
 scst_device_handler_alloc(const char *handler_name)
 {
@@ -133,12 +201,6 @@ scst_device_handler_alloc(const char *handler_name)
 		goto out_err;
 	}
 
-	handler->mgmt_path = spdk_sprintf_alloc("%s/%s", handler->path, SCST_MGMT_IO);
-	if (spdk_unlikely(!handler->mgmt_path)) {
-		SPDK_ERRLOG("Failed to alloc dev handler mgmt path\n");
-		goto out_err;
-	}
-
 	TAILQ_INIT(&handler->device_list);
 
 	return handler;
@@ -152,7 +214,6 @@ out_err:
 static void
 scst_device_handler_free(struct scst_device_handler *handler)
 {
-	free((char *) handler->mgmt_path);
 	free((char *) handler->path);
 	free((char *) handler->name);
 	free(handler);
@@ -444,6 +505,320 @@ scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void 
 	scst_pipeline(&scst_device_close_properties, cb_fn, cb_arg, params);
 }
 
+static struct scst_target_driver *
+scst_target_driver_alloc(const char *driver_name)
+{
+	struct scst_target_driver *driver;
+
+	driver = calloc(1, sizeof(*driver));
+	if (spdk_unlikely(!driver)) {
+		SPDK_ERRLOG("Failed to alloc SCST target driver\n");
+		return NULL;
+	}
+
+	driver->name = strdup(driver_name);
+	if (spdk_unlikely(!driver->name)) {
+		SPDK_ERRLOG("Failed to alloc target driver name %s\n", driver_name);
+		goto out_err;
+	}
+
+	driver->path = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_TARGETS, driver->name);
+	if (spdk_unlikely(!driver->path)) {
+		SPDK_ERRLOG("Failed to alloc target driver path\n");
+		goto out_err;
+	}
+
+	TAILQ_INIT(&driver->target_list);
+
+	return driver;
+
+out_err:
+	scst_target_driver_free(driver);
+
+	return NULL;
+}
+
+static void
+scst_target_driver_free(struct scst_target_driver *driver)
+{
+	free((char *) driver->path);
+	free((char *) driver->name);
+	free(driver);
+}
+
+static void
+scst_target_driver_destroy(struct scst_target_driver *driver)
+{
+	struct scst_target *target, *tmp;
+
+	TAILQ_FOREACH_SAFE(target, &driver->target_list, list, tmp) {
+		scst_target_destroy(target);
+	}
+}
+
+static struct scst_target *
+scst_target_driver_find(struct scst_target_driver *driver, const char *target_name)
+{
+	struct scst_target *target;
+
+	TAILQ_FOREACH(target, &driver->target_list, list) {
+		if (!strcmp(target_name, target->name)) {
+			return target;
+		}
+	}
+
+	return NULL;
+}
+
+static inline struct scst_target_driver *
+scst_target_driver_next(struct scst_target_driver *driver)
+{
+	struct scst *scst = g_scst;
+	return !driver ? TAILQ_FIRST(&scst->driver_list) : TAILQ_NEXT(driver, list);
+}
+
+static struct scst_target *
+scst_target_alloc(struct scst_target_driver *driver, const char *name)
+{
+	struct scst_target *target;
+
+	target = calloc(1, sizeof(*target));
+	if (spdk_unlikely(!target)) {
+		SPDK_ERRLOG("Failed to alloc SCST target\n");
+		return NULL;
+	}
+
+	target->name = strdup(name);
+	if (spdk_unlikely(!target->name)) {
+		SPDK_ERRLOG("Failed to alloc SCST target name\n");
+		goto out_err;
+	}
+
+	target->path = spdk_sprintf_alloc("%s/%s", driver->path, target->name);
+	if (spdk_unlikely(!target->path)) {
+		SPDK_ERRLOG("Failed to alloc SCST target path\n");
+		goto out_err;
+	}
+
+	target->driver = driver;
+
+	return target;
+
+out_err:
+	scst_target_free(target);
+
+	return NULL;
+}
+
+static void
+scst_target_free(struct scst_target *target)
+{
+	free((char *) target->path);
+	free((char *) target->name);
+	free(target);
+}
+
+static void
+scst_target_destroy(struct scst_target *target)
+{
+	struct scst_target_driver *driver = target->driver;
+
+	TAILQ_REMOVE(&driver->target_list, target, list);
+
+	scst_put_target_driver(driver);
+
+	scst_target_free(target);
+}
+
+static inline struct scst_target *
+scst_target_next(struct scst_target_driver *driver, struct scst_target *target)
+{
+	return !target ? TAILQ_FIRST(&driver->target_list) : TAILQ_NEXT(target, list);
+}
+
+static struct sto_rpc_writefile_args *
+target_add_create_args(const char *driver_name, const char *target_name)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = calloc(1, sizeof(*args));
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to alloc writefile args\n");
+		return NULL;
+	}
+
+	args->filepath = scst_target_driver_mgmt(driver_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("add_target %s", target_name);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	return args;
+
+out_err:
+	sto_rpc_writefile_args_free(args);
+
+	return NULL;
+}
+
+static void
+target_add(const char *driver_name, const char *target_name,
+	   sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = target_add_create_args(driver_name, target_name);
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to create writefile args for `target_add`\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST target add: filepath[%s], buf[%s]\n", args->filepath, args->buf);
+
+	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+}
+
+static struct sto_rpc_writefile_args *
+target_del_create_args(const char *driver_name, const char *target_name)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = calloc(1, sizeof(*args));
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to alloc writefile args\n");
+		return NULL;
+	}
+
+	args->filepath = scst_target_driver_mgmt(driver_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("del_target %s", target_name);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	return args;
+
+out_err:
+	sto_rpc_writefile_args_free(args);
+
+	return NULL;
+}
+
+static void
+target_del(const char *driver_name, const char *target_name,
+	   sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = target_del_create_args(driver_name, target_name);
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to create writefile args for `target_del`\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST target del: filepath[%s], data[%s]\n", args->filepath, args->buf);
+
+	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+}
+
+static void
+target_add_step(struct sto_pipeline *pipe)
+{
+	struct scst_target_params *params = sto_pipeline_get_priv(pipe);
+
+	if (scst_find_target(params->driver_name, params->target_name)) {
+		sto_pipeline_step_next(pipe, -EEXIST);
+		return;
+	}
+
+	target_add(params->driver_name, params->target_name, sto_pipeline_step_done, pipe);
+}
+
+static void
+target_add_rollback_step(struct sto_pipeline *pipe)
+{
+	struct scst_target_params *params = sto_pipeline_get_priv(pipe);
+
+	target_del(params->driver_name, params->target_name, sto_pipeline_step_done, pipe);
+}
+
+static void
+target_add_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_target_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_add_target(params->driver_name, params->target_name);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_target_add_properties = {
+	.steps = {
+		STO_PL_STEP(target_add_step, target_add_rollback_step),
+		STO_PL_STEP(target_add_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_target_add(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_target_add_properties, cb_fn, cb_arg, params);
+}
+
+static void
+target_del_step(struct sto_pipeline *pipe)
+{
+	struct scst_target_params *params = sto_pipeline_get_priv(pipe);
+
+	if (!scst_find_target(params->driver_name, params->target_name)) {
+		sto_pipeline_step_next(pipe, -ENOENT);
+		return;
+	}
+
+	target_del(params->driver_name, params->target_name, sto_pipeline_step_done, pipe);
+}
+
+static void
+target_del_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_target_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_remove_target(params->driver_name, params->target_name);
+	assert(!rc);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_target_del_properties = {
+	.steps = {
+		STO_PL_STEP(target_del_step, NULL),
+		STO_PL_STEP(target_del_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_target_del_properties, cb_fn, cb_arg, params);
+}
+
 static struct scst *
 scst_create(void)
 {
@@ -470,6 +845,7 @@ scst_create(void)
 	}
 
 	TAILQ_INIT(&scst->handler_list);
+	TAILQ_INIT(&scst->driver_list);
 
 	return scst;
 
@@ -483,8 +859,31 @@ free_scst:
 }
 
 static void
+scst_destroy_handlers(struct scst *scst)
+{
+	struct scst_device_handler *handler, *tmp;
+
+	TAILQ_FOREACH_SAFE(handler, &scst->handler_list, list, tmp) {
+		scst_device_handler_destroy(handler);
+	}
+}
+
+static void
+scst_destroy_drivers(struct scst *scst)
+{
+	struct scst_target_driver *driver, *tmp;
+
+	TAILQ_FOREACH_SAFE(driver, &scst->driver_list, list, tmp) {
+		scst_target_driver_destroy(driver);
+	}
+}
+
+static void
 scst_destroy(struct scst *scst)
 {
+	scst_destroy_drivers(scst);
+	scst_destroy_handlers(scst);
+
 	sto_pipeline_engine_destroy(scst->engine);
 	free((char *) scst->config_path);
 	free(scst);
@@ -608,6 +1007,124 @@ scst_remove_device(const char *handler_name, const char *device_name)
 	return 0;
 }
 
+static struct scst_target_driver *
+scst_find_target_driver(struct scst *scst, const char *driver_name)
+{
+	struct scst_target_driver *driver;
+
+	TAILQ_FOREACH(driver, &scst->driver_list, list) {
+		if (!strcmp(driver_name, driver->name)) {
+			return driver;
+		}
+	}
+
+	return NULL;
+}
+
+static struct scst_target_driver *
+scst_get_target_driver(const char *driver_name)
+{
+	struct scst *scst = g_scst;
+	struct scst_target_driver *driver;
+
+	driver = scst_find_target_driver(scst, driver_name);
+	if (!driver) {
+		driver = scst_target_driver_alloc(driver_name);
+		if (spdk_unlikely(!driver)) {
+			SPDK_ERRLOG("Failed to alloc %s driver\n",
+				    driver_name);
+			return NULL;
+		}
+
+		TAILQ_INSERT_TAIL(&scst->driver_list, driver, list);
+	}
+
+	driver->ref_cnt++;
+
+	return driver;
+}
+
+static void
+scst_put_target_driver(struct scst_target_driver *driver)
+{
+	struct scst *scst = g_scst;
+	int ref_cnt = --driver->ref_cnt;
+
+	assert(ref_cnt >= 0);
+
+	if (ref_cnt == 0) {
+		TAILQ_REMOVE(&scst->driver_list, driver, list);
+		scst_target_driver_free(driver);
+	}
+}
+
+static struct scst_target *
+scst_find_target(const char *driver_name, const char *target_name)
+{
+	struct scst *scst = g_scst;
+	struct scst_target_driver *driver;
+
+	driver = scst_find_target_driver(scst, driver_name);
+	if (spdk_unlikely(!driver)) {
+		return NULL;
+	}
+
+	return scst_target_driver_find(driver, target_name);
+}
+
+static int
+scst_add_target(const char *driver_name, const char *target_name)
+{
+	struct scst_target_driver *driver;
+	struct scst_target *target;
+
+	if (scst_find_target(driver_name, target_name)) {
+		SPDK_ERRLOG("SCST target %s is already exist\n", target_name);
+		return -EEXIST;
+	}
+
+	driver = scst_get_target_driver(driver_name);
+	if (spdk_unlikely(!driver)) {
+		SPDK_ERRLOG("Failed to get %s driver\n", driver_name);
+		return -ENOMEM;
+	}
+
+	target = scst_target_alloc(driver, target_name);
+	if (spdk_unlikely(!target)) {
+		SPDK_ERRLOG("Failed to alloc %s SCST target\n", target_name);
+		goto put_handler;
+	}
+
+	TAILQ_INSERT_TAIL(&driver->target_list, target, list);
+
+	SPDK_ERRLOG("SCST target %s driver [%s] was added\n",
+		    target->name, driver->name);
+
+	return 0;
+
+put_handler:
+	scst_put_target_driver(driver);
+
+	return -ENOMEM;
+}
+
+static int
+scst_remove_target(const char *driver_name, const char *target_name)
+{
+	struct scst_target *target;
+
+	target = scst_find_target(driver_name, target_name);
+	if (spdk_unlikely(!target)) {
+		SPDK_ERRLOG("Failed to find `%s` SCST target to remove\n",
+			    target_name);
+		return -ENOENT;
+	}
+
+	scst_target_destroy(target);
+
+	return 0;
+}
+
 static void
 device_dumps_json(struct sto_tree_node *device_lnk_node, struct spdk_json_write_ctx *w)
 {
@@ -632,14 +1149,7 @@ device_dumps_json(struct sto_tree_node *device_lnk_node, struct spdk_json_write_
 static void
 handler_dumps_json(struct sto_tree_node *handler, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_node *device_node, *mgmt_node;
-
-	mgmt_node = sto_tree_node_find(handler, "mgmt");
-	if (spdk_unlikely(!mgmt_node)) {
-		SPDK_ERRLOG("Failed to find 'mgmt' for handler %s\n",
-			    handler->inode->name);
-		return;
-	}
+	struct sto_tree_node *device_node;
 
 	spdk_json_write_name(w, handler->inode->name);
 
@@ -702,6 +1212,84 @@ handler_list_dumps_json(struct sto_tree_node *tree_root, struct spdk_json_write_
 	spdk_json_write_array_end(w);
 }
 
+static void
+target_dumps_json(struct sto_tree_node *target_node, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_name(w, target_node->inode->name);
+
+	spdk_json_write_object_begin(w);
+
+	scst_serialize_attrs(target_node, w);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
+driver_dumps_json(struct sto_tree_node *driver, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *target_node;
+
+	spdk_json_write_name(w, driver->inode->name);
+
+	spdk_json_write_object_begin(w);
+
+	spdk_json_write_named_array_begin(w, "targets");
+
+	STO_TREE_FOREACH_TYPE(target_node, driver, STO_INODE_TYPE_DIR) {
+		spdk_json_write_object_begin(w);
+		target_dumps_json(target_node, w);
+		spdk_json_write_object_end(w);
+	}
+
+	spdk_json_write_array_end(w);
+
+	spdk_json_write_object_end(w);
+}
+
+static bool
+driver_list_is_empty(struct sto_tree_node *driver_list_node)
+{
+	struct sto_tree_node *driver_node;
+
+	if (sto_tree_node_first_child_type(driver_list_node, STO_INODE_TYPE_DIR) == NULL) {
+		return true;
+	}
+
+	STO_TREE_FOREACH_TYPE(driver_node, driver_list_node, STO_INODE_TYPE_DIR) {
+		if (sto_tree_node_first_child_type(driver_node, STO_INODE_TYPE_DIR) != NULL) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void
+driver_list_dumps_json(struct sto_tree_node *tree_root, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *driver_list_node, *driver_node;
+
+	driver_list_node = sto_tree_node_find(tree_root, "targets");
+
+	if (!driver_list_node || driver_list_is_empty(driver_list_node)) {
+		return;
+	}
+
+	spdk_json_write_named_array_begin(w, "drivers");
+
+	STO_TREE_FOREACH_TYPE(driver_node, driver_list_node, STO_INODE_TYPE_DIR) {
+		if (sto_tree_node_first_child_type(driver_node, STO_INODE_TYPE_DIR) == NULL) {
+			continue;
+		}
+
+		spdk_json_write_object_begin(w);
+		driver_dumps_json(driver_node, w);
+		spdk_json_write_object_end(w);
+	}
+
+	spdk_json_write_array_end(w);
+}
+
 static int
 dumps_json_write_cb(void *cb_ctx, struct spdk_json_write_ctx *w)
 {
@@ -710,6 +1298,7 @@ dumps_json_write_cb(void *cb_ctx, struct spdk_json_write_ctx *w)
 	spdk_json_write_object_begin(w);
 
 	handler_list_dumps_json(tree_root, w);
+	driver_list_dumps_json(tree_root, w);
 
 	spdk_json_write_object_end(w);
 
@@ -824,9 +1413,65 @@ handler_list_load_json_step(struct sto_pipeline *pipe)
 	sto_json_async_iter_start(&opts, sto_pipeline_step_done, pipe);
 }
 
+static void
+target_load_json(struct sto_json_async_iter *iter)
+{
+	struct spdk_json_val *driver = sto_json_async_iter_get_json(iter);
+	struct spdk_json_val *target = sto_json_async_iter_get_object(iter);
+	char *driver_name = NULL, *target_name = NULL;
+	int rc = 0;
+
+	if (spdk_json_decode_string(spdk_json_object_first(driver), &driver_name)) {
+		SPDK_ERRLOG("Failed to decode driver name\n");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (spdk_json_decode_string(spdk_json_object_first(target), &target_name)) {
+		SPDK_ERRLOG("Failed to decode target name\n");
+		rc = -EINVAL;
+		goto free_driver_name;
+	}
+
+	rc = scst_add_target(driver_name, target_name);
+
+	free(target_name);
+
+free_driver_name:
+	free(driver_name);
+
+out:
+	sto_json_async_iter_next(iter, rc);
+}
+
+static void
+driver_load_json(struct sto_json_async_iter *iter)
+{
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_json_async_iter_get_object(iter),
+		.iterate_fn = target_load_json,
+		.next_fn = target_json_iter_next,
+	};
+
+	sto_json_async_iter_start(&opts, sto_json_async_iterate_done, iter);
+}
+
+static void
+driver_list_load_json_step(struct sto_pipeline *pipe)
+{
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_pipeline_get_priv(pipe),
+		.iterate_fn = driver_load_json,
+		.next_fn = driver_json_iter_next,
+	};
+
+	sto_json_async_iter_start(&opts, sto_pipeline_step_done, pipe);
+}
+
 static const struct sto_pipeline_properties scst_load_json_properties = {
 	.steps = {
 		STO_PL_STEP(handler_list_load_json_step, NULL),
+		STO_PL_STEP(driver_list_load_json_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
 	},
 };
@@ -874,6 +1519,9 @@ scst_scan_system(sto_generic_cb cb_fn, void *cb_arg)
 struct info_json_ctx {
 	struct scst_device_handler *handler;
 	struct scst_device *device;
+
+	struct scst_target_driver *driver;
+	struct scst_target *target;
 };
 
 static void
@@ -992,6 +1640,85 @@ out:
 }
 
 static void
+target_json_constructor(struct sto_pipeline *pipe)
+{
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+
+	spdk_json_write_name(w, ctx->target->name);
+	spdk_json_write_object_begin(w);
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+
+	sto_pipeline_step_next(pipe, 0);
+}
+
+static int
+target_list_json_constructor(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	ctx->target = scst_target_next(ctx->driver, ctx->target);
+	if (ctx->target) {
+		spdk_json_write_object_begin(w);
+
+		sto_pipeline_queue_step(pipe, STO_PL_STEP(target_json_constructor, NULL));
+		return 0;
+	}
+
+	spdk_json_write_array_end(w);
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+
+	return STO_PL_CONSTRUCTOR_FINISHED;
+}
+
+static int
+driver_list_json_constructor(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	ctx->driver = scst_target_driver_next(ctx->driver);
+	if (ctx->driver) {
+		spdk_json_write_object_begin(w);
+
+		spdk_json_write_name(w, ctx->driver->name);
+		spdk_json_write_object_begin(w);
+		spdk_json_write_named_array_begin(w, "targets");
+
+		sto_pipeline_queue_step(pipe, STO_PL_STEP_CONSTRUCTOR(target_list_json_constructor, NULL));
+		return 0;
+	}
+
+	spdk_json_write_array_end(w);
+
+	return STO_PL_CONSTRUCTOR_FINISHED;
+}
+
+static void
+info_json_driver_list_step(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct scst *scst = g_scst;
+	int rc = 0;
+
+	if (TAILQ_EMPTY(&scst->driver_list)) {
+		goto out;
+	}
+
+	spdk_json_write_named_array_begin(w, "drivers");
+
+	rc = sto_pipeline_insert_step(pipe, STO_PL_STEP_CONSTRUCTOR(driver_list_json_constructor, NULL));
+
+out:
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static void
 info_json_end_step(struct sto_pipeline *pipe)
 {
 	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
@@ -1007,6 +1734,7 @@ static const struct sto_pipeline_properties scst_info_json_properties = {
 	.steps = {
 		STO_PL_STEP(info_json_start_step, NULL),
 		STO_PL_STEP(info_json_handler_list_step, NULL),
+		STO_PL_STEP(info_json_driver_list_step, NULL),
 		STO_PL_STEP(info_json_end_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
 	},
@@ -1054,27 +1782,6 @@ scst_write_config(sto_generic_cb cb_fn, void *cb_arg)
 {
 	scst_pipeline(&scst_write_config_properties, cb_fn, cb_arg, NULL);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static int
 attr_add(struct sto_json_str_field *attr, char **attributes)
@@ -1169,7 +1876,8 @@ device_restore_json_done(void *cb_arg, int rc)
 	struct device_restore_ctx *ctx = cb_arg;
 
 	if (rc && rc == -EEXIST) {
-		SPDK_ERRLOG("Device has been alredy restored\n");
+		SPDK_ERRLOG("Device %s has been alredy restored\n",
+			    ctx->params.device_name);
 		rc = 0;
 	}
 
@@ -1331,9 +2039,97 @@ handler_list_restore_json_step(struct sto_pipeline *pipe)
 	sto_json_async_iter_start(&opts, sto_pipeline_step_done, pipe);
 }
 
+struct target_restore_ctx {
+	struct scst_target_params params;
+	struct sto_json_async_iter *iter;
+};
+
+static void
+target_restore_json_done(void *cb_arg, int rc)
+{
+	struct target_restore_ctx *ctx = cb_arg;
+
+	if (rc && rc == -EEXIST) {
+		SPDK_ERRLOG("Target %s has been alredy restored\n",
+			    ctx->params.target_name);
+		rc = 0;
+	}
+
+	sto_json_async_iter_next(ctx->iter, rc);
+
+	scst_target_params_deinit(&ctx->params);
+	free(ctx);
+}
+
+static void
+target_restore_json(struct sto_json_async_iter *iter)
+{
+	struct spdk_json_val *driver, *target;
+	struct target_restore_ctx *ctx;
+	struct scst_target_params *params;
+	int rc = 0;
+
+	driver = sto_json_async_iter_get_json(iter);
+	target = sto_json_async_iter_get_object(iter);
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to alloc ctx for device restore\n");
+		sto_json_async_iter_next(iter, -ENOMEM);
+		return;
+	}
+
+	ctx->iter = iter;
+	params = &ctx->params;
+
+	if (spdk_json_decode_string(spdk_json_object_first(driver), &params->driver_name)) {
+		SPDK_ERRLOG("Failed to decode driver name\n");
+		rc = -EINVAL;
+		goto out_err;
+	}
+
+	if (spdk_json_decode_string(spdk_json_object_first(target), &params->target_name)) {
+		SPDK_ERRLOG("Failed to decode target name\n");
+		rc = -EINVAL;
+		goto out_err;
+	}
+
+	scst_target_add(params, target_restore_json_done, ctx);
+
+	return;
+
+out_err:
+	target_restore_json_done(ctx, rc);
+}
+
+static void
+driver_restore_json(struct sto_json_async_iter *iter)
+{
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_json_async_iter_get_object(iter),
+		.iterate_fn = target_restore_json,
+		.next_fn = target_json_iter_next,
+	};
+
+	sto_json_async_iter_start(&opts, sto_json_async_iterate_done, iter);
+}
+
+static void
+driver_list_restore_json_step(struct sto_pipeline *pipe)
+{
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_pipeline_get_priv(pipe),
+		.iterate_fn = driver_restore_json,
+		.next_fn = driver_json_iter_next,
+	};
+
+	sto_json_async_iter_start(&opts, sto_pipeline_step_done, pipe);
+}
+
 static const struct sto_pipeline_properties scst_restore_json_properties = {
 	.steps = {
 		STO_PL_STEP(handler_list_restore_json_step, NULL),
+		STO_PL_STEP(driver_list_restore_json_step, NULL),
 		STO_PL_STEP_TERMINATOR(),
 	},
 };
@@ -1401,6 +2197,24 @@ scst_pipeline(const struct sto_pipeline_properties *properties,
 }
 
 static void
+init_restore_config_done(void *cb_arg, int rc)
+{
+	struct sto_generic_cpl *cpl = cb_arg;
+
+	if (rc && rc != -ENOENT) {
+		SPDK_ERRLOG("Failed to restore config, rc=%d\n", rc);
+		goto out;
+	}
+
+	rc = 0;
+
+	SPDK_ERRLOG("SCST initialization successed finished\n");
+
+out:
+	sto_generic_call_cpl(cpl, rc);
+}
+
+static void
 init_scan_system_done(void *cb_arg, int rc)
 {
 	struct sto_generic_cpl *cpl = cb_arg;
@@ -1411,7 +2225,7 @@ init_scan_system_done(void *cb_arg, int rc)
 		return;
 	}
 
-	scst_restore_config(sto_generic_cpl_cb, cpl);
+	scst_restore_config(init_restore_config_done, cpl);
 }
 
 void
@@ -1419,6 +2233,8 @@ scst_init(sto_generic_cb cb_fn, void *cb_arg)
 {
 	struct sto_generic_cpl *cpl;
 	struct scst *scst;
+
+	SPDK_ERRLOG("SCST initialization has been started\n");
 
 	if (g_scst) {
 		SPDK_ERRLOG("FAILED: SCST has already been initialized\n");
@@ -1449,11 +2265,6 @@ void
 scst_fini(sto_generic_cb cb_fn, void *cb_arg)
 {
 	struct scst *scst = g_scst;
-	struct scst_device_handler *handler, *tmp;
-
-	TAILQ_FOREACH_SAFE(handler, &scst->handler_list, list, tmp) {
-		scst_device_handler_destroy(handler);
-	}
 
 	scst_destroy(scst);
 

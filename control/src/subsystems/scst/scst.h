@@ -128,6 +128,23 @@ scst_device_params_deinit(void *params_ptr)
 void scst_device_open(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
 void scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
 
+struct scst_target_params {
+	char *driver_name;
+	char *target_name;
+};
+
+static inline void
+scst_target_params_deinit(void *params_ptr)
+{
+	struct scst_target_params *params = params_ptr;
+
+	free(params->driver_name);
+	free(params->target_name);
+}
+
+void scst_target_add(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
+void scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
 void scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
 void scst_scan_system(sto_generic_cb cb_fn, void *cb_arg);
 void scst_write_config(sto_generic_cb cb_fn, void *cb_arg);
