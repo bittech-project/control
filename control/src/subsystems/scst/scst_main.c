@@ -54,12 +54,6 @@ scst_device_handler_alloc(const char *handler_name)
 		goto out_err;
 	}
 
-	handler->path = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_HANDLERS, handler->name);
-	if (spdk_unlikely(!handler->path)) {
-		SPDK_ERRLOG("Failed to alloc dev handler path\n");
-		goto out_err;
-	}
-
 	TAILQ_INIT(&handler->device_list);
 
 	return handler;
@@ -73,7 +67,6 @@ out_err:
 static void
 scst_device_handler_free(struct scst_device_handler *handler)
 {
-	free((char *) handler->path);
 	free((char *) handler->name);
 	free(handler);
 }
@@ -127,12 +120,6 @@ scst_device_alloc(struct scst_device_handler *handler, const char *name)
 		goto out_err;
 	}
 
-	device->path = spdk_sprintf_alloc("%s/%s", handler->path, device->name);
-	if (spdk_unlikely(!device->path)) {
-		SPDK_ERRLOG("Failed to alloc SCST device path\n");
-		goto out_err;
-	}
-
 	device->handler = handler;
 
 	return device;
@@ -146,7 +133,6 @@ out_err:
 static void
 scst_device_free(struct scst_device *device)
 {
-	free((char *) device->path);
 	free((char *) device->name);
 	free(device);
 }
@@ -180,7 +166,7 @@ device_open_create_args(const char *handler_name, const char *device_name, const
 		return NULL;
 	}
 
-	args->filepath = scst_handler_mgmt(handler_name);
+	args->filepath = scst_device_handler_mgmt_path(handler_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
 		goto out_err;
@@ -241,7 +227,7 @@ device_close_create_args(const char *handler_name, const char *device_name)
 		return NULL;
 	}
 
-	args->filepath = scst_handler_mgmt(handler_name);
+	args->filepath = scst_device_handler_mgmt_path(handler_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
 		goto out_err;
@@ -382,12 +368,6 @@ scst_target_driver_alloc(const char *driver_name)
 		goto out_err;
 	}
 
-	driver->path = spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_TARGETS, driver->name);
-	if (spdk_unlikely(!driver->path)) {
-		SPDK_ERRLOG("Failed to alloc target driver path\n");
-		goto out_err;
-	}
-
 	TAILQ_INIT(&driver->target_list);
 
 	return driver;
@@ -401,7 +381,6 @@ out_err:
 static void
 scst_target_driver_free(struct scst_target_driver *driver)
 {
-	free((char *) driver->path);
 	free((char *) driver->name);
 	free(driver);
 }
@@ -455,12 +434,6 @@ scst_target_alloc(struct scst_target_driver *driver, const char *name)
 		goto out_err;
 	}
 
-	target->path = spdk_sprintf_alloc("%s/%s", driver->path, target->name);
-	if (spdk_unlikely(!target->path)) {
-		SPDK_ERRLOG("Failed to alloc SCST target path\n");
-		goto out_err;
-	}
-
 	target->driver = driver;
 
 	return target;
@@ -474,7 +447,6 @@ out_err:
 static void
 scst_target_free(struct scst_target *target)
 {
-	free((char *) target->path);
 	free((char *) target->name);
 	free(target);
 }
@@ -508,7 +480,7 @@ target_add_create_args(const char *driver_name, const char *target_name)
 		return NULL;
 	}
 
-	args->filepath = scst_target_driver_mgmt(driver_name);
+	args->filepath = scst_target_driver_mgmt_path(driver_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
 		goto out_err;
@@ -557,7 +529,7 @@ target_del_create_args(const char *driver_name, const char *target_name)
 		return NULL;
 	}
 
-	args->filepath = scst_target_driver_mgmt(driver_name);
+	args->filepath = scst_target_driver_mgmt_path(driver_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
 		goto out_err;
@@ -690,8 +662,6 @@ scst_create(void)
 		SPDK_ERRLOG("Failed to alloc SCST instance\n");
 		return NULL;
 	}
-
-	scst->sys_path = SCST_ROOT;
 
 	scst->config_path = strdup(SCST_DEF_CONFIG_PATH);
 	if (spdk_unlikely(!scst->config_path)) {

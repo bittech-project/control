@@ -266,7 +266,6 @@ out:
 void
 scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json)
 {
-	struct scst *scst = scst_get_instance();
 	struct dumps_json_ctx *ctx;
 
 	ctx = calloc(1, sizeof(*ctx));
@@ -281,7 +280,7 @@ scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json)
 	ctx->cb_fn = cb_fn;
 	ctx->cb_arg = cb_arg;
 
-	sto_tree(scst->sys_path, 0, false, dumps_json, ctx);
+	sto_tree(SCST_ROOT, 0, false, dumps_json, ctx);
 }
 
 static void
@@ -497,8 +496,19 @@ static void
 device_json_constructor(struct sto_pipeline *pipe)
 {
 	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+	const char *device_path;
 
-	scst_read_attrs(ctx->device->path, device_read_attrs_done, pipe);
+	device_path = scst_device_path(ctx->device);
+	if (spdk_unlikely(!device_path)) {
+		SPDK_ERRLOG("Failed to alloc `%s` device path\n",
+			    ctx->device->name);
+		sto_pipeline_step_next(pipe, -ENOMEM);
+		return;
+	}
+
+	scst_read_attrs(device_path, device_read_attrs_done, pipe);
+
+	free((char *) device_path);
 }
 
 static int
@@ -904,7 +914,7 @@ handler_parse_mgmt_path(struct spdk_json_val *handler)
 		return ERR_PTR(-EINVAL);
 	}
 
-	mgmt_path = scst_handler_mgmt(handler_name);
+	mgmt_path = scst_device_handler_mgmt_path(handler_name);
 
 	free(handler_name);
 

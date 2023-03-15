@@ -35,20 +35,10 @@ struct sto_pipeline_properties;
 #define SCST_RESYNC_IO	"resync_size"
 #define SCST_T10_IO	"t10_dev_id"
 
-struct scst_device_handler;
-
-struct scst_device {
-	const char *name;
-	const char *path;
-
-	struct scst_device_handler *handler;
-
-	TAILQ_ENTRY(scst_device) list;
-};
+struct scst_device;
 
 struct scst_device_handler {
 	const char *name;
-	const char *path;
 
 	TAILQ_HEAD(, scst_device) device_list;
 	int ref_cnt;
@@ -56,20 +46,57 @@ struct scst_device_handler {
 	TAILQ_ENTRY(scst_device_handler) list;
 };
 
-struct scst_target_driver;
+struct scst_device_handler *scst_device_handler_next(struct scst_device_handler *handler);
 
-struct scst_target {
+static inline const char *
+scst_device_handler_mgmt_path(const char *handler_name)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+				  handler_name, SCST_MGMT_IO);
+}
+
+struct scst_device {
 	const char *name;
-	const char *path;
 
-	struct scst_target_driver *driver;
+	struct scst_device_handler *handler;
 
-	TAILQ_ENTRY(scst_target) list;
+	TAILQ_ENTRY(scst_device) list;
 };
+
+struct scst_device *scst_device_next(struct scst_device_handler *handler, struct scst_device *device);
+
+static inline const char *
+scst_device_path(struct scst_device *device)
+{
+	struct scst_device_handler *handler = device->handler;
+
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
+				  handler->name, device->name);
+}
+
+struct scst_device_params {
+	char *handler_name;
+	char *device_name;
+	char *attributes;
+};
+
+static inline void
+scst_device_params_deinit(void *params_ptr)
+{
+	struct scst_device_params *params = params_ptr;
+
+	free(params->handler_name);
+	free(params->device_name);
+	free(params->attributes);
+}
+
+void scst_device_open(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
+void scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
+struct scst_target;
 
 struct scst_target_driver {
 	const char *name;
-	const char *path;
 
 	TAILQ_HEAD(, scst_target) target_list;
 	int ref_cnt;
@@ -77,8 +104,43 @@ struct scst_target_driver {
 	TAILQ_ENTRY(scst_target_driver) list;
 };
 
+struct scst_target_driver *scst_target_driver_next(struct scst_target_driver *driver);
+
+static inline const char *
+scst_target_driver_mgmt_path(const char *driver_name)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+				  driver_name, SCST_MGMT_IO);
+}
+
+struct scst_target {
+	const char *name;
+
+	struct scst_target_driver *driver;
+
+	TAILQ_ENTRY(scst_target) list;
+};
+
+struct scst_target *scst_target_next(struct scst_target_driver *driver, struct scst_target *target);
+
+struct scst_target_params {
+	char *driver_name;
+	char *target_name;
+};
+
+static inline void
+scst_target_params_deinit(void *params_ptr)
+{
+	struct scst_target_params *params = params_ptr;
+
+	free(params->driver_name);
+	free(params->target_name);
+}
+
+void scst_target_add(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
+void scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
 struct scst {
-	const char *sys_path;
 	const char *config_path;
 
 	struct sto_pipeline_engine *engine;
@@ -86,13 +148,6 @@ struct scst {
 	TAILQ_HEAD(, scst_device_handler) handler_list;
 	TAILQ_HEAD(, scst_target_driver) driver_list;
 };
-
-static inline const char *
-scst_handler_mgmt(const char *handler)
-{
-	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_HANDLERS,
-				  handler, SCST_MGMT_IO);
-}
 
 static inline const char *
 scst_dev_groups_mgmt(void)
@@ -119,13 +174,6 @@ scst_dev_group_target_group_mgmt(const char *dev_group, const char *target_group
 {
 	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
 				  dev_group, "target_groups", target_group, SCST_MGMT_IO);
-}
-
-static inline const char *
-scst_target_driver_mgmt(const char *target_driver)
-{
-	return spdk_sprintf_alloc("%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-				  target_driver, SCST_MGMT_IO);
 }
 
 static inline const char *
@@ -160,48 +208,6 @@ void scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write
 
 typedef void (*scst_read_attrs_done_t)(void *cb_arg, struct sto_json_ctx *json, int rc);
 void scst_read_attrs(const char *dirpath, scst_read_attrs_done_t cb_fn, void *cb_arg);
-
-struct scst_device_handler *scst_device_handler_next(struct scst_device_handler *handler);
-struct scst_device *scst_device_next(struct scst_device_handler *handler, struct scst_device *device);
-
-struct scst_target_driver *scst_target_driver_next(struct scst_target_driver *driver);
-struct scst_target *scst_target_next(struct scst_target_driver *driver, struct scst_target *target);
-
-struct scst_device_params {
-	char *handler_name;
-	char *device_name;
-	char *attributes;
-};
-
-static inline void
-scst_device_params_deinit(void *params_ptr)
-{
-	struct scst_device_params *params = params_ptr;
-
-	free(params->handler_name);
-	free(params->device_name);
-	free(params->attributes);
-}
-
-void scst_device_open(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
-void scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
-
-struct scst_target_params {
-	char *driver_name;
-	char *target_name;
-};
-
-static inline void
-scst_target_params_deinit(void *params_ptr)
-{
-	struct scst_target_params *params = params_ptr;
-
-	free(params->driver_name);
-	free(params->target_name);
-}
-
-void scst_target_add(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
-void scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
 
 int scst_add_device(const char *handler_name, const char *device_name);
 int scst_add_target(const char *driver_name, const char *target_name);
