@@ -6,10 +6,19 @@
 
 #include <sto_server.h>
 
+#include "sto_control.h"
 #include "sto_version.h"
 #include "sto_client.h"
 #include "sto_core.h"
 #include "sto_err.h"
+
+static bool g_control_initialized;
+
+bool
+sto_control_is_initialized(void)
+{
+	return g_control_initialized;
+}
 
 /*
  * Usage function for printing parameters that are specific to this application
@@ -39,6 +48,8 @@ control_core_init_done(void *cb_arg, int rc)
 
 	SPDK_NOTICELOG("Successfully started the %s SPDK application\n",
 		       STO_VERSION_STRING);
+
+	g_control_initialized = true;
 
 	return;
 

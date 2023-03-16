@@ -4,6 +4,7 @@
 #include <spdk/likely.h>
 #include <spdk/jsonrpc.h>
 
+#include "sto_control.h"
 #include "sto_core.h"
 
 struct spdk_json_val;
@@ -29,14 +30,17 @@ sto_control_rpc(struct spdk_jsonrpc_request *request, const struct spdk_json_val
 {
 	int rc;
 
+	if (!sto_control_is_initialized()) {
+		SPDK_ERRLOG("Control has not been initialized yet\n");
+		spdk_jsonrpc_send_error_response(request, -EAGAIN, strerror(EAGAIN));
+		return;
+	}
+
 	rc = sto_core_process(params, sto_control_rpc_done, request);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to start core process\n");
 		spdk_jsonrpc_send_error_response(request, rc, strerror(-rc));
-		goto out;
+		return;
 	}
-
-out:
-	return;
 }
 SPDK_RPC_REGISTER("control", sto_control_rpc, SPDK_RPC_RUNTIME)
