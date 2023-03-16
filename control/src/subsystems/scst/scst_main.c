@@ -132,7 +132,7 @@ device_open_step(struct sto_pipeline *pipe)
 {
 	struct scst_device_params *params = sto_pipeline_get_priv(pipe);
 
-	if (scst_find_device(scst_get_instance(), params->handler_name, params->device_name)) {
+	if (scst_find_device(scst_get_instance(), params->device_name)) {
 		sto_pipeline_step_next(pipe, -EEXIST);
 		return;
 	}
@@ -179,7 +179,7 @@ device_close_step(struct sto_pipeline *pipe)
 {
 	struct scst_device_params *params = sto_pipeline_get_priv(pipe);
 
-	if (!scst_find_device(scst_get_instance(), params->handler_name, params->device_name)) {
+	if (!scst_find_device(scst_get_instance(), params->device_name)) {
 		sto_pipeline_step_next(pipe, -ENOENT);
 		return;
 	}
@@ -193,7 +193,7 @@ device_close_cfg_step(struct sto_pipeline *pipe)
 	struct scst_device_params *params = sto_pipeline_get_priv(pipe);
 	int rc;
 
-	rc = scst_remove_device(scst_get_instance(), params->handler_name, params->device_name);
+	rc = scst_remove_device(scst_get_instance(), params->device_name);
 	assert(!rc);
 
 	sto_pipeline_step_next(pipe, rc);

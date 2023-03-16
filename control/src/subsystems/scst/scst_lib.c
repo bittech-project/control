@@ -4,13 +4,14 @@
 #include <spdk/string.h>
 #include <spdk/json.h>
 
+#include "scst_lib.h"
+
 #include "sto_async.h"
 #include "sto_rpc_aio.h"
 #include "sto_tree.h"
 #include "sto_inode.h"
 #include "sto_json.h"
-
-#include "scst_lib.h"
+#include "sto_hash.h"
 
 struct spdk_json_write_ctx;
 
@@ -81,20 +82,6 @@ scst_device_handler_destroy(struct scst_device_handler *handler)
 	}
 }
 
-static struct scst_device *
-scst_device_handler_find(struct scst_device_handler *handler, const char *device_name)
-{
-	struct scst_device *device;
-
-	TAILQ_FOREACH(device, &handler->device_list, list) {
-		if (!strcmp(device_name, device->name)) {
-			return device;
-		}
-	}
-
-	return NULL;
-}
-
 struct scst_device_handler *
 scst_device_handler_next(struct scst *scst, struct scst_device_handler *handler)
 {
@@ -120,6 +107,8 @@ scst_device_alloc(struct scst_device_handler *handler, const char *name)
 
 	device->handler = handler;
 
+	sto_hash_elem_init(&device->he, device->name, strlen(device->name));
+
 	return device;
 
 out_err:
@@ -141,6 +130,8 @@ scst_device_destroy(struct scst_device *device)
 	struct scst_device_handler *handler = device->handler;
 
 	TAILQ_REMOVE(&handler->device_list, device, list);
+
+	sto_hash_elem_del(&device->he);
 
 	scst_put_device_handler(handler);
 
@@ -388,6 +379,7 @@ struct scst *
 scst_create(void)
 {
 	struct scst *scst;
+	int rc;
 
 	scst = calloc(1, sizeof(*scst));
 	if (spdk_unlikely(!scst)) {
@@ -407,10 +399,20 @@ scst_create(void)
 		goto free_config_path;
 	}
 
+#define SCST_DEVICE_LOOKUP_MAP_SIZE 64
+	rc = sto_hash_init(&scst->device_lookup_map, SCST_DEVICE_LOOKUP_MAP_SIZE);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to initialize SCST device lookup map\n");
+		goto destroy_engine;
+	}
+
 	TAILQ_INIT(&scst->handler_list);
 	TAILQ_INIT(&scst->driver_list);
 
 	return scst;
+
+destroy_engine:
+	sto_pipeline_engine_destroy(scst->engine);
 
 free_config_path:
 	free((char *) scst->config_path);
@@ -447,6 +449,7 @@ scst_destroy(struct scst *scst)
 	scst_destroy_drivers(scst);
 	scst_destroy_handlers(scst);
 
+	sto_hash_destroy(&scst->device_lookup_map);
 	sto_pipeline_engine_destroy(scst->engine);
 	free((char *) scst->config_path);
 	free(scst);
@@ -796,16 +799,16 @@ scst_put_device_handler(struct scst_device_handler *handler)
 }
 
 struct scst_device *
-scst_find_device(struct scst *scst, const char *handler_name, const char *device_name)
+scst_find_device(struct scst *scst, const char *device_name)
 {
-	struct scst_device_handler *handler;
+	struct sto_hash_elem *he;
 
-	handler = scst_find_device_handler(scst, handler_name);
-	if (spdk_unlikely(!handler)) {
+	he = sto_hash_lookup(&scst->device_lookup_map, device_name, strlen(device_name));
+	if (!he) {
 		return NULL;
 	}
 
-	return scst_device_handler_find(handler, device_name);
+	return SPDK_CONTAINEROF(he, struct scst_device, he);
 }
 
 int
@@ -814,7 +817,7 @@ scst_add_device(struct scst *scst, const char *handler_name, const char *device_
 	struct scst_device_handler *handler;
 	struct scst_device *device;
 
-	if (scst_find_device(scst, handler_name, device_name)) {
+	if (scst_find_device(scst, device_name)) {
 		SPDK_ERRLOG("SCST device %s is already exist\n", device_name);
 		return -EEXIST;
 	}
@@ -833,6 +836,8 @@ scst_add_device(struct scst *scst, const char *handler_name, const char *device_
 
 	TAILQ_INSERT_TAIL(&handler->device_list, device, list);
 
+	sto_hash_add(&scst->device_lookup_map, &device->he);
+
 	SPDK_ERRLOG("SCST device %s handler [%s] was added\n",
 		    device->name, handler->name);
 
@@ -845,11 +850,11 @@ put_handler:
 }
 
 int
-scst_remove_device(struct scst *scst, const char *handler_name, const char *device_name)
+scst_remove_device(struct scst *scst, const char *device_name)
 {
 	struct scst_device *device;
 
-	device = scst_find_device(scst, handler_name, device_name);
+	device = scst_find_device(scst, device_name);
 	if (spdk_unlikely(!device)) {
 		SPDK_ERRLOG("Failed to find `%s` SCST device to remove\n",
 			    device_name);

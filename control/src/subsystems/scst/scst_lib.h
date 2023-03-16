@@ -4,6 +4,7 @@
 #include "sto_async.h"
 #include "sto_json.h"
 #include "sto_pipeline.h"
+#include "sto_hash.h"
 
 struct sto_tree_node;
 struct sto_pipeline_properties;
@@ -44,6 +45,7 @@ struct scst_device {
 
 	struct scst_device_handler *handler;
 
+	struct sto_hash_elem he;
 	TAILQ_ENTRY(scst_device) list;
 };
 
@@ -94,6 +96,8 @@ struct scst {
 
 	TAILQ_HEAD(, scst_device_handler) handler_list;
 	TAILQ_HEAD(, scst_target_driver) driver_list;
+
+	struct sto_hash device_lookup_map;
 };
 
 struct scst_device_handler *scst_device_handler_next(struct scst *scst, struct scst_device_handler *handler);
@@ -196,8 +200,8 @@ typedef void (*scst_read_attrs_done_t)(void *cb_arg, struct sto_json_ctx *json, 
 void scst_read_attrs(const char *dirpath, scst_read_attrs_done_t cb_fn, void *cb_arg);
 
 int scst_add_device(struct scst *scst, const char *handler_name, const char *device_name);
-int scst_remove_device(struct scst *scst, const char *handler_name, const char *device_name);
-struct scst_device *scst_find_device(struct scst *scst, const char *handler_name, const char *device_name);
+int scst_remove_device(struct scst *scst, const char *device_name);
+struct scst_device *scst_find_device(struct scst *scst, const char *device_name);
 
 int scst_add_target(struct scst *scst, const char *driver_name, const char *target_name);
 int scst_remove_target(struct scst *scst, const char *driver_name, const char *target_name);
