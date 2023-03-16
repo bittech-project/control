@@ -942,7 +942,7 @@ scst_parse_attrs(struct spdk_json_val *attributes, char **available_params)
 	const struct spdk_json_val *val;
 	char *attributes_str = NULL;
 	struct sto_json_iter iter;
-	int rc;
+	int rc = 0;
 
 	if (!attributes) {
 		return NULL;
@@ -956,6 +956,10 @@ scst_parse_attrs(struct spdk_json_val *attributes, char **available_params)
 		}
 	}
 
+	if (!attributes_str) {
+		return NULL;
+	}
+
 	attributes_str[strlen(attributes_str) - 1] = '\0';
 
 	return attributes_str;
@@ -963,7 +967,7 @@ scst_parse_attrs(struct spdk_json_val *attributes, char **available_params)
 out_err:
 	free(attributes_str);
 
-	return NULL;
+	return ERR_PTR(rc);
 }
 
 struct device_restore_ctx {
@@ -1026,12 +1030,15 @@ device_restore_json(struct sto_json_async_iter *iter)
 	}
 
 	if (values) {
-		params->attributes = scst_parse_attrs(values, available_params);
-		if (spdk_unlikely(!params->attributes)) {
+		char *attributes = scst_parse_attrs(values, available_params);
+
+		if (IS_ERR(attributes)) {
 			SPDK_ERRLOG("Failed to parse SCST attributes\n");
 			rc = -EINVAL;
 			goto out_err;
 		}
+
+		params->attributes = attributes;
 	}
 
 	scst_device_open(params, device_restore_json_done, ctx);
