@@ -27,28 +27,82 @@ scst_json_ctx_deinit(void *ctx_ptr)
 	sto_json_ctx_destroy(&ctx->json);
 }
 
-static struct spdk_json_val *
+static inline struct spdk_json_val *
 handler_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 {
 	return sto_json_array_next(json, object, "handlers");
 }
 
-static struct spdk_json_val *
+static inline struct spdk_json_val *
 device_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 {
 	return sto_json_array_next(sto_json_value(spdk_json_object_first(json)), object, "devices");
 }
 
-static struct spdk_json_val *
+static inline struct spdk_json_val *
 driver_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 {
 	return sto_json_array_next(json, object, "drivers");
 }
 
-static struct spdk_json_val *
+static inline struct spdk_json_val *
 target_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 {
 	return sto_json_array_next(sto_json_value(spdk_json_object_first(json)), object, "targets");
+}
+
+static inline struct spdk_json_val *
+ini_group_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
+{
+	return sto_json_array_next(sto_json_value(spdk_json_object_first(json)), object, "ini_groups");
+}
+
+static int
+decode_target_params(struct spdk_json_val *driver, struct spdk_json_val *target,
+		     struct scst_target_params *params)
+{
+	if (spdk_json_decode_string(spdk_json_object_first(driver), &params->driver_name)) {
+		SPDK_ERRLOG("Failed to decode `driver_name`\n");
+		goto out_err;
+	}
+
+	if (spdk_json_decode_string(spdk_json_object_first(target), &params->target_name)) {
+		SPDK_ERRLOG("Failed to decode `target_name`\n");
+		goto out_err;
+	}
+
+	return 0;
+
+out_err:
+	scst_target_params_deinit(params);
+	return -EINVAL;
+}
+
+static int
+decode_ini_group_params(struct spdk_json_val *driver, struct spdk_json_val *target,
+			struct spdk_json_val *ini_group, struct scst_ini_group_params *params)
+{
+	if (spdk_json_decode_string(spdk_json_object_first(driver), &params->driver_name)) {
+		SPDK_ERRLOG("Failed to decode `driver_name`\n");
+		goto out_err;
+	}
+
+	if (spdk_json_decode_string(spdk_json_object_first(target), &params->target_name)) {
+		SPDK_ERRLOG("Failed to decode `target_name`\n");
+		goto out_err;
+	}
+
+	if (spdk_json_decode_string(spdk_json_object_first(ini_group), &params->ini_group_name)) {
+		SPDK_ERRLOG("Failed to decode `ini_group_name`\n");
+		goto out_err;
+	}
+
+	return 0;
+
+out_err:
+	scst_ini_group_params_deinit(params);
+	return -EINVAL;
+
 }
 
 static void
@@ -139,13 +193,37 @@ handler_list_dumps_json(struct sto_tree_node *tree_root, struct spdk_json_write_
 }
 
 static void
+ini_group_dumps_json(struct sto_tree_node *ini_group_node, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_name(w, ini_group_node->inode->name);
+	spdk_json_write_object_begin(w);
+	spdk_json_write_object_end(w);
+}
+
+static void
 target_dumps_json(struct sto_tree_node *target_node, struct spdk_json_write_ctx *w)
 {
+	struct sto_tree_node *ini_group_list_node, *ini_group_node;
+
 	spdk_json_write_name(w, target_node->inode->name);
 
 	spdk_json_write_object_begin(w);
 
 	scst_serialize_attrs(target_node, w);
+
+	ini_group_list_node = sto_tree_node_find(target_node, "ini_groups");
+
+	if (ini_group_list_node && sto_tree_node_first_child_type(ini_group_list_node, STO_INODE_TYPE_DIR)) {
+		spdk_json_write_named_array_begin(w, "ini_groups");
+
+		STO_TREE_FOREACH_TYPE(ini_group_node, ini_group_list_node, STO_INODE_TYPE_DIR) {
+			spdk_json_write_object_begin(w);
+			ini_group_dumps_json(ini_group_node, w);
+			spdk_json_write_object_end(w);
+		}
+
+		spdk_json_write_array_end(w);
+	}
 
 	spdk_json_write_object_end(w);
 }
@@ -286,10 +364,12 @@ scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json)
 static void
 device_load_json(struct sto_json_async_iter *iter)
 {
-	struct spdk_json_val *handler = sto_json_async_iter_get_json(iter);
-	struct spdk_json_val *device = sto_json_async_iter_get_object(iter);
+	struct spdk_json_val *handler, *device;
 	char *handler_name = NULL, *device_name = NULL;
 	int rc = 0;
+
+	handler = sto_json_async_iter_get_json(iter);
+	device = sto_json_async_iter_get_object(iter);
 
 	if (spdk_json_decode_string(spdk_json_object_first(handler), &handler_name)) {
 		SPDK_ERRLOG("Failed to decode handler name\n");
@@ -339,33 +419,71 @@ handler_list_load_json_step(struct sto_pipeline *pipe)
 }
 
 static void
-target_load_json(struct sto_json_async_iter *iter)
+ini_group_load_json(struct sto_json_async_iter *iter)
 {
-	struct spdk_json_val *driver = sto_json_async_iter_get_json(iter);
-	struct spdk_json_val *target = sto_json_async_iter_get_object(iter);
-	char *driver_name = NULL, *target_name = NULL;
+	struct spdk_json_val *driver, *target, *ini_group;
+	struct scst_ini_group_params params = {};
 	int rc = 0;
 
-	if (spdk_json_decode_string(spdk_json_object_first(driver), &driver_name)) {
-		SPDK_ERRLOG("Failed to decode driver name\n");
-		rc = -EINVAL;
+	driver = sto_json_async_iter_get_json(sto_json_async_iter_get_priv(iter));
+	target = sto_json_async_iter_get_json(iter);
+	ini_group = sto_json_async_iter_get_object(iter);
+
+	rc = decode_ini_group_params(driver, target, ini_group, &params);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode ini_group params to load\n");
 		goto out;
 	}
 
-	if (spdk_json_decode_string(spdk_json_object_first(target), &target_name)) {
-		SPDK_ERRLOG("Failed to decode target name\n");
-		rc = -EINVAL;
-		goto free_driver_name;
-	}
-
-	rc = scst_add_target(driver_name, target_name);
-
-	free(target_name);
-
-free_driver_name:
-	free(driver_name);
+	rc = scst_add_ini_group(params.driver_name, params.target_name, params.ini_group_name);
 
 out:
+	scst_ini_group_params_deinit(&params);
+
+	sto_json_async_iter_next(iter, rc);
+}
+
+static void
+ini_group_list_load_json(struct sto_json_async_iter *iter)
+{
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_json_async_iter_get_object(iter),
+		.iterate_fn = ini_group_load_json,
+		.next_fn = ini_group_json_iter_next,
+		.priv = iter,
+	};
+
+	sto_json_async_iter_start(&opts, sto_json_async_iterate_done, iter);
+}
+
+static void
+target_load_json(struct sto_json_async_iter *iter)
+{
+	struct spdk_json_val *driver, *target;
+	struct scst_target_params params = {};
+	int rc = 0;
+
+	driver = sto_json_async_iter_get_json(iter);
+	target = sto_json_async_iter_get_object(iter);
+
+	rc = decode_target_params(driver, target, &params);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode target params\n");
+		goto out_err;
+	}
+
+	rc = scst_add_target(params.driver_name, params.target_name);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to add target\n");
+		goto out_err;
+	}
+
+	ini_group_list_load_json(iter);
+
+	return;
+
+out_err:
+	scst_target_params_deinit(&params);
 	sto_json_async_iter_next(iter, rc);
 }
 
@@ -447,6 +565,7 @@ struct info_json_ctx {
 
 	struct scst_target_driver *driver;
 	struct scst_target *target;
+	struct scst_ini_group *ini_group;
 };
 
 static void
@@ -576,18 +695,64 @@ out:
 }
 
 static void
-target_json_constructor(struct sto_pipeline *pipe)
+ini_group_json_constructor(struct sto_pipeline *pipe)
 {
-	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
 	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
 
-	spdk_json_write_name(w, ctx->target->name);
+	spdk_json_write_name(w, ctx->ini_group->name);
 	spdk_json_write_object_begin(w);
 	spdk_json_write_object_end(w);
 
 	spdk_json_write_object_end(w);
 
 	sto_pipeline_step_next(pipe, 0);
+}
+
+static int
+ini_group_list_json_constructor(struct sto_pipeline *pipe)
+{
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+
+	ctx->ini_group = scst_ini_group_next(ctx->target, ctx->ini_group);
+	if (ctx->ini_group) {
+		spdk_json_write_object_begin(w);
+
+		sto_pipeline_queue_step(pipe, STO_PL_STEP(ini_group_json_constructor, NULL));
+		return 0;
+	}
+
+	spdk_json_write_array_end(w);
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+
+	return STO_PL_CONSTRUCTOR_FINISHED;
+}
+
+static void
+target_json_constructor(struct sto_pipeline *pipe)
+{
+	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
+	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
+	int rc = 0;
+
+	spdk_json_write_name(w, ctx->target->name);
+	spdk_json_write_object_begin(w);
+
+	if (TAILQ_EMPTY(&ctx->target->group_list)) {
+		spdk_json_write_object_end(w);
+		spdk_json_write_object_end(w);
+		goto out;
+	}
+
+	spdk_json_write_named_array_begin(w, "ini_groups");
+
+	rc = sto_pipeline_insert_step(pipe, STO_PL_STEP_CONSTRUCTOR(ini_group_list_json_constructor, NULL));
+
+out:
+	sto_pipeline_step_next(pipe, rc);
 }
 
 static int
@@ -975,6 +1140,80 @@ handler_list_restore_json_step(struct sto_pipeline *pipe)
 	sto_json_async_iter_start(&opts, sto_pipeline_step_done, pipe);
 }
 
+struct ini_group_restore_ctx {
+	struct scst_ini_group_params params;
+	struct sto_json_async_iter *iter;
+};
+
+static void
+ini_group_restore_json_done(void *cb_arg, int rc)
+{
+	struct ini_group_restore_ctx *ctx = cb_arg;
+
+	switch (rc) {
+	case -EEXIST:
+		SPDK_ERRLOG("Ini group %s has been alredy restored\n",
+			    ctx->params.ini_group_name);
+		/* fallthrough */
+	case 0:
+		break;
+	default:
+		sto_json_async_iter_next(ctx->iter, rc);
+		goto free_ctx;
+	}
+
+free_ctx:
+	scst_ini_group_params_deinit(&ctx->params);
+	free(ctx);
+}
+
+static void
+ini_group_restore_json(struct sto_json_async_iter *iter)
+{
+	struct spdk_json_val *driver, *target, *ini_group;
+	struct ini_group_restore_ctx *ctx;
+	int rc = 0;
+
+	driver = sto_json_async_iter_get_json(sto_json_async_iter_get_priv(iter));
+	target = sto_json_async_iter_get_json(iter);
+	ini_group = sto_json_async_iter_get_object(iter);
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (spdk_unlikely(!ctx)) {
+		SPDK_ERRLOG("Failed to alloc ctx for ini_group restore\n");
+		sto_json_async_iter_next(iter, -ENOMEM);
+		return;
+	}
+
+	ctx->iter = iter;
+
+	rc = decode_ini_group_params(driver, target, ini_group, &ctx->params);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode ini_group params to load\n");
+		goto out;
+	}
+
+	scst_ini_group_add(&ctx->params, ini_group_restore_json_done, ctx);
+
+	return;
+
+out:
+	ini_group_restore_json_done(ctx, rc);
+}
+
+static void
+ini_group_list_restore_json(struct sto_json_async_iter *iter)
+{
+	struct sto_json_async_iter_opts opts = {
+		.json = sto_json_async_iter_get_object(iter),
+		.iterate_fn = ini_group_restore_json,
+		.next_fn = ini_group_json_iter_next,
+		.priv = iter,
+	};
+
+	sto_json_async_iter_start(&opts, sto_json_async_iterate_done, iter);
+}
+
 struct target_restore_ctx {
 	struct scst_target_params params;
 	struct sto_json_async_iter *iter;
@@ -985,14 +1224,21 @@ target_restore_json_done(void *cb_arg, int rc)
 {
 	struct target_restore_ctx *ctx = cb_arg;
 
-	if (rc && rc == -EEXIST) {
+	switch (rc) {
+	case -EEXIST:
 		SPDK_ERRLOG("Target %s has been alredy restored\n",
 			    ctx->params.target_name);
-		rc = 0;
+		/* fallthrough */
+	case 0:
+		break;
+	default:
+		sto_json_async_iter_next(ctx->iter, rc);
+		goto free_ctx;
 	}
 
-	sto_json_async_iter_next(ctx->iter, rc);
+	ini_group_list_restore_json(ctx->iter);
 
+free_ctx:
 	scst_target_params_deinit(&ctx->params);
 	free(ctx);
 }
@@ -1002,7 +1248,6 @@ target_restore_json(struct sto_json_async_iter *iter)
 {
 	struct spdk_json_val *driver, *target;
 	struct target_restore_ctx *ctx;
-	struct scst_target_params *params;
 	int rc = 0;
 
 	driver = sto_json_async_iter_get_json(iter);
@@ -1010,27 +1255,20 @@ target_restore_json(struct sto_json_async_iter *iter)
 
 	ctx = calloc(1, sizeof(*ctx));
 	if (spdk_unlikely(!ctx)) {
-		SPDK_ERRLOG("Failed to alloc ctx for device restore\n");
+		SPDK_ERRLOG("Failed to alloc ctx for target restore\n");
 		sto_json_async_iter_next(iter, -ENOMEM);
 		return;
 	}
 
 	ctx->iter = iter;
-	params = &ctx->params;
 
-	if (spdk_json_decode_string(spdk_json_object_first(driver), &params->driver_name)) {
-		SPDK_ERRLOG("Failed to decode driver name\n");
-		rc = -EINVAL;
+	rc = decode_target_params(driver, target, &ctx->params);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to decode target params\n");
 		goto out_err;
 	}
 
-	if (spdk_json_decode_string(spdk_json_object_first(target), &params->target_name)) {
-		SPDK_ERRLOG("Failed to decode target name\n");
-		rc = -EINVAL;
-		goto out_err;
-	}
-
-	scst_target_add(params, target_restore_json_done, ctx);
+	scst_target_add(&ctx->params, target_restore_json_done, ctx);
 
 	return;
 

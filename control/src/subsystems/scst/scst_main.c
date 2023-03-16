@@ -18,15 +18,19 @@
 static struct scst *g_scst;
 
 
+static void scst_device_handler_free(struct scst_device_handler *handler);
+
 static void scst_device_free(struct scst_device *device);
 static void scst_device_destroy(struct scst_device *device);
 
-static void scst_device_handler_free(struct scst_device_handler *handler);
+static void scst_target_driver_free(struct scst_target_driver *driver);
 
 static void scst_target_free(struct scst_target *target);
 static void scst_target_destroy(struct scst_target *target);
 
-static void scst_target_driver_free(struct scst_target_driver *driver);
+static struct scst_ini_group *scst_ini_group_alloc(struct scst_target *target, const char *name);
+static void scst_ini_group_free(struct scst_ini_group *ini_group);
+static void scst_ini_group_destroy(struct scst_ini_group *ini_group);
 
 static void scst_put_device_handler(struct scst_device_handler *handler);
 static int scst_remove_device(const char *handler_name, const char *device_name);
@@ -36,6 +40,9 @@ static void scst_put_target_driver(struct scst_target_driver *driver);
 static int scst_remove_target(const char *driver_name, const char *target_name);
 static struct scst_target *scst_find_target(const char *driver_name, const char *target_name);
 
+static struct scst_ini_group *scst_find_ini_group(const char *driver_name, const char *target_name,
+						  const char *ini_group_name);
+static int scst_remove_ini_group(const char *driver_name, const char *target_name, const char *ini_group_name);
 
 static struct scst_device_handler *
 scst_device_handler_alloc(const char *handler_name)
@@ -435,6 +442,7 @@ scst_target_alloc(struct scst_target_driver *driver, const char *name)
 	}
 
 	target->driver = driver;
+	TAILQ_INIT(&target->group_list);
 
 	return target;
 
@@ -455,10 +463,15 @@ static void
 scst_target_destroy(struct scst_target *target)
 {
 	struct scst_target_driver *driver = target->driver;
+	struct scst_ini_group *ini_group, *tmp;
 
 	TAILQ_REMOVE(&driver->target_list, target, list);
 
 	scst_put_target_driver(driver);
+
+	TAILQ_FOREACH_SAFE(ini_group, &target->group_list, list, tmp) {
+		scst_ini_group_destroy(ini_group);
+	}
 
 	scst_target_free(target);
 }
@@ -467,6 +480,63 @@ struct scst_target *
 scst_target_next(struct scst_target_driver *driver, struct scst_target *target)
 {
 	return !target ? TAILQ_FIRST(&driver->target_list) : TAILQ_NEXT(target, list);
+}
+
+static struct scst_ini_group *
+scst_target_find_ini_group(struct scst_target *target, const char *ini_group_name)
+{
+	struct scst_ini_group *ini_group;
+
+	TAILQ_FOREACH(ini_group, &target->group_list, list) {
+		if (!strcmp(ini_group_name, ini_group->name)) {
+			return ini_group;
+		}
+	}
+
+	return NULL;
+}
+
+static int
+scst_target_add_ini_group(struct scst_target *target, const char *ini_group_name)
+{
+	struct scst_ini_group *ini_group;
+
+	if (scst_target_find_ini_group(target, ini_group_name)) {
+		SPDK_ERRLOG("ini group `%s` has arleady been in target `%s`\n",
+			    ini_group_name, target->name);
+		return -EEXIST;
+	}
+
+	ini_group = scst_ini_group_alloc(target, ini_group_name);
+	if (spdk_unlikely(!ini_group)) {
+		SPDK_ERRLOG("Failed to alloc ini group `%s`\n",
+			    ini_group_name);
+		return -ENOMEM;
+	}
+
+	TAILQ_INSERT_TAIL(&target->group_list, ini_group, list);
+
+	SPDK_ERRLOG("SCST ini_group %s target [%s] was added\n",
+		    ini_group->name, target->name);
+
+	return 0;
+}
+
+static int
+scst_target_remove_ini_group(struct scst_target *target, const char *ini_group_name)
+{
+	struct scst_ini_group *ini_group;
+
+	ini_group = scst_target_find_ini_group(target, ini_group_name);
+	if (spdk_unlikely(!ini_group)) {
+		SPDK_ERRLOG("ini group `%s` has not been found in target `%s`\n",
+			    ini_group_name, target->name);
+		return -ENOENT;
+	}
+
+	scst_ini_group_destroy(ini_group);
+
+	return 0;
 }
 
 static struct sto_rpc_writefile_args *
@@ -650,6 +720,242 @@ void
 scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg)
 {
 	scst_pipeline(&scst_target_del_properties, cb_fn, cb_arg, params);
+}
+
+static struct scst_ini_group *
+scst_ini_group_alloc(struct scst_target *target, const char *name)
+{
+	struct scst_ini_group *ini_group;
+
+	ini_group = calloc(1, sizeof(*ini_group));
+	if (spdk_unlikely(!ini_group)) {
+		SPDK_ERRLOG("Failed to alloc SCST ini group\n");
+		return NULL;
+	}
+
+	ini_group->name = strdup(name);
+	if (spdk_unlikely(!ini_group->name)) {
+		SPDK_ERRLOG("Failed to alloc SCST ini group name\n");
+		goto out_err;
+	}
+
+	ini_group->target = target;
+
+	return ini_group;
+
+out_err:
+	scst_ini_group_free(ini_group);
+
+	return NULL;
+}
+
+static void
+scst_ini_group_free(struct scst_ini_group *ini_group)
+{
+	free((char *) ini_group->name);
+	free(ini_group);
+}
+
+static void
+scst_ini_group_destroy(struct scst_ini_group *ini_group)
+{
+	struct scst_target *target = ini_group->target;
+
+	TAILQ_REMOVE(&target->group_list, ini_group, list);
+
+	scst_ini_group_free(ini_group);
+}
+
+struct scst_ini_group *
+scst_ini_group_next(struct scst_target *target, struct scst_ini_group *ini_group)
+{
+	return !ini_group ? TAILQ_FIRST(&target->group_list) : TAILQ_NEXT(ini_group, list);
+}
+
+static struct sto_rpc_writefile_args *
+ini_group_add_create_args(const char *driver_name, const char *target_name, const char *ini_group_name)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = calloc(1, sizeof(*args));
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to alloc writefile args\n");
+		return NULL;
+	}
+
+	args->filepath = scst_ini_group_mgmt_path(driver_name, target_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("create %s", ini_group_name);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	return args;
+
+out_err:
+	sto_rpc_writefile_args_free(args);
+
+	return NULL;
+}
+
+static void
+ini_group_add(const char *driver_name, const char *target_name, const char *ini_group_name,
+	      sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = ini_group_add_create_args(driver_name, target_name, ini_group_name);
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to create writefile args for `ini_group_add`\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST ini_group add: filepath[%s], buf[%s]\n", args->filepath, args->buf);
+
+	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+}
+
+static struct sto_rpc_writefile_args *
+ini_group_del_create_args(const char *driver_name, const char *target_name, const char *ini_group_name)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = calloc(1, sizeof(*args));
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to alloc writefile args\n");
+		return NULL;
+	}
+
+	args->filepath = scst_ini_group_mgmt_path(driver_name, target_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("del %s", ini_group_name);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	return args;
+
+out_err:
+	sto_rpc_writefile_args_free(args);
+
+	return NULL;
+}
+
+static void
+ini_group_del(const char *driver_name, const char *target_name, const char *ini_group_name,
+	      sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args *args;
+
+	args = ini_group_del_create_args(driver_name, target_name, ini_group_name);
+	if (spdk_unlikely(!args)) {
+		SPDK_ERRLOG("Failed to create writefile args for `ini_group_del`\n");
+		cb_fn(cb_arg, -ENOMEM);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST ini_group del: filepath[%s], data[%s]\n", args->filepath, args->buf);
+
+	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+}
+
+static void
+ini_group_add_step(struct sto_pipeline *pipe)
+{
+	struct scst_ini_group_params *params = sto_pipeline_get_priv(pipe);
+
+	if (scst_find_ini_group(params->driver_name, params->target_name, params->ini_group_name)) {
+		sto_pipeline_step_next(pipe, -EEXIST);
+		return;
+	}
+
+	ini_group_add(params->driver_name, params->target_name, params->ini_group_name,
+		      sto_pipeline_step_done, pipe);
+}
+
+static void
+ini_group_add_rollback_step(struct sto_pipeline *pipe)
+{
+	struct scst_ini_group_params *params = sto_pipeline_get_priv(pipe);
+
+	ini_group_del(params->driver_name, params->target_name, params->ini_group_name,
+		      sto_pipeline_step_done, pipe);
+}
+
+static void
+ini_group_add_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_ini_group_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_add_ini_group(params->driver_name, params->target_name, params->ini_group_name);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_ini_group_add_properties = {
+	.steps = {
+		STO_PL_STEP(ini_group_add_step, ini_group_add_rollback_step),
+		STO_PL_STEP(ini_group_add_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_ini_group_add(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_ini_group_add_properties, cb_fn, cb_arg, params);
+}
+
+static void
+ini_group_del_step(struct sto_pipeline *pipe)
+{
+	struct scst_ini_group_params *params = sto_pipeline_get_priv(pipe);
+
+	if (!scst_find_ini_group(params->driver_name, params->target_name, params->ini_group_name)) {
+		sto_pipeline_step_next(pipe, -ENOENT);
+		return;
+	}
+
+	ini_group_del(params->driver_name, params->target_name, params->ini_group_name,
+		      sto_pipeline_step_done, pipe);
+}
+
+static void
+ini_group_del_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_ini_group_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_remove_ini_group(params->driver_name, params->target_name, params->ini_group_name);
+	assert(!rc);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_ini_group_del_properties = {
+	.steps = {
+		STO_PL_STEP(ini_group_del_step, NULL),
+		STO_PL_STEP(ini_group_del_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_ini_group_del(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(&scst_ini_group_del_properties, cb_fn, cb_arg, params);
 }
 
 static struct scst *
@@ -954,6 +1260,48 @@ scst_remove_target(const char *driver_name, const char *target_name)
 	scst_target_destroy(target);
 
 	return 0;
+}
+
+static struct scst_ini_group *
+scst_find_ini_group(const char *driver_name, const char *target_name, const char *ini_group_name)
+{
+	struct scst_target *target;
+
+	target = scst_find_target(driver_name, target_name);
+	if (spdk_unlikely(!target)) {
+		return NULL;
+	}
+
+	return scst_target_find_ini_group(target, ini_group_name);
+}
+
+int
+scst_add_ini_group(const char *driver_name, const char *target_name, const char *ini_group_name)
+{
+	struct scst_target *target;
+
+	target = scst_find_target(driver_name, target_name);
+	if (spdk_unlikely(!target)) {
+		SPDK_ERRLOG("Cann't find SCST target %s\n", target_name);
+		return -EEXIST;
+	}
+
+	return scst_target_add_ini_group(target, ini_group_name);
+}
+
+static int
+scst_remove_ini_group(const char *driver_name, const char *target_name, const char *ini_group_name)
+{
+	struct scst_target *target;
+
+	target = scst_find_target(driver_name, target_name);
+	if (spdk_unlikely(!target)) {
+		SPDK_ERRLOG("Failed to find `%s` SCST target to remove ini group %s\n",
+			    target_name, ini_group_name);
+		return -ENOENT;
+	}
+
+	return scst_target_remove_ini_group(target, ini_group_name);
 }
 
 static void

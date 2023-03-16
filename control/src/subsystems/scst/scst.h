@@ -113,10 +113,53 @@ scst_target_driver_mgmt_path(const char *driver_name)
 				  driver_name, SCST_MGMT_IO);
 }
 
+struct scst_ini_group {
+	const char *name;
+
+	struct scst_target *target;
+
+	TAILQ_ENTRY(scst_ini_group) list;
+};
+
+struct scst_ini_group *scst_ini_group_next(struct scst_target *target, struct scst_ini_group *ini_group);
+
+static inline const char *
+scst_ini_group_mgmt_path(const char *driver_name, const char *target_name)
+{
+	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
+				  driver_name, target_name, "ini_groups", SCST_MGMT_IO);
+}
+
+struct scst_ini_group_params {
+	char *driver_name;
+	char *target_name;
+	char *ini_group_name;
+};
+
+static inline void
+scst_ini_group_params_deinit(void *params_ptr)
+{
+	struct scst_ini_group_params *params = params_ptr;
+
+	free(params->driver_name);
+	params->driver_name = NULL;
+
+	free(params->target_name);
+	params->target_name = NULL;
+
+	free(params->ini_group_name);
+	params->ini_group_name = NULL;
+}
+
+void scst_ini_group_add(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg);
+void scst_ini_group_del(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
 struct scst_target {
 	const char *name;
 
 	struct scst_target_driver *driver;
+
+	TAILQ_HEAD(, scst_ini_group) group_list;
 
 	TAILQ_ENTRY(scst_target) list;
 };
@@ -134,7 +177,10 @@ scst_target_params_deinit(void *params_ptr)
 	struct scst_target_params *params = params_ptr;
 
 	free(params->driver_name);
+	params->driver_name = NULL;
+
 	free(params->target_name);
+	params->target_name = NULL;
 }
 
 void scst_target_add(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
@@ -177,13 +223,6 @@ scst_dev_group_target_group_mgmt(const char *dev_group, const char *target_group
 }
 
 static inline const char *
-scst_target_ini_groups_mgmt(const char *target_driver, const char *target)
-{
-	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_TARGETS,
-				  target_driver, target, "ini_groups", SCST_MGMT_IO);
-}
-
-static inline const char *
 scst_target_lun_mgmt(const char *target_driver, const char *target, const char *ini_group)
 {
 	if (ini_group) {
@@ -211,6 +250,7 @@ void scst_read_attrs(const char *dirpath, scst_read_attrs_done_t cb_fn, void *cb
 
 int scst_add_device(const char *handler_name, const char *device_name);
 int scst_add_target(const char *driver_name, const char *target_name);
+int scst_add_ini_group(const char *driver_name, const char *target_name, const char *ini_group_name);
 
 void scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
 void scst_scan_system(sto_generic_cb cb_fn, void *cb_arg);

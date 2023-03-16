@@ -732,58 +732,94 @@ scst_target_disable_constructor(void *arg1, const void *arg2)
 	return 0;
 }
 
-struct scst_group_params {
+struct group_ops_params {
 	char *group;
 	char *driver;
 	char *target;
 };
 
-static const struct sto_ops_param_dsc scst_group_params_descriptors[] = {
-	STO_OPS_PARAM_STR(group, struct scst_group_params, "SCST group name"),
-	STO_OPS_PARAM_STR(driver, struct scst_group_params, "SCST target driver name"),
-	STO_OPS_PARAM_STR(target, struct scst_group_params, "SCST target name"),
+static const struct sto_ops_param_dsc group_ops_params_descriptors[] = {
+	STO_OPS_PARAM_STR(group, struct group_ops_params, "SCST group name"),
+	STO_OPS_PARAM_STR(driver, struct group_ops_params, "SCST target driver name"),
+	STO_OPS_PARAM_STR(target, struct group_ops_params, "SCST target name"),
 };
 
-static const struct sto_ops_params_properties scst_group_params_properties =
-	STO_OPS_PARAMS_INITIALIZER(scst_group_params_descriptors, struct scst_group_params);
+static const struct sto_ops_params_properties group_ops_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(group_ops_params_descriptors, struct group_ops_params);
 
 static int
-scst_group_add_constructor(void *arg1, const void *arg2)
+group_add_req_constructor(void *arg1, const void *arg2)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_group_params *ops_params = arg2;
+	struct scst_ini_group_params *req_params = arg1;
+	const struct group_ops_params *ops_params = arg2;
 
-	req_params->file = scst_target_ini_groups_mgmt(ops_params->driver, ops_params->target);
-	if (spdk_unlikely(!req_params->file)) {
+	req_params->driver_name = strdup(ops_params->driver);
+	if (spdk_unlikely(!req_params->driver_name)) {
 		return -ENOMEM;
 	}
 
-	req_params->data = spdk_sprintf_alloc("create %s", ops_params->group);
-	if (spdk_unlikely(!req_params->data)) {
+	req_params->target_name = strdup(ops_params->target);
+	if (spdk_unlikely(!req_params->target_name)) {
+		return -ENOMEM;
+	}
+
+	req_params->ini_group_name = strdup(ops_params->group);
+	if (spdk_unlikely(!req_params->ini_group_name)) {
 		return -ENOMEM;
 	}
 
 	return 0;
 }
 
-static int
-scst_group_del_constructor(void *arg1, const void *arg2)
+static void
+ini_group_add_req_step(struct sto_pipeline *pipe)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_group_params *ops_params = arg2;
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_ini_group_params *params = sto_req_get_params(req);
 
-	req_params->file = scst_target_ini_groups_mgmt(ops_params->driver, ops_params->target);
-	if (spdk_unlikely(!req_params->file)) {
-		return -ENOMEM;
-	}
-
-	req_params->data = spdk_sprintf_alloc("del %s", ops_params->group);
-	if (spdk_unlikely(!req_params->data)) {
-		return -ENOMEM;
-	}
-
-	return 0;
+	scst_ini_group_add(params, sto_pipeline_step_done, pipe);
 }
+
+static void ini_group_del_req_step(struct sto_pipeline *pipe);
+
+const struct sto_req_properties scst_ini_group_add_req_properties = {
+	.params_size = sizeof(struct scst_ini_group_params),
+	.params_deinit_fn = scst_ini_group_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(ini_group_add_req_step, ini_group_del_req_step),
+		STO_PL_STEP(scst_write_config_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
+
+static int
+ini_group_del_req_constructor(void *arg1, const void *arg2)
+{
+	return group_add_req_constructor(arg1, arg2);
+}
+
+static void
+ini_group_del_req_step(struct sto_pipeline *pipe)
+{
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_ini_group_params *params = sto_req_get_params(req);
+
+	scst_ini_group_del(params, sto_pipeline_step_done, pipe);
+}
+
+const struct sto_req_properties scst_ini_group_del_req_properties = {
+	.params_size = sizeof(struct scst_ini_group_params),
+	.params_deinit_fn = scst_ini_group_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(ini_group_del_req_step, NULL),
+		STO_PL_STEP(scst_write_config_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
 
 struct scst_lun_add_params {
 	int lun;
@@ -1095,16 +1131,16 @@ static const struct sto_ops scst_ops[] = {
 	{
 		.name = "group_add",
 		.description = "Add a group to a given driver & target",
-		.params_properties = &scst_group_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_group_add_constructor,
+		.params_properties = &group_ops_params_properties,
+		.req_properties = &scst_ini_group_add_req_properties,
+		.req_params_constructor = group_add_req_constructor,
 	},
 	{
 		.name = "group_del",
 		.description = "Remove a group from a given driver & target",
-		.params_properties = &scst_group_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_group_del_constructor,
+		.params_properties = &group_ops_params_properties,
+		.req_properties = &scst_ini_group_del_req_properties,
+		.req_params_constructor = ini_group_del_req_constructor,
 	},
 	{
 		.name = "lun_add",
