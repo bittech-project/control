@@ -5,6 +5,7 @@
 #include <spdk/log.h>
 #include <spdk/string.h>
 
+#include "scst_lib.h"
 #include "scst.h"
 
 #include "sto_json.h"
@@ -12,8 +13,6 @@
 #include "sto_err.h"
 #include "sto_rpc_aio.h"
 #include "sto_tree.h"
-
-#define SCST_DEF_CONFIG_PATH "/etc/control.scst.json"
 
 struct scst_json_ctx {
 	struct sto_json_ctx json;
@@ -383,7 +382,7 @@ device_load_json(struct sto_json_async_iter *iter)
 		goto free_handler_name;
 	}
 
-	rc = scst_add_device(handler_name, device_name);
+	rc = scst_add_device(scst_get_instance(), handler_name, device_name);
 
 	free(device_name);
 
@@ -435,7 +434,8 @@ ini_group_load_json(struct sto_json_async_iter *iter)
 		goto out;
 	}
 
-	rc = scst_add_ini_group(params.driver_name, params.target_name, params.ini_group_name);
+	rc = scst_add_ini_group(scst_get_instance(), params.driver_name,
+				params.target_name, params.ini_group_name);
 
 out:
 	scst_ini_group_params_deinit(&params);
@@ -472,7 +472,7 @@ target_load_json(struct sto_json_async_iter *iter)
 		goto out_err;
 	}
 
-	rc = scst_add_target(params.driver_name, params.target_name);
+	rc = scst_add_target(scst_get_instance(), params.driver_name, params.target_name);
 	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to add target\n");
 		goto out_err;
@@ -523,7 +523,7 @@ static void
 scst_load_json(struct spdk_json_val *json, sto_generic_cb cb_fn, void *cb_arg)
 {
 	sto_json_print("SCST load JSON", json);
-	scst_pipeline(&scst_load_json_properties, cb_fn, cb_arg, json);
+	scst_pipeline(scst_get_instance(), &scst_load_json_properties, cb_fn, cb_arg, json);
 }
 
 static void
@@ -556,7 +556,7 @@ static const struct sto_pipeline_properties scst_scan_system_properties = {
 void
 scst_scan_system(sto_generic_cb cb_fn, void *cb_arg)
 {
-	scst_pipeline(&scst_scan_system_properties, cb_fn, cb_arg, NULL);
+	scst_pipeline(scst_get_instance(), &scst_scan_system_properties, cb_fn, cb_arg, NULL);
 }
 
 struct info_json_ctx {
@@ -658,7 +658,7 @@ handler_list_json_constructor(struct sto_pipeline *pipe)
 	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
 	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
 
-	ctx->handler = scst_device_handler_next(ctx->handler);
+	ctx->handler = scst_device_handler_next(scst_get_instance(), ctx->handler);
 	if (ctx->handler) {
 		spdk_json_write_object_begin(w);
 
@@ -783,7 +783,7 @@ driver_list_json_constructor(struct sto_pipeline *pipe)
 	struct spdk_json_write_ctx *w = sto_pipeline_get_priv(pipe);
 	struct info_json_ctx *ctx = sto_pipeline_get_ctx(pipe);
 
-	ctx->driver = scst_target_driver_next(ctx->driver);
+	ctx->driver = scst_target_driver_next(scst_get_instance(), ctx->driver);
 	if (ctx->driver) {
 		spdk_json_write_object_begin(w);
 
@@ -845,7 +845,7 @@ static void
 scst_info_json(void *cb_ctx, struct spdk_json_write_ctx *w,
 	       sto_generic_cb cb_fn, void *cb_arg)
 {
-	scst_pipeline(&scst_info_json_properties, cb_fn, cb_arg, w);
+	scst_pipeline(scst_get_instance(), &scst_info_json_properties, cb_fn, cb_arg, w);
 }
 
 static void
@@ -881,7 +881,7 @@ static const struct sto_pipeline_properties scst_write_config_properties = {
 void
 scst_write_config(sto_generic_cb cb_fn, void *cb_arg)
 {
-	scst_pipeline(&scst_write_config_properties, cb_fn, cb_arg, NULL);
+	scst_pipeline(scst_get_instance(), &scst_write_config_properties, cb_fn, cb_arg, NULL);
 }
 
 static int
@@ -1125,7 +1125,8 @@ static const struct sto_pipeline_properties handler_restore_json_properties = {
 static void
 handler_restore_json(struct sto_json_async_iter *iter)
 {
-	scst_pipeline(&handler_restore_json_properties, sto_json_async_iterate_done, iter, iter);
+	scst_pipeline(scst_get_instance(), &handler_restore_json_properties,
+		      sto_json_async_iterate_done, iter, iter);
 }
 
 static void
@@ -1161,6 +1162,8 @@ ini_group_restore_json_done(void *cb_arg, int rc)
 		sto_json_async_iter_next(ctx->iter, rc);
 		goto free_ctx;
 	}
+
+	sto_json_async_iter_next(ctx->iter, 0);
 
 free_ctx:
 	scst_ini_group_params_deinit(&ctx->params);
@@ -1312,7 +1315,7 @@ static void
 scst_restore_json(struct spdk_json_val *json, sto_generic_cb cb_fn, void *cb_arg)
 {
 	sto_json_print("SCST restore JSON", json);
-	scst_pipeline(&scst_restore_json_properties, cb_fn, cb_arg, json);
+	scst_pipeline(scst_get_instance(), &scst_restore_json_properties, cb_fn, cb_arg, json);
 }
 
 static void
@@ -1358,5 +1361,5 @@ static const struct sto_pipeline_properties scst_restore_config_properties = {
 void
 scst_restore_config(sto_generic_cb cb_fn, void *cb_arg)
 {
-	scst_pipeline(&scst_restore_config_properties, cb_fn, cb_arg, NULL);
+	scst_pipeline(scst_get_instance(), &scst_restore_config_properties, cb_fn, cb_arg, NULL);
 }

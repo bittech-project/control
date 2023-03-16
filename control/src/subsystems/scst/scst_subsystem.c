@@ -4,6 +4,7 @@
 #include <spdk/likely.h>
 #include <spdk/string.h>
 
+#include "scst_lib.h"
 #include "scst.h"
 
 #include "sto_generic_req.h"
