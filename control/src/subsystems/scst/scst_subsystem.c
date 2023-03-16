@@ -836,7 +836,7 @@ static const struct sto_ops_param_dsc scst_lun_add_params_descriptors[] = {
 	STO_OPS_PARAM_STR(driver, struct scst_lun_add_params, "SCST target driver name"),
 	STO_OPS_PARAM_STR(target, struct scst_lun_add_params, "SCST target name"),
 	STO_OPS_PARAM_STR(device, struct scst_lun_add_params, "SCST device name"),
-	STO_OPS_PARAM_STR(group, struct scst_lun_add_params, "SCST group name"),
+	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_add_params, "SCST group name"),
 	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_lun_add_params, "SCST device attributes <p=v,...>"),
 };
 

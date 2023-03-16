@@ -31,6 +31,9 @@ static struct scst_ini_group *scst_ini_group_alloc(struct scst_target *target, c
 static void scst_ini_group_free(struct scst_ini_group *ini_group);
 static void scst_ini_group_destroy(struct scst_ini_group *ini_group);
 
+static struct scst_lun *scst_lun_alloc(struct scst_device *device, uint32_t id);
+static void scst_lun_free(struct scst_lun *lun);
+
 static void scst_put_device_handler(struct scst_device_handler *handler);
 
 static void scst_put_target_driver(struct scst_target_driver *driver);
@@ -228,6 +231,8 @@ scst_target_alloc(struct scst_target_driver *driver, const char *name)
 	}
 
 	target->driver = driver;
+
+	TAILQ_INIT(&target->lun_list);
 	TAILQ_INIT(&target->group_list);
 
 	return target;
@@ -325,6 +330,64 @@ scst_target_remove_ini_group(struct scst_target *target, const char *ini_group_n
 	return 0;
 }
 
+static struct scst_lun *
+scst_target_find_lun(struct scst_target *target, uint32_t id)
+{
+	struct scst_lun *lun;
+
+	TAILQ_FOREACH(lun, &target->lun_list, list) {
+		if (id == lun->id) {
+			return lun;
+		}
+	}
+
+	return NULL;
+}
+
+static int
+scst_target_add_lun(struct scst_target *target, struct scst_device *device, uint32_t id)
+{
+	struct scst_lun *lun;
+
+	if (scst_target_find_lun(target, id)) {
+		SPDK_ERRLOG("lun `%d` has arleady been in target `%s`\n",
+			    id, target->name);
+		return -EEXIST;
+	}
+
+	lun = scst_lun_alloc(device, id);
+	if (spdk_unlikely(!lun)) {
+		SPDK_ERRLOG("Failed to alloc lun `%d`\n", id);
+		return -ENOMEM;
+	}
+
+	TAILQ_INSERT_TAIL(&target->lun_list, lun, list);
+
+	SPDK_ERRLOG("SCST lun %d device [%s] was added to target %s\n",
+		    lun->id, device->name, target->name);
+
+	return 0;
+}
+
+static int
+scst_target_remove_lun(struct scst_target *target, uint32_t id)
+{
+	struct scst_lun *lun;
+
+	lun = scst_target_find_lun(target, id);
+	if (spdk_unlikely(!lun)) {
+		SPDK_ERRLOG("lun `%u` has not been found in target `%s`\n",
+			    id, target->name);
+		return -ENOENT;
+	}
+
+	TAILQ_REMOVE(&target->lun_list, lun, list);
+
+	scst_lun_free(lun);
+
+	return 0;
+}
+
 static struct scst_ini_group *
 scst_ini_group_alloc(struct scst_target *target, const char *name)
 {
@@ -343,6 +406,8 @@ scst_ini_group_alloc(struct scst_target *target, const char *name)
 	}
 
 	ini_group->target = target;
+
+	TAILQ_INIT(&ini_group->lun_list);
 
 	return ini_group;
 
@@ -373,6 +438,87 @@ struct scst_ini_group *
 scst_ini_group_next(struct scst_target *target, struct scst_ini_group *ini_group)
 {
 	return !ini_group ? TAILQ_FIRST(&target->group_list) : TAILQ_NEXT(ini_group, list);
+}
+
+static struct scst_lun *
+scst_ini_group_find_lun(struct scst_ini_group *group, uint32_t id)
+{
+	struct scst_lun *lun;
+
+	TAILQ_FOREACH(lun, &group->lun_list, list) {
+		if (id == lun->id) {
+			return lun;
+		}
+	}
+
+	return NULL;
+}
+
+static int
+scst_ini_group_add_lun(struct scst_ini_group *group, struct scst_device *device, uint32_t id)
+{
+	struct scst_lun *lun;
+
+	if (scst_ini_group_find_lun(group, id)) {
+		SPDK_ERRLOG("lun `%d` has arleady been in ini group `%s`\n",
+			    id, group->name);
+		return -EEXIST;
+	}
+
+	lun = scst_lun_alloc(device, id);
+	if (spdk_unlikely(!lun)) {
+		SPDK_ERRLOG("Failed to alloc lun `%d`\n", id);
+		return -ENOMEM;
+	}
+
+	TAILQ_INSERT_TAIL(&group->lun_list, lun, list);
+
+	SPDK_ERRLOG("SCST lun %d device [%s] was added to ini_group %s\n",
+		    lun->id, device->name, group->name);
+
+	return 0;
+}
+
+static int
+scst_ini_group_remove_lun(struct scst_ini_group *group, uint32_t id)
+{
+	struct scst_lun *lun;
+
+	lun = scst_ini_group_find_lun(group, id);
+	if (spdk_unlikely(!lun)) {
+		SPDK_ERRLOG("lun `%u` has not been found in ini group `%s`\n",
+			    id, group->name);
+		return -ENOENT;
+	}
+
+	TAILQ_REMOVE(&group->lun_list, lun, list);
+
+	scst_lun_free(lun);
+
+	return 0;
+}
+
+static struct scst_lun *
+scst_lun_alloc(struct scst_device *device, uint32_t id)
+{
+	struct scst_lun *lun;
+
+	lun = calloc(1, sizeof(*lun));
+	if (spdk_unlikely(!lun)) {
+		SPDK_ERRLOG("Failed to alloc SCST %u lun for device %s\n",
+			    id, device->name);
+		return NULL;
+	}
+
+	lun->device = device;
+
+	return lun;
+}
+
+static void
+scst_lun_free(struct scst_lun *lun)
+{
+	free(lun);
 }
 
 struct scst *
@@ -1005,7 +1151,7 @@ scst_add_ini_group(struct scst *scst, const char *driver_name,
 	target = scst_find_target(scst, driver_name, target_name);
 	if (spdk_unlikely(!target)) {
 		SPDK_ERRLOG("Cann't find SCST target %s\n", target_name);
-		return -EEXIST;
+		return -ENOENT;
 	}
 
 	return scst_target_add_ini_group(target, ini_group_name);
@@ -1025,4 +1171,81 @@ scst_remove_ini_group(struct scst *scst, const char *driver_name,
 	}
 
 	return scst_target_remove_ini_group(target, ini_group_name);
+}
+
+int
+scst_add_target_lun(struct scst *scst, const char *driver_name,
+		    const char *target_name, const char *device_name,
+		    uint32_t id)
+{
+	struct scst_target *target;
+	struct scst_device *device;
+
+	target = scst_find_target(scst, driver_name, target_name);
+	if (spdk_unlikely(!target)) {
+		SPDK_ERRLOG("Cann't find SCST target %s\n", target_name);
+		return -ENOENT;
+	}
+
+	device = scst_find_device(scst, device_name);
+	if (spdk_unlikely(!device)) {
+		SPDK_ERRLOG("Cann't find SCST device %s\n", device_name);
+		return -ENOENT;
+	}
+
+	return scst_target_add_lun(target, device, id);
+}
+
+int
+scst_remove_target_lun(struct scst *scst, const char *driver_name,
+		       const char *target_name, uint32_t id)
+{
+	struct scst_target *target;
+
+	target = scst_find_target(scst, driver_name, target_name);
+	if (spdk_unlikely(!target)) {
+		SPDK_ERRLOG("Cann't find SCST target %s\n", target_name);
+		return -ENOENT;
+	}
+
+	return scst_target_remove_lun(target, id);
+}
+
+int
+scst_add_ini_group_lun(struct scst *scst, const char *driver_name,
+		       const char *target_name, const char *ini_group_name,
+		       const char *device_name, uint32_t id)
+{
+	struct scst_ini_group *group;
+	struct scst_device *device;
+
+	group = scst_find_ini_group(scst, driver_name, target_name, ini_group_name);
+	if (spdk_unlikely(!group)) {
+		SPDK_ERRLOG("Cann't find SCST ini group %s\n", ini_group_name);
+		return -ENOENT;
+	}
+
+	device = scst_find_device(scst, device_name);
+	if (spdk_unlikely(!device)) {
+		SPDK_ERRLOG("Cann't find SCST device %s\n", device_name);
+		return -ENOENT;
+	}
+
+	return scst_ini_group_add_lun(group, device, id);
+}
+
+int
+scst_remove_ini_group_lun(struct scst *scst, const char *driver_name,
+			  const char *target_name, const char *ini_group_name,
+			  uint32_t id)
+{
+	struct scst_ini_group *group;
+
+	group = scst_find_ini_group(scst, driver_name, target_name, ini_group_name);
+	if (spdk_unlikely(!group)) {
+		SPDK_ERRLOG("Cann't find SCST ini group %s\n", ini_group_name);
+		return -ENOENT;
+	}
+
+	return scst_ini_group_remove_lun(group, id);
 }

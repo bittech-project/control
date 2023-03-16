@@ -60,10 +60,22 @@ struct scst_device_handler {
 	TAILQ_ENTRY(scst_device_handler) list;
 };
 
+struct scst_lun {
+	uint32_t id;
+
+	struct scst_device *device;
+
+	TAILQ_ENTRY(scst_lun) list;
+};
+
+TAILQ_HEAD(scst_lun_list, scst_lun);
+
 struct scst_ini_group {
 	const char *name;
 
 	struct scst_target *target;
+
+	struct scst_lun_list lun_list;
 
 	TAILQ_ENTRY(scst_ini_group) list;
 };
@@ -73,6 +85,7 @@ struct scst_target {
 
 	struct scst_target_driver *driver;
 
+	struct scst_lun_list lun_list;
 	TAILQ_HEAD(, scst_ini_group) group_list;
 
 	TAILQ_ENTRY(scst_target) list;
@@ -213,5 +226,18 @@ int scst_remove_ini_group(struct scst *scst, const char *driver_name,
 			  const char *target_name, const char *ini_group_name);
 struct scst_ini_group *scst_find_ini_group(struct scst *scst, const char *driver_name,
 					   const char *target_name, const char *ini_group_name);
+
+int scst_add_target_lun(struct scst *scst, const char *driver_name,
+			const char *target_name, const char *device_name,
+			uint32_t id);
+int scst_remove_target_lun(struct scst *scst, const char *driver_name,
+			   const char *target_name, uint32_t id);
+
+int scst_add_ini_group_lun(struct scst *scst, const char *driver_name,
+			   const char *target_name, const char *ini_group_name,
+			   const char *device_name, uint32_t id);
+int scst_remove_ini_group_lun(struct scst *scst, const char *driver_name,
+			      const char *target_name, const char *ini_group_name,
+			      uint32_t id);
 
 #endif /* _SCST_LIB_H_ */
