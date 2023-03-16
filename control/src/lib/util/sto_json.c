@@ -367,6 +367,25 @@ sto_json_async_iter_next(struct sto_json_async_iter *iter, int rc)
 	opts->iterate_fn(iter);
 }
 
+struct spdk_json_val *
+sto_json_array_next(struct spdk_json_val *json, struct spdk_json_val *object, const char *array_name)
+{
+	if (!object) {
+		struct spdk_json_val *array = json;
+		int rc = 0;
+
+		rc = spdk_json_find_array(array, array_name, NULL, &array);
+		if (spdk_unlikely(rc)) {
+			SPDK_ERRLOG("Could not find `%s` array in JSON\n", array_name);
+			return NULL;
+		}
+
+		return spdk_json_array_first(array);
+	}
+
+	return spdk_json_next(object);
+}
+
 struct json_write_buf {
 	char data[1024];
 	unsigned cur_off;
@@ -430,7 +449,8 @@ sto_json_parse(void *buf, size_t size)
 
 	rc = spdk_json_parse(buf, size, NULL, 0, &end, 0);
 	if (spdk_unlikely(rc < 0)) {
-		SPDK_NOTICELOG("Counting JSON failed (%zd)\n", rc);
+		SPDK_NOTICELOG("Counting JSON failed (%zd), buf:\n\n%s\n\n",
+			       rc, (char *) buf);
 		return ERR_PTR(rc);
 	}
 

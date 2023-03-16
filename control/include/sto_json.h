@@ -101,6 +101,9 @@ void sto_json_async_iter_start(struct sto_json_async_iter_opts *opts,
 void sto_json_async_iter_next(struct sto_json_async_iter *iter, int rc);
 void sto_json_async_iter_finish(struct sto_json_async_iter *iter, int rc);
 
+struct spdk_json_val *sto_json_array_next(struct spdk_json_val *json, struct spdk_json_val *object,
+					  const char *array_name);
+
 static inline void
 sto_json_async_iterate_done(void *cb_arg, int rc)
 {

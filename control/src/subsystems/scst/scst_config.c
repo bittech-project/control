@@ -28,79 +28,27 @@ scst_json_ctx_deinit(void *ctx_ptr)
 }
 
 static struct spdk_json_val *
-device_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
-{
-	if (!object) {
-		struct spdk_json_val *device_arr = sto_json_value(spdk_json_object_first(json));
-		int rc = 0;
-
-		rc = spdk_json_find_array(device_arr, "devices", NULL, &device_arr);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Could not find devices array from JSON\n");
-			return NULL;
-		}
-
-		return spdk_json_array_first(device_arr);
-	}
-
-	return spdk_json_next(object);
-}
-
-static struct spdk_json_val *
 handler_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 {
-	if (!object) {
-		struct spdk_json_val *handler_arr = json;
-		int rc;
-
-		rc = spdk_json_find_array(handler_arr, "handlers", NULL, &handler_arr);
-		if (rc) {
-			SPDK_ERRLOG("Could not find handlers array from JSON\n");
-			return NULL;
-		}
-
-		return spdk_json_array_first(handler_arr);
-	}
-
-	return spdk_json_next(object);
+	return sto_json_array_next(json, object, "handlers");
 }
 
 static struct spdk_json_val *
-target_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
+device_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 {
-	if (!object) {
-		struct spdk_json_val *target_arr = sto_json_value(spdk_json_object_first(json));
-		int rc = 0;
-
-		rc = spdk_json_find_array(target_arr, "targets", NULL, &target_arr);
-		if (spdk_unlikely(rc)) {
-			SPDK_ERRLOG("Could not find targets array from JSON\n");
-			return NULL;
-		}
-
-		return spdk_json_array_first(target_arr);
-	}
-
-	return spdk_json_next(object);
+	return sto_json_array_next(sto_json_value(spdk_json_object_first(json)), object, "devices");
 }
 
 static struct spdk_json_val *
 driver_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
 {
-	if (!object) {
-		struct spdk_json_val *driver_arr = json;
-		int rc;
+	return sto_json_array_next(json, object, "drivers");
+}
 
-		rc = spdk_json_find_array(driver_arr, "drivers", NULL, &driver_arr);
-		if (rc) {
-			SPDK_ERRLOG("Could not find drivers array from JSON\n");
-			return NULL;
-		}
-
-		return spdk_json_array_first(driver_arr);
-	}
-
-	return spdk_json_next(object);
+static struct spdk_json_val *
+target_json_iter_next(struct spdk_json_val *json, struct spdk_json_val *object)
+{
+	return sto_json_array_next(sto_json_value(spdk_json_object_first(json)), object, "targets");
 }
 
 static void
