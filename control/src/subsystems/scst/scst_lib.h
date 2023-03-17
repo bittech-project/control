@@ -212,27 +212,32 @@ void scst_serialize_attrs(struct sto_tree_node *obj_node, struct spdk_json_write
 typedef void (*scst_read_attrs_done_t)(void *cb_arg, struct sto_json_ctx *json, int rc);
 void scst_read_attrs(const char *dirpath, scst_read_attrs_done_t cb_fn, void *cb_arg);
 
+struct scst_device *scst_find_device(struct scst *scst, const char *device_name);
 int scst_add_device(struct scst *scst, const char *handler_name, const char *device_name);
 int scst_remove_device(struct scst *scst, const char *device_name);
-struct scst_device *scst_find_device(struct scst *scst, const char *device_name);
 
+struct scst_target *scst_find_target(struct scst *scst, const char *driver_name, const char *target_name);
 int scst_add_target(struct scst *scst, const char *driver_name, const char *target_name);
 int scst_remove_target(struct scst *scst, const char *driver_name, const char *target_name);
-struct scst_target *scst_find_target(struct scst *scst, const char *driver_name, const char *target_name);
 
+struct scst_ini_group *scst_find_ini_group(struct scst *scst, const char *driver_name,
+					   const char *target_name, const char *ini_group_name);
 int scst_add_ini_group(struct scst *scst, const char *driver_name,
 		       const char *target_name, const char *ini_group_name);
 int scst_remove_ini_group(struct scst *scst, const char *driver_name,
 			  const char *target_name, const char *ini_group_name);
-struct scst_ini_group *scst_find_ini_group(struct scst *scst, const char *driver_name,
-					   const char *target_name, const char *ini_group_name);
 
+struct scst_lun *scst_find_target_lun(struct scst *scst, const char *driver_name,
+				      const char *target_name, uint32_t id);
 int scst_add_target_lun(struct scst *scst, const char *driver_name,
 			const char *target_name, const char *device_name,
 			uint32_t id);
 int scst_remove_target_lun(struct scst *scst, const char *driver_name,
 			   const char *target_name, uint32_t id);
 
+struct scst_lun *scst_find_ini_group_lun(struct scst *scst, const char *driver_name,
+					 const char *target_name, const char *ini_group_name,
+					 uint32_t id);
 int scst_add_ini_group_lun(struct scst *scst, const char *driver_name,
 			   const char *target_name, const char *ini_group_name,
 			   const char *device_name, uint32_t id);

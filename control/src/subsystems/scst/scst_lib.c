@@ -1173,6 +1173,20 @@ scst_remove_ini_group(struct scst *scst, const char *driver_name,
 	return scst_target_remove_ini_group(target, ini_group_name);
 }
 
+struct scst_lun *
+scst_find_target_lun(struct scst *scst, const char *driver_name,
+		     const char *target_name, uint32_t id)
+{
+	struct scst_target *target;
+
+	target = scst_find_target(scst, driver_name, target_name);
+	if (spdk_unlikely(!target)) {
+		return NULL;
+	}
+
+	return scst_target_find_lun(target, id);
+}
+
 int
 scst_add_target_lun(struct scst *scst, const char *driver_name,
 		    const char *target_name, const char *device_name,
@@ -1209,6 +1223,21 @@ scst_remove_target_lun(struct scst *scst, const char *driver_name,
 	}
 
 	return scst_target_remove_lun(target, id);
+}
+
+struct scst_lun *
+scst_find_ini_group_lun(struct scst *scst, const char *driver_name,
+			const char *target_name, const char *ini_group_name,
+			uint32_t id)
+{
+	struct scst_ini_group *group;
+
+	group = scst_find_ini_group(scst, driver_name, target_name, ini_group_name);
+	if (spdk_unlikely(!group)) {
+		return NULL;
+	}
+
+	return scst_ini_group_find_lun(group, id);
 }
 
 int
