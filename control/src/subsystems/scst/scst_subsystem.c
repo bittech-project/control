@@ -171,17 +171,13 @@ static int
 dev_open_req_constructor(void *arg1, const void *arg2)
 {
 	struct scst_device_params *req_params = arg1;
-	const struct dev_open_ops_params *ops_params = arg2;
+	struct dev_open_ops_params *ops_params = (void *) arg2;
 
-	req_params->device_name = strdup(ops_params->device);
-	if (spdk_unlikely(!req_params->device_name)) {
-		return -ENOMEM;
-	}
+	req_params->device_name = ops_params->device;
+	ops_params->device = NULL;
 
-	req_params->handler_name = strdup(ops_params->handler);
-	if (spdk_unlikely(!req_params->handler_name)) {
-		return -ENOMEM;
-	}
+	req_params->handler_name = ops_params->handler;
+	ops_params->handler = NULL;
 
 	if (ops_params->attributes) {
 		return scst_parse_attributes(ops_params->attributes, &req_params->attributes);
@@ -230,17 +226,13 @@ static int
 dev_close_req_constructor(void *arg1, const void *arg2)
 {
 	struct scst_device_params *req_params = arg1;
-	const struct dev_close_ops_params *ops_params = arg2;
+	struct dev_close_ops_params *ops_params = (void *) arg2;
 
-	req_params->device_name = strdup(ops_params->device);
-	if (spdk_unlikely(!req_params->device_name)) {
-		return -ENOMEM;
-	}
+	req_params->device_name = ops_params->device;
+	ops_params->device = NULL;
 
-	req_params->handler_name = strdup(ops_params->handler);
-	if (spdk_unlikely(!req_params->handler_name)) {
-		return -ENOMEM;
-	}
+	req_params->handler_name = ops_params->handler;
+	ops_params->handler = NULL;
 
 	return 0;
 }
@@ -591,17 +583,13 @@ static int
 target_add_req_constructor(void *arg1, const void *arg2)
 {
 	struct scst_target_params *req_params = arg1;
-	const struct target_ops_params *ops_params = arg2;
+	struct target_ops_params *ops_params = (void *) arg2;
 
-	req_params->driver_name = strdup(ops_params->driver);
-	if (spdk_unlikely(!req_params->driver_name)) {
-		return -ENOMEM;
-	}
+	req_params->driver_name = ops_params->driver;
+	ops_params->driver = NULL;
 
-	req_params->target_name = strdup(ops_params->target);
-	if (spdk_unlikely(!req_params->target_name)) {
-		return -ENOMEM;
-	}
+	req_params->target_name = ops_params->target;
+	ops_params->target = NULL;
 
 	return 0;
 }
@@ -752,22 +740,16 @@ static int
 group_add_req_constructor(void *arg1, const void *arg2)
 {
 	struct scst_ini_group_params *req_params = arg1;
-	const struct group_ops_params *ops_params = arg2;
+	struct group_ops_params *ops_params = (void *) arg2;
 
-	req_params->driver_name = strdup(ops_params->driver);
-	if (spdk_unlikely(!req_params->driver_name)) {
-		return -ENOMEM;
-	}
+	req_params->driver_name = ops_params->driver;
+	ops_params->driver = NULL;
 
-	req_params->target_name = strdup(ops_params->target);
-	if (spdk_unlikely(!req_params->target_name)) {
-		return -ENOMEM;
-	}
+	req_params->target_name = ops_params->target;
+	ops_params->target = NULL;
 
-	req_params->ini_group_name = strdup(ops_params->group);
-	if (spdk_unlikely(!req_params->ini_group_name)) {
-		return -ENOMEM;
-	}
+	req_params->ini_group_name = ops_params->group;
+	ops_params->group = NULL;
 
 	return 0;
 }
