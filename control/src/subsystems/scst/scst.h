@@ -9,23 +9,20 @@ struct scst_device_params {
 	char *attributes;
 };
 
-static inline void
-scst_device_params_deinit(void *params_ptr)
-{
-	struct scst_device_params *params = params_ptr;
-
-	free(params->handler_name);
-	params->handler_name = NULL;
-
-	free(params->device_name);
-	params->device_name = NULL;
-
-	free(params->attributes);
-	params->attributes = NULL;
-}
+void scst_device_params_deinit(void *params_ptr);
 
 void scst_device_open(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
 void scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
+struct scst_target_params {
+	char *driver_name;
+	char *target_name;
+};
+
+void scst_target_params_deinit(void *params_ptr);
+
+void scst_target_add(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
+void scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
 
 struct scst_ini_group_params {
 	char *driver_name;
@@ -33,43 +30,10 @@ struct scst_ini_group_params {
 	char *ini_group_name;
 };
 
-static inline void
-scst_ini_group_params_deinit(void *params_ptr)
-{
-	struct scst_ini_group_params *params = params_ptr;
-
-	free(params->driver_name);
-	params->driver_name = NULL;
-
-	free(params->target_name);
-	params->target_name = NULL;
-
-	free(params->ini_group_name);
-	params->ini_group_name = NULL;
-}
+void scst_ini_group_params_deinit(void *params_ptr);
 
 void scst_ini_group_add(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg);
 void scst_ini_group_del(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg);
-
-struct scst_target_params {
-	char *driver_name;
-	char *target_name;
-};
-
-static inline void
-scst_target_params_deinit(void *params_ptr)
-{
-	struct scst_target_params *params = params_ptr;
-
-	free(params->driver_name);
-	params->driver_name = NULL;
-
-	free(params->target_name);
-	params->target_name = NULL;
-}
-
-void scst_target_add(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
-void scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg);
 
 void scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
 void scst_scan_system(sto_generic_cb cb_fn, void *cb_arg);

@@ -16,6 +16,20 @@
 
 static struct scst *g_scst;
 
+void
+scst_device_params_deinit(void *params_ptr)
+{
+	struct scst_device_params *params = params_ptr;
+
+	free(params->handler_name);
+	params->handler_name = NULL;
+
+	free(params->device_name);
+	params->device_name = NULL;
+
+	free(params->attributes);
+	params->attributes = NULL;
+}
 
 static int
 device_open_init_args(struct scst_device_params *params, struct sto_rpc_writefile_args *args)
@@ -196,6 +210,18 @@ scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void 
 	scst_pipeline(scst_get_instance(), &scst_device_close_properties, cb_fn, cb_arg, params);
 }
 
+void
+scst_target_params_deinit(void *params_ptr)
+{
+	struct scst_target_params *params = params_ptr;
+
+	free(params->driver_name);
+	params->driver_name = NULL;
+
+	free(params->target_name);
+	params->target_name = NULL;
+}
+
 static int
 target_add_init_args(struct scst_target_params *params, struct sto_rpc_writefile_args *args)
 {
@@ -361,6 +387,21 @@ void
 scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *cb_arg)
 {
 	scst_pipeline(scst_get_instance(), &scst_target_del_properties, cb_fn, cb_arg, params);
+}
+
+void
+scst_ini_group_params_deinit(void *params_ptr)
+{
+	struct scst_ini_group_params *params = params_ptr;
+
+	free(params->driver_name);
+	params->driver_name = NULL;
+
+	free(params->target_name);
+	params->target_name = NULL;
+
+	free(params->ini_group_name);
+	params->ini_group_name = NULL;
 }
 
 static int
