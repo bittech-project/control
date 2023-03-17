@@ -17,17 +17,10 @@
 static struct scst *g_scst;
 
 
-static struct sto_rpc_writefile_args *
-device_open_create_args(const char *handler_name, const char *device_name, const char *attributes)
+static int
+device_open_init_args(struct sto_rpc_writefile_args *args, const char *handler_name,
+		      const char *device_name, const char *attributes)
 {
-	struct sto_rpc_writefile_args *args;
-
-	args = calloc(1, sizeof(*args));
-	if (spdk_unlikely(!args)) {
-		SPDK_ERRLOG("Failed to alloc writefile args\n");
-		return NULL;
-	}
-
 	args->filepath = scst_device_handler_mgmt_path(handler_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
@@ -52,43 +45,36 @@ device_open_create_args(const char *handler_name, const char *device_name, const
 		args->buf = tmp;
 	}
 
-	return args;
+	return 0;
 
 out_err:
-	sto_rpc_writefile_args_free(args);
+	sto_rpc_writefile_args_deinit(args);
 
-	return NULL;
+	return -ENOMEM;
 }
 
 static void
 device_open(const char *handler_name, const char *device_name, const char *attributes,
 	    sto_generic_cb cb_fn, void *cb_arg)
 {
-	struct sto_rpc_writefile_args *args;
+	struct sto_rpc_writefile_args args = {};
+	int rc;
 
-	args = device_open_create_args(handler_name, device_name, attributes);
-	if (spdk_unlikely(!args)) {
+	rc = device_open_init_args(&args, handler_name, device_name, attributes);
+	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to create writefile args for `device_open`\n");
-		cb_fn(cb_arg, -ENOMEM);
+		cb_fn(cb_arg, rc);
 		return;
 	}
 
-	SPDK_ERRLOG("SCST device open, filepath[%s], buf[%s]\n", args->filepath, args->buf);
+	SPDK_ERRLOG("SCST device open, filepath[%s], buf[%s]\n", args.filepath, args.buf);
 
-	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
 }
 
-static struct sto_rpc_writefile_args *
-device_close_create_args(const char *handler_name, const char *device_name)
+static int
+device_close_init_args(struct sto_rpc_writefile_args *args, const char *handler_name, const char *device_name)
 {
-	struct sto_rpc_writefile_args *args;
-
-	args = calloc(1, sizeof(*args));
-	if (spdk_unlikely(!args)) {
-		SPDK_ERRLOG("Failed to alloc writefile args\n");
-		return NULL;
-	}
-
 	args->filepath = scst_device_handler_mgmt_path(handler_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
@@ -101,30 +87,31 @@ device_close_create_args(const char *handler_name, const char *device_name)
 		goto out_err;
 	}
 
-	return args;
+	return 0;
 
 out_err:
-	sto_rpc_writefile_args_free(args);
+	sto_rpc_writefile_args_deinit(args);
 
-	return NULL;
+	return -ENOMEM;
 }
 
 static void
 device_close(const char *handler_name, const char *device_name,
 	     sto_generic_cb cb_fn, void *cb_arg)
 {
-	struct sto_rpc_writefile_args *args;
+	struct sto_rpc_writefile_args args = {};
+	int rc;
 
-	args = device_close_create_args(handler_name, device_name);
-	if (spdk_unlikely(!args)) {
+	rc = device_close_init_args(&args, handler_name, device_name);
+	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to create writefile args for `device_close`\n");
-		cb_fn(cb_arg, -ENOMEM);
+		cb_fn(cb_arg, rc);
 		return;
 	}
 
-	SPDK_ERRLOG("SCST device close, filepath[%s], data[%s]\n", args->filepath, args->buf);
+	SPDK_ERRLOG("SCST device close, filepath[%s], data[%s]\n", args.filepath, args.buf);
 
-	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
 }
 
 static void
@@ -213,17 +200,9 @@ scst_device_close(struct scst_device_params *params, sto_generic_cb cb_fn, void 
 	scst_pipeline(scst_get_instance(), &scst_device_close_properties, cb_fn, cb_arg, params);
 }
 
-static struct sto_rpc_writefile_args *
-target_add_create_args(const char *driver_name, const char *target_name)
+static int
+target_add_init_args(struct sto_rpc_writefile_args *args, const char *driver_name, const char *target_name)
 {
-	struct sto_rpc_writefile_args *args;
-
-	args = calloc(1, sizeof(*args));
-	if (spdk_unlikely(!args)) {
-		SPDK_ERRLOG("Failed to alloc writefile args\n");
-		return NULL;
-	}
-
 	args->filepath = scst_target_driver_mgmt_path(driver_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
@@ -236,43 +215,36 @@ target_add_create_args(const char *driver_name, const char *target_name)
 		goto out_err;
 	}
 
-	return args;
+	return 0;
 
 out_err:
-	sto_rpc_writefile_args_free(args);
+	sto_rpc_writefile_args_deinit(args);
 
-	return NULL;
+	return -ENOMEM;
 }
 
 static void
 target_add(const char *driver_name, const char *target_name,
 	   sto_generic_cb cb_fn, void *cb_arg)
 {
-	struct sto_rpc_writefile_args *args;
+	struct sto_rpc_writefile_args args = {};
+	int rc;
 
-	args = target_add_create_args(driver_name, target_name);
-	if (spdk_unlikely(!args)) {
+	rc = target_add_init_args(&args, driver_name, target_name);
+	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to create writefile args for `target_add`\n");
-		cb_fn(cb_arg, -ENOMEM);
+		cb_fn(cb_arg, rc);
 		return;
 	}
 
-	SPDK_ERRLOG("SCST target add: filepath[%s], buf[%s]\n", args->filepath, args->buf);
+	SPDK_ERRLOG("SCST target add: filepath[%s], buf[%s]\n", args.filepath, args.buf);
 
-	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
 }
 
-static struct sto_rpc_writefile_args *
-target_del_create_args(const char *driver_name, const char *target_name)
+static int
+target_del_init_args(struct sto_rpc_writefile_args *args, const char *driver_name, const char *target_name)
 {
-	struct sto_rpc_writefile_args *args;
-
-	args = calloc(1, sizeof(*args));
-	if (spdk_unlikely(!args)) {
-		SPDK_ERRLOG("Failed to alloc writefile args\n");
-		return NULL;
-	}
-
 	args->filepath = scst_target_driver_mgmt_path(driver_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
@@ -285,30 +257,31 @@ target_del_create_args(const char *driver_name, const char *target_name)
 		goto out_err;
 	}
 
-	return args;
+	return 0;
 
 out_err:
-	sto_rpc_writefile_args_free(args);
+	sto_rpc_writefile_args_deinit(args);
 
-	return NULL;
+	return -ENOMEM;
 }
 
 static void
 target_del(const char *driver_name, const char *target_name,
 	   sto_generic_cb cb_fn, void *cb_arg)
 {
-	struct sto_rpc_writefile_args *args;
+	struct sto_rpc_writefile_args args = {};
+	int rc;
 
-	args = target_del_create_args(driver_name, target_name);
-	if (spdk_unlikely(!args)) {
+	rc = target_del_init_args(&args, driver_name, target_name);
+	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to create writefile args for `target_del`\n");
-		cb_fn(cb_arg, -ENOMEM);
+		cb_fn(cb_arg, rc);
 		return;
 	}
 
-	SPDK_ERRLOG("SCST target del: filepath[%s], data[%s]\n", args->filepath, args->buf);
+	SPDK_ERRLOG("SCST target del: filepath[%s], data[%s]\n", args.filepath, args.buf);
 
-	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
 }
 
 static void
@@ -396,17 +369,10 @@ scst_target_del(struct scst_target_params *params, sto_generic_cb cb_fn, void *c
 	scst_pipeline(scst_get_instance(), &scst_target_del_properties, cb_fn, cb_arg, params);
 }
 
-static struct sto_rpc_writefile_args *
-ini_group_add_create_args(const char *driver_name, const char *target_name, const char *ini_group_name)
+static int
+ini_group_add_init_args(struct sto_rpc_writefile_args *args, const char *driver_name,
+			const char *target_name, const char *ini_group_name)
 {
-	struct sto_rpc_writefile_args *args;
-
-	args = calloc(1, sizeof(*args));
-	if (spdk_unlikely(!args)) {
-		SPDK_ERRLOG("Failed to alloc writefile args\n");
-		return NULL;
-	}
-
 	args->filepath = scst_ini_group_mgmt_path(driver_name, target_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
@@ -419,43 +385,37 @@ ini_group_add_create_args(const char *driver_name, const char *target_name, cons
 		goto out_err;
 	}
 
-	return args;
+	return 0;
 
 out_err:
-	sto_rpc_writefile_args_free(args);
+	sto_rpc_writefile_args_deinit(args);
 
-	return NULL;
+	return -ENOMEM;
 }
 
 static void
 ini_group_add(const char *driver_name, const char *target_name, const char *ini_group_name,
 	      sto_generic_cb cb_fn, void *cb_arg)
 {
-	struct sto_rpc_writefile_args *args;
+	struct sto_rpc_writefile_args args = {};
+	int rc;
 
-	args = ini_group_add_create_args(driver_name, target_name, ini_group_name);
-	if (spdk_unlikely(!args)) {
+	rc = ini_group_add_init_args(&args, driver_name, target_name, ini_group_name);
+	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to create writefile args for `ini_group_add`\n");
-		cb_fn(cb_arg, -ENOMEM);
+		cb_fn(cb_arg, rc);
 		return;
 	}
 
-	SPDK_ERRLOG("SCST ini_group add: filepath[%s], buf[%s]\n", args->filepath, args->buf);
+	SPDK_ERRLOG("SCST ini_group add: filepath[%s], buf[%s]\n", args.filepath, args.buf);
 
-	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
 }
 
-static struct sto_rpc_writefile_args *
-ini_group_del_create_args(const char *driver_name, const char *target_name, const char *ini_group_name)
+static int
+ini_group_del_init_args(struct sto_rpc_writefile_args *args, const char *driver_name,
+			const char *target_name, const char *ini_group_name)
 {
-	struct sto_rpc_writefile_args *args;
-
-	args = calloc(1, sizeof(*args));
-	if (spdk_unlikely(!args)) {
-		SPDK_ERRLOG("Failed to alloc writefile args\n");
-		return NULL;
-	}
-
 	args->filepath = scst_ini_group_mgmt_path(driver_name, target_name);
 	if (spdk_unlikely(!args->filepath)) {
 		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
@@ -468,30 +428,31 @@ ini_group_del_create_args(const char *driver_name, const char *target_name, cons
 		goto out_err;
 	}
 
-	return args;
+	return 0;
 
 out_err:
-	sto_rpc_writefile_args_free(args);
+	sto_rpc_writefile_args_deinit(args);
 
-	return NULL;
+	return -ENOMEM;
 }
 
 static void
 ini_group_del(const char *driver_name, const char *target_name, const char *ini_group_name,
 	      sto_generic_cb cb_fn, void *cb_arg)
 {
-	struct sto_rpc_writefile_args *args;
+	struct sto_rpc_writefile_args args = {};
+	int rc;
 
-	args = ini_group_del_create_args(driver_name, target_name, ini_group_name);
-	if (spdk_unlikely(!args)) {
+	rc = ini_group_del_init_args(&args, driver_name, target_name, ini_group_name);
+	if (spdk_unlikely(rc)) {
 		SPDK_ERRLOG("Failed to create writefile args for `ini_group_del`\n");
-		cb_fn(cb_arg, -ENOMEM);
+		cb_fn(cb_arg, rc);
 		return;
 	}
 
-	SPDK_ERRLOG("SCST ini_group del: filepath[%s], data[%s]\n", args->filepath, args->buf);
+	SPDK_ERRLOG("SCST ini_group del: filepath[%s], data[%s]\n", args.filepath, args.buf);
 
-	sto_rpc_writefile_args(args, 0, cb_fn, cb_arg);
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
 }
 
 static void

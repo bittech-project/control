@@ -480,11 +480,13 @@ target_load_json(struct sto_json_async_iter *iter)
 
 	ini_group_list_load_json(iter);
 
+out:
+	scst_target_params_deinit(&params);
 	return;
 
 out_err:
-	scst_target_params_deinit(&params);
 	sto_json_async_iter_next(iter, rc);
+	goto out;
 }
 
 static void
