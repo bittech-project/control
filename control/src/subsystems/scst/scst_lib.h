@@ -227,22 +227,14 @@ int scst_add_ini_group(struct scst *scst, const char *driver_name,
 int scst_remove_ini_group(struct scst *scst, const char *driver_name,
 			  const char *target_name, const char *ini_group_name);
 
-struct scst_lun *scst_find_target_lun(struct scst *scst, const char *driver_name,
-				      const char *target_name, uint32_t lun_id);
-int scst_add_target_lun(struct scst *scst, const char *driver_name,
-			const char *target_name, const char *device_name,
-			uint32_t lun_id);
-int scst_remove_target_lun(struct scst *scst, const char *driver_name,
-			   const char *target_name, uint32_t lun_id);
-
-struct scst_lun *scst_find_ini_group_lun(struct scst *scst, const char *driver_name,
-					 const char *target_name, const char *ini_group_name,
-					 uint32_t lun_id);
-int scst_add_ini_group_lun(struct scst *scst, const char *driver_name,
-			   const char *target_name, const char *ini_group_name,
-			   const char *device_name, uint32_t lun_id);
-int scst_remove_ini_group_lun(struct scst *scst, const char *driver_name,
-			      const char *target_name, const char *ini_group_name,
-			      uint32_t lun_id);
+struct scst_lun *scst_find_lun(struct scst *scst, const char *driver_name,
+			       const char *target_name, const char *ini_group_name,
+			       uint32_t lun_id);
+int scst_add_lun(struct scst *scst, const char *driver_name,
+		 const char *target_name, const char *ini_group_name,
+		 const char *device_name, uint32_t lun_id);
+int scst_remove_lun(struct scst *scst, const char *driver_name,
+		    const char *target_name, const char *ini_group_name,
+		    uint32_t lun_id);
 
 #endif /* _SCST_LIB_H_ */

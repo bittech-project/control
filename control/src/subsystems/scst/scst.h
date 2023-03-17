@@ -15,8 +15,13 @@ scst_device_params_deinit(void *params_ptr)
 	struct scst_device_params *params = params_ptr;
 
 	free(params->handler_name);
+	params->handler_name = NULL;
+
 	free(params->device_name);
+	params->device_name = NULL;
+
 	free(params->attributes);
+	params->attributes = NULL;
 }
 
 void scst_device_open(struct scst_device_params *params, sto_generic_cb cb_fn, void *cb_arg);
