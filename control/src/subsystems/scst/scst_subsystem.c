@@ -804,7 +804,7 @@ const struct sto_req_properties scst_ini_group_del_req_properties = {
 	}
 };
 
-struct scst_lun_add_params {
+struct lun_add_ops_params {
 	int lun;
 	char *driver;
 	char *target;
@@ -813,96 +813,135 @@ struct scst_lun_add_params {
 	char *attributes;
 };
 
-static const struct sto_ops_param_dsc scst_lun_add_params_descriptors[] = {
-	STO_OPS_PARAM_INT32(lun, struct scst_lun_add_params, "LUN number"),
-	STO_OPS_PARAM_STR(driver, struct scst_lun_add_params, "SCST target driver name"),
-	STO_OPS_PARAM_STR(target, struct scst_lun_add_params, "SCST target name"),
-	STO_OPS_PARAM_STR(device, struct scst_lun_add_params, "SCST device name"),
-	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_add_params, "SCST group name"),
-	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct scst_lun_add_params, "SCST device attributes <p=v,...>"),
+static const struct sto_ops_param_dsc lun_add_ops_params_descriptors[] = {
+	STO_OPS_PARAM_INT32(lun, struct lun_add_ops_params, "LUN number"),
+	STO_OPS_PARAM_STR(driver, struct lun_add_ops_params, "SCST target driver name"),
+	STO_OPS_PARAM_STR(target, struct lun_add_ops_params, "SCST target name"),
+	STO_OPS_PARAM_STR(device, struct lun_add_ops_params, "SCST device name"),
+	STO_OPS_PARAM_STR_OPTIONAL(group, struct lun_add_ops_params, "SCST group name"),
+	STO_OPS_PARAM_STR_OPTIONAL(attributes, struct lun_add_ops_params, "SCST device attributes <p=v,...>"),
 };
 
-static const struct sto_ops_params_properties scst_lun_add_params_properties =
-	STO_OPS_PARAMS_INITIALIZER(scst_lun_add_params_descriptors, struct scst_lun_add_params);
+static const struct sto_ops_params_properties lun_add_ops_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(lun_add_ops_params_descriptors, struct lun_add_ops_params);
 
 static int
-scst_lun_add_constructor(void *arg1, const void *arg2)
+lun_add_req_constructor(void *arg1, const void *arg2)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_lun_add_params *ops_params = arg2;
-	char *data;
+	struct scst_lun_params *req_params = arg1;
+	struct lun_add_ops_params *ops_params = (void *) arg2;
 
-	req_params->file = scst_target_lun_mgmt(ops_params->driver,
-						ops_params->target, ops_params->group);
-	if (spdk_unlikely(!req_params->file)) {
-		return -ENOMEM;
-	}
+	req_params->lun_id = ops_params->lun;
 
-	data = spdk_sprintf_alloc("add %s %d", ops_params->device, ops_params->lun);
-	if (spdk_unlikely(!data)) {
-		SPDK_ERRLOG("Failed to alloc memory for data\n");
-		return -ENOMEM;
-	}
+	req_params->driver_name = ops_params->driver;
+	ops_params->driver = NULL;
+
+	req_params->target_name = ops_params->target;
+	ops_params->target = NULL;
+
+	req_params->ini_group_name = ops_params->group;
+	ops_params->group = NULL;
+
+	req_params->device_name = ops_params->device;
+	ops_params->device = NULL;
 
 	if (ops_params->attributes) {
-		int rc = scst_parse_attributes(ops_params->attributes, &data);
-		if (spdk_unlikely(rc)) {
-			free(data);
-			return rc;
-		}
+		return scst_parse_attributes(ops_params->attributes, &req_params->attributes);
 	}
-
-	req_params->data = data;
 
 	return 0;
 }
 
-struct scst_lun_del_params {
+static void
+lun_add_req_step(struct sto_pipeline *pipe)
+{
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_lun_params *params = sto_req_get_params(req);
+
+	scst_lun_add(params, sto_pipeline_step_done, pipe);
+}
+
+static void lun_del_req_step(struct sto_pipeline *pipe);
+
+const struct sto_req_properties lun_add_req_properties = {
+	.params_size = sizeof(struct scst_lun_params),
+	.params_deinit_fn = scst_lun_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(lun_add_req_step, lun_del_req_step),
+		STO_PL_STEP(scst_write_config_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
+
+struct lun_del_ops_params {
 	int lun;
 	char *driver;
 	char *target;
 	char *group;
 };
 
-static const struct sto_ops_param_dsc scst_lun_del_params_descriptors[] = {
-	STO_OPS_PARAM_INT32(lun, struct scst_lun_del_params, "LUN number"),
-	STO_OPS_PARAM_STR(driver, struct scst_lun_del_params, "SCST target driver name"),
-	STO_OPS_PARAM_STR(target, struct scst_lun_del_params, "SCST target name"),
-	STO_OPS_PARAM_STR_OPTIONAL(group, struct scst_lun_del_params, "SCST group name"),
+static const struct sto_ops_param_dsc lun_del_ops_params_descriptors[] = {
+	STO_OPS_PARAM_INT32(lun, struct lun_del_ops_params, "LUN number"),
+	STO_OPS_PARAM_STR(driver, struct lun_del_ops_params, "SCST target driver name"),
+	STO_OPS_PARAM_STR(target, struct lun_del_ops_params, "SCST target name"),
+	STO_OPS_PARAM_STR_OPTIONAL(group, struct lun_del_ops_params, "SCST group name"),
 };
 
-static const struct sto_ops_params_properties scst_lun_del_params_properties =
-	STO_OPS_PARAMS_INITIALIZER(scst_lun_del_params_descriptors, struct scst_lun_del_params);
+static const struct sto_ops_params_properties lun_del_ops_params_properties =
+	STO_OPS_PARAMS_INITIALIZER(lun_del_ops_params_descriptors, struct lun_del_ops_params);
 
 static int
-scst_lun_del_constructor(void *arg1, const void *arg2)
+lun_del_req_constructor(void *arg1, const void *arg2)
 {
-	struct sto_write_req_params *req_params = arg1;
-	const struct scst_lun_del_params *ops_params = arg2;
+	struct scst_lun_params *req_params = arg1;
+	struct lun_add_ops_params *ops_params = (void *) arg2;
 
-	req_params->file = scst_target_lun_mgmt(ops_params->driver,
-						ops_params->target, ops_params->group);
-	if (spdk_unlikely(!req_params->file)) {
-		return -ENOMEM;
-	}
+	req_params->lun_id = ops_params->lun;
 
-	req_params->data = spdk_sprintf_alloc("del %d", ops_params->lun);
-	if (spdk_unlikely(!req_params->data)) {
-		return -ENOMEM;
-	}
+	req_params->driver_name = ops_params->driver;
+	ops_params->driver = NULL;
+
+	req_params->target_name = ops_params->target;
+	ops_params->target = NULL;
+
+	req_params->ini_group_name = ops_params->group;
+	ops_params->group = NULL;
 
 	return 0;
 }
+
+static void
+lun_del_req_step(struct sto_pipeline *pipe)
+{
+	struct sto_req *req = sto_pipeline_get_priv(pipe);
+	struct scst_lun_params *params = sto_req_get_params(req);
+
+	scst_lun_del(params, sto_pipeline_step_done, pipe);
+}
+
+const struct sto_req_properties lun_del_req_properties = {
+	.params_size = sizeof(struct scst_lun_params),
+	.params_deinit_fn = scst_lun_params_deinit,
+
+	.response = sto_dummy_req_response,
+	.steps = {
+		STO_PL_STEP(lun_del_req_step, NULL),
+		STO_PL_STEP(scst_write_config_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	}
+};
 
 static int
 scst_lun_replace_constructor(void *arg1, const void *arg2)
 {
 	struct sto_write_req_params *req_params = arg1;
-	const struct scst_lun_add_params *ops_params = arg2;
+	const struct lun_add_ops_params *ops_params = arg2;
 	char *data;
 
-	req_params->file = scst_target_lun_mgmt(ops_params->driver,
-						ops_params->target, ops_params->group);
+	req_params->file = scst_target_lun_mgmt_path(ops_params->driver,
+						     ops_params->target, ops_params->group);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -947,8 +986,8 @@ scst_lun_clear_constructor(void *arg1, const void *arg2)
 	struct sto_write_req_params *req_params = arg1;
 	const struct scst_lun_clear_params *ops_params = arg2;
 
-	req_params->file = scst_target_lun_mgmt(ops_params->driver,
-						ops_params->target, ops_params->group);
+	req_params->file = scst_target_lun_mgmt_path(ops_params->driver,
+						     ops_params->target, ops_params->group);
 	if (spdk_unlikely(!req_params->file)) {
 		return -ENOMEM;
 	}
@@ -1128,21 +1167,21 @@ static const struct sto_ops scst_ops[] = {
 	{
 		.name = "lun_add",
 		.description = "Adds a given device to a group",
-		.params_properties = &scst_lun_add_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_lun_add_constructor,
+		.params_properties = &lun_add_ops_params_properties,
+		.req_properties = &lun_add_req_properties,
+		.req_params_constructor = lun_add_req_constructor,
 	},
 	{
 		.name = "lun_del",
 		.description = "Remove a LUN from a group",
-		.params_properties = &scst_lun_del_params_properties,
-		.req_properties = &sto_write_req_properties,
-		.req_params_constructor = scst_lun_del_constructor,
+		.params_properties = &lun_del_ops_params_properties,
+		.req_properties = &lun_del_req_properties,
+		.req_params_constructor = lun_del_req_constructor,
 	},
 	{
 		.name = "lun_replace",
 		.description = "Adds a given device to a group",
-		.params_properties = &scst_lun_add_params_properties,
+		.params_properties = &lun_add_ops_params_properties,
 		.req_properties = &sto_write_req_properties,
 		.req_params_constructor = scst_lun_replace_constructor,
 	},

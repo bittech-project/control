@@ -575,6 +575,211 @@ scst_ini_group_del(struct scst_ini_group_params *params, sto_generic_cb cb_fn, v
 	scst_pipeline(scst_get_instance(), &scst_ini_group_del_properties, cb_fn, cb_arg, params);
 }
 
+void
+scst_lun_params_deinit(void *params_ptr)
+{
+	struct scst_lun_params *params = params_ptr;
+
+	free(params->driver_name);
+	params->driver_name = NULL;
+
+	free(params->target_name);
+	params->target_name = NULL;
+
+	free(params->ini_group_name);
+	params->ini_group_name = NULL;
+
+	free(params->device_name);
+	params->device_name = NULL;
+
+	free(params->attributes);
+	params->attributes = NULL;
+}
+
+static int
+lun_add_init_args(struct scst_lun_params *params, struct sto_rpc_writefile_args *args)
+{
+	args->filepath = scst_target_lun_mgmt_path(params->driver_name, params->target_name,
+						   params->ini_group_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("add %s %u", params->device_name, params->lun_id);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	if (params->attributes) {
+		char *result;
+
+		result = spdk_sprintf_append_realloc(args->buf, " %s", params->attributes);
+		if (spdk_unlikely(!result)) {
+			SPDK_ERRLOG("Failed to realloc writefile args buf\n");
+			goto out_err;
+		}
+
+		args->buf = result;
+	}
+
+	return 0;
+
+out_err:
+	sto_rpc_writefile_args_deinit(args);
+
+	return -ENOMEM;
+}
+
+static void
+lun_add(struct scst_lun_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args args = {};
+	int rc;
+
+	rc = lun_add_init_args(params, &args);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to create writefile args for `lun_add`\n");
+		cb_fn(cb_arg, rc);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST lun add, filepath[%s], buf[%s]\n", args.filepath, args.buf);
+
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
+}
+
+static int
+lun_del_init_args(struct scst_lun_params *params, struct sto_rpc_writefile_args *args)
+{
+	args->filepath = scst_target_lun_mgmt_path(params->driver_name,
+						   params->target_name, params->ini_group_name);
+	if (spdk_unlikely(!args->filepath)) {
+		SPDK_ERRLOG("Failed to alloc writefile args filepath\n");
+		goto out_err;
+	}
+
+	args->buf = spdk_sprintf_alloc("del %u", params->lun_id);
+	if (spdk_unlikely(!args->buf)) {
+		SPDK_ERRLOG("Failed to alloc writefile args buf\n");
+		goto out_err;
+	}
+
+	return 0;
+
+out_err:
+	sto_rpc_writefile_args_deinit(args);
+	return -ENOMEM;
+}
+
+static void
+lun_del(struct scst_lun_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	struct sto_rpc_writefile_args args = {};
+	int rc;
+
+	rc = lun_del_init_args(params, &args);
+	if (spdk_unlikely(rc)) {
+		SPDK_ERRLOG("Failed to create writefile args for `device_close`\n");
+		cb_fn(cb_arg, rc);
+		return;
+	}
+
+	SPDK_ERRLOG("SCST lun del, filepath[%s], data[%s]\n", args.filepath, args.buf);
+
+	sto_rpc_writefile_args(&args, cb_fn, cb_arg);
+}
+
+static void
+lun_add_step(struct sto_pipeline *pipe)
+{
+	struct scst_lun_params *params = sto_pipeline_get_priv(pipe);
+
+	if (scst_find_lun(scst_get_instance(), params->driver_name, params->target_name,
+			  params->ini_group_name, params->lun_id)) {
+		sto_pipeline_step_next(pipe, -EEXIST);
+		return;
+	}
+
+	lun_add(params, sto_pipeline_step_done, pipe);
+}
+
+static void
+lun_add_rollback_step(struct sto_pipeline *pipe)
+{
+	struct scst_lun_params *params = sto_pipeline_get_priv(pipe);
+
+	lun_del(params, sto_pipeline_step_done, pipe);
+}
+
+static void
+lun_add_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_lun_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_add_lun(scst_get_instance(), params->driver_name, params->target_name,
+			  params->ini_group_name, params->device_name, params->lun_id);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_lun_add_properties = {
+	.steps = {
+		STO_PL_STEP(lun_add_step, lun_add_rollback_step),
+		STO_PL_STEP(lun_add_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_lun_add(struct scst_lun_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(scst_get_instance(), &scst_lun_add_properties, cb_fn, cb_arg, params);
+}
+
+static void
+lun_del_step(struct sto_pipeline *pipe)
+{
+	struct scst_lun_params *params = sto_pipeline_get_priv(pipe);
+
+	if (!scst_find_lun(scst_get_instance(), params->driver_name, params->target_name,
+			   params->ini_group_name, params->lun_id)) {
+		sto_pipeline_step_next(pipe, -ENOENT);
+		return;
+	}
+
+	lun_del(params, sto_pipeline_step_done, pipe);
+}
+
+static void
+lun_del_cfg_step(struct sto_pipeline *pipe)
+{
+	struct scst_lun_params *params = sto_pipeline_get_priv(pipe);
+	int rc;
+
+	rc = scst_remove_lun(scst_get_instance(), params->driver_name, params->target_name,
+			     params->ini_group_name, params->lun_id);
+	assert(!rc);
+
+	sto_pipeline_step_next(pipe, rc);
+}
+
+static const struct sto_pipeline_properties scst_lun_del_properties = {
+	.steps = {
+		STO_PL_STEP(lun_del_step, NULL),
+		STO_PL_STEP(lun_del_cfg_step, NULL),
+		STO_PL_STEP_TERMINATOR(),
+	},
+};
+
+void
+scst_lun_del(struct scst_lun_params *params, sto_generic_cb cb_fn, void *cb_arg)
+{
+	scst_pipeline(scst_get_instance(), &scst_lun_del_properties, cb_fn, cb_arg, params);
+}
+
 static void
 init_restore_config_done(void *cb_arg, int rc)
 {

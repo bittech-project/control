@@ -33,9 +33,9 @@ static void scst_ini_group_destroy(struct scst_ini_group *ini_group);
 
 static struct scst_lun *scst_lun_alloc(struct scst_device *device, uint32_t lun_id);
 static void scst_lun_free(struct scst_lun *lun);
-static struct scst_lun *scst_lun_find(struct scst_lun_list *lun_list, uint32_t lun_id);
-static int scst_lun_add(struct scst_lun_list *lun_list, struct scst_device *device, uint32_t lun_id);
-static int scst_lun_remove(struct scst_lun_list *lun_list, uint32_t lun_id);
+static struct scst_lun *scst_lun_list_find(struct scst_lun_list *lun_list, uint32_t lun_id);
+static int scst_lun_list_add(struct scst_lun_list *lun_list, struct scst_device *device, uint32_t lun_id);
+static int scst_lun_list_remove(struct scst_lun_list *lun_list, uint32_t lun_id);
 
 static void scst_put_device_handler(struct scst_device_handler *handler);
 
@@ -336,19 +336,19 @@ scst_target_remove_ini_group(struct scst_target *target, const char *ini_group_n
 static inline struct scst_lun *
 scst_target_find_lun(struct scst_target *target, uint32_t lun_id)
 {
-	return scst_lun_find(&target->lun_list, lun_id);
+	return scst_lun_list_find(&target->lun_list, lun_id);
 }
 
 static inline int
 scst_target_add_lun(struct scst_target *target, struct scst_device *device, uint32_t lun_id)
 {
-	return scst_lun_add(&target->lun_list, device, lun_id);
+	return scst_lun_list_add(&target->lun_list, device, lun_id);
 }
 
 static inline int
 scst_target_remove_lun(struct scst_target *target, uint32_t lun_id)
 {
-	return scst_lun_remove(&target->lun_list, lun_id);
+	return scst_lun_list_remove(&target->lun_list, lun_id);
 }
 
 static struct scst_ini_group *
@@ -406,19 +406,19 @@ scst_ini_group_next(struct scst_target *target, struct scst_ini_group *ini_group
 static inline struct scst_lun *
 scst_ini_group_find_lun(struct scst_ini_group *group, uint32_t lun_id)
 {
-	return scst_lun_find(&group->lun_list, lun_id);
+	return scst_lun_list_find(&group->lun_list, lun_id);
 }
 
 static inline int
 scst_ini_group_add_lun(struct scst_ini_group *group, struct scst_device *device, uint32_t lun_id)
 {
-	return scst_lun_add(&group->lun_list, device, lun_id);
+	return scst_lun_list_add(&group->lun_list, device, lun_id);
 }
 
 static inline int
 scst_ini_group_remove_lun(struct scst_ini_group *group, uint32_t lun_id)
 {
-	return scst_lun_remove(&group->lun_list, lun_id);
+	return scst_lun_list_remove(&group->lun_list, lun_id);
 }
 
 static struct scst_lun *
@@ -434,6 +434,7 @@ scst_lun_alloc(struct scst_device *device, uint32_t lun_id)
 	}
 
 	lun->device = device;
+	lun->id = lun_id;
 
 	return lun;
 }
@@ -445,7 +446,7 @@ scst_lun_free(struct scst_lun *lun)
 }
 
 static struct scst_lun *
-scst_lun_find(struct scst_lun_list *lun_list, uint32_t lun_id)
+scst_lun_list_find(struct scst_lun_list *lun_list, uint32_t lun_id)
 {
 	struct scst_lun *lun;
 
@@ -459,11 +460,11 @@ scst_lun_find(struct scst_lun_list *lun_list, uint32_t lun_id)
 }
 
 static int
-scst_lun_add(struct scst_lun_list *lun_list, struct scst_device *device, uint32_t lun_id)
+scst_lun_list_add(struct scst_lun_list *lun_list, struct scst_device *device, uint32_t lun_id)
 {
 	struct scst_lun *lun;
 
-	if (scst_lun_find(lun_list, lun_id)) {
+	if (scst_lun_list_find(lun_list, lun_id)) {
 		SPDK_ERRLOG("lun `%u` has arleady presented in SCST\n", lun_id);
 		return -EEXIST;
 	}
@@ -476,15 +477,17 @@ scst_lun_add(struct scst_lun_list *lun_list, struct scst_device *device, uint32_
 
 	TAILQ_INSERT_TAIL(lun_list, lun, list);
 
+	SPDK_ERRLOG("LUN %u device[%s] was added\n", lun_id, device->name);
+
 	return 0;
 }
 
 static int
-scst_lun_remove(struct scst_lun_list *lun_list, uint32_t lun_id)
+scst_lun_list_remove(struct scst_lun_list *lun_list, uint32_t lun_id)
 {
 	struct scst_lun *lun;
 
-	lun = scst_lun_find(lun_list, lun_id);
+	lun = scst_lun_list_find(lun_list, lun_id);
 	if (spdk_unlikely(!lun)) {
 		SPDK_ERRLOG("lun `%u` has not been presented in SCST\n", lun_id);
 		return -ENOENT;
@@ -493,6 +496,8 @@ scst_lun_remove(struct scst_lun_list *lun_list, uint32_t lun_id)
 	TAILQ_REMOVE(lun_list, lun, list);
 
 	scst_lun_free(lun);
+
+	SPDK_ERRLOG("LUN %u was removed\n", lun_id);
 
 	return 0;
 }

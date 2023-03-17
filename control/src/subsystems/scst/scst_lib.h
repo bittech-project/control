@@ -154,6 +154,21 @@ scst_ini_group_mgmt_path(const char *driver_name, const char *target_name)
 }
 
 static inline const char *
+scst_target_lun_mgmt_path(const char *driver_name, const char *target_name, const char *ini_group_name)
+{
+	if (ini_group_name) {
+		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
+					  SCST_TARGETS, driver_name,
+					  target_name, "ini_groups", ini_group_name,
+					  "luns", SCST_MGMT_IO);
+	} else {
+		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
+					  SCST_TARGETS, driver_name,
+					  target_name, "luns", SCST_MGMT_IO);
+	}
+}
+
+static inline const char *
 scst_dev_groups_mgmt(void)
 {
 	return spdk_sprintf_alloc("%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS, SCST_MGMT_IO);
@@ -178,21 +193,6 @@ scst_dev_group_target_group_mgmt(const char *dev_group, const char *target_group
 {
 	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT, SCST_DEV_GROUPS,
 				  dev_group, "target_groups", target_group, SCST_MGMT_IO);
-}
-
-static inline const char *
-scst_target_lun_mgmt(const char *target_driver, const char *target, const char *ini_group)
-{
-	if (ini_group) {
-		return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s/%s/%s", SCST_ROOT,
-					  SCST_TARGETS, target_driver,
-					  target, "ini_groups", ini_group,
-					  "luns", SCST_MGMT_IO);
-	}
-
-	return spdk_sprintf_alloc("%s/%s/%s/%s/%s/%s", SCST_ROOT,
-				  SCST_TARGETS, target_driver,
-				  target, "luns", SCST_MGMT_IO);
 }
 
 struct scst *scst_create(void);

@@ -35,6 +35,20 @@ void scst_ini_group_params_deinit(void *params_ptr);
 void scst_ini_group_add(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg);
 void scst_ini_group_del(struct scst_ini_group_params *params, sto_generic_cb cb_fn, void *cb_arg);
 
+struct scst_lun_params {
+	uint32_t lun_id;
+	char *driver_name;
+	char *target_name;
+	char *ini_group_name;
+	char *device_name;
+	char *attributes;
+};
+
+void scst_lun_params_deinit(void *params_ptr);
+
+void scst_lun_add(struct scst_lun_params *params, sto_generic_cb cb_fn, void *cb_arg);
+void scst_lun_del(struct scst_lun_params *params, sto_generic_cb cb_fn, void *cb_arg);
+
 void scst_dumps_json(sto_generic_cb cb_fn, void *cb_arg, struct sto_json_ctx *json);
 void scst_scan_system(sto_generic_cb cb_fn, void *cb_arg);
 void scst_write_config(sto_generic_cb cb_fn, void *cb_arg);
