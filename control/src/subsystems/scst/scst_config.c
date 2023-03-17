@@ -192,37 +192,90 @@ handler_list_dumps_json(struct sto_tree_node *tree_root, struct spdk_json_write_
 }
 
 static void
-ini_group_dumps_json(struct sto_tree_node *ini_group_node, struct spdk_json_write_ctx *w)
+lun_dumps_json(struct sto_tree_node *lun_node, struct spdk_json_write_ctx *w)
 {
-	spdk_json_write_name(w, ini_group_node->inode->name);
+	struct sto_tree_node *device_lnk_node, *device_node;
+
+	device_lnk_node = sto_tree_node_find(lun_node, "device");
+	assert(device_lnk_node);
+
+	device_node = sto_tree_node_resolv_lnk(device_lnk_node);
+	if (spdk_unlikely(!device_node)) {
+		SPDK_ERRLOG("Failed to resolve device %s link\n",
+			    device_lnk_node->inode->name);
+		return;
+	}
+
+	spdk_json_write_name(w, lun_node->inode->name);
 	spdk_json_write_object_begin(w);
+
+	scst_serialize_attrs(lun_node, w);
+
+	spdk_json_write_named_string(w, "device", device_node->inode->name);
+
 	spdk_json_write_object_end(w);
 }
 
 static void
-target_dumps_json(struct sto_tree_node *target_node, struct spdk_json_write_ctx *w)
+lun_list_dumps_json(struct sto_tree_node *group_node, struct spdk_json_write_ctx *w)
 {
-	struct sto_tree_node *ini_group_list_node, *ini_group_node;
+	struct sto_tree_node *lun_list_node, *lun_node;
 
-	spdk_json_write_name(w, target_node->inode->name);
+	lun_list_node = sto_tree_node_find(group_node, "luns");
 
+	if (lun_list_node && sto_tree_node_first_child_type(lun_list_node, STO_INODE_TYPE_DIR)) {
+		spdk_json_write_named_array_begin(w, "luns");
+
+		STO_TREE_FOREACH_TYPE(lun_node, lun_list_node, STO_INODE_TYPE_DIR) {
+			spdk_json_write_object_begin(w);
+			lun_dumps_json(lun_node, w);
+			spdk_json_write_object_end(w);
+		}
+
+		spdk_json_write_array_end(w);
+	}
+}
+
+static void
+ini_group_dumps_json(struct sto_tree_node *group_node, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_name(w, group_node->inode->name);
 	spdk_json_write_object_begin(w);
 
-	scst_serialize_attrs(target_node, w);
+	lun_list_dumps_json(group_node, w);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
+ini_group_list_dumps_json(struct sto_tree_node *target_node, struct spdk_json_write_ctx *w)
+{
+	struct sto_tree_node *ini_group_list_node, *group_node;
 
 	ini_group_list_node = sto_tree_node_find(target_node, "ini_groups");
 
 	if (ini_group_list_node && sto_tree_node_first_child_type(ini_group_list_node, STO_INODE_TYPE_DIR)) {
 		spdk_json_write_named_array_begin(w, "ini_groups");
 
-		STO_TREE_FOREACH_TYPE(ini_group_node, ini_group_list_node, STO_INODE_TYPE_DIR) {
+		STO_TREE_FOREACH_TYPE(group_node, ini_group_list_node, STO_INODE_TYPE_DIR) {
 			spdk_json_write_object_begin(w);
-			ini_group_dumps_json(ini_group_node, w);
+			ini_group_dumps_json(group_node, w);
 			spdk_json_write_object_end(w);
 		}
 
 		spdk_json_write_array_end(w);
 	}
+}
+
+static void
+target_dumps_json(struct sto_tree_node *target_node, struct spdk_json_write_ctx *w)
+{
+	spdk_json_write_name(w, target_node->inode->name);
+
+	spdk_json_write_object_begin(w);
+
+	ini_group_list_dumps_json(target_node, w);
+	lun_list_dumps_json(target_node, w);
 
 	spdk_json_write_object_end(w);
 }
