@@ -1,0 +1,25 @@
+- name: Lazy unmounting {{ cpnl_mountpoint }}
+  ansible.builtin.shell: "umount -l {{ cpnl_mountpoint }}"
+  when: cpnl_lazy_umount
+  register: umount_shell
+  ignore_errors: true
+
+- name: unmounting the filesystem
+  mount:
+    path: "{{ cpnl_mountpoint }}"
+    fstype: xfs
+    src: "{{ cpnl_device_path }}"
+    boot: false
+    state: unmounted
+  when: not cpnl_lazy_umount
+
+- name: removing the line from the fstab
+  ansible.builtin.lineinfile:
+    dest: /etc/fstab
+    regexp: "^{{ cpnl_device_path }}"
+    state: absent
+
+- name: removing the mountpoint
+  ansible.builtin.file:
+    path: "{{ cpnl_mountpoint }}"
+    state: absent

@@ -1,0 +1,10 @@
+- name: SCAN
+  hosts: localhost
+  environment:
+      PYTHONPATH: /opt/testlib/jobs/python_scripts
+  roles:
+      - pre_play
+      - scan
+# how to run:
+# cd /opt/testlib/jobs
+# ansible-playbook SCAN.yml

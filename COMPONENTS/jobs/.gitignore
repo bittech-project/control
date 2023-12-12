@@ -1,0 +1,14 @@
+.idea
+.vscode
+build
+.vscode
+.gradle
+gradle/
+gradlew
+gradlew.bat
+src/group_vars/all.yml
+src/packages
+.project
+.settings/
+**/__pycache__
+**/.pytest_cache

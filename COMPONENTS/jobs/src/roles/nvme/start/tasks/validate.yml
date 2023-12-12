@@ -1,0 +1,4 @@
+- name: validate
+  ansible.builtin.set_fact:
+    ip: "{{ ip | mandatory}}"
+    target: "{{ target | mandatory}}"

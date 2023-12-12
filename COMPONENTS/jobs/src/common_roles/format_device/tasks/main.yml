@@ -1,0 +1,14 @@
+- name: main block
+  block:
+    - name: run validation
+      include_tasks: validate.yml
+    - name: regular run
+      include_tasks: run.yml
+  rescue:
+    - name: collect error
+      set_stats:
+        data:
+          error: "{{ansible_failed_result}}"
+    - name: rethrow
+      ansible.builtin.fail:
+        msg: "{{ansible_failed_result}}"

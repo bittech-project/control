@@ -1,0 +1,6 @@
+- name: Installation procedure for TestLib
+  hosts: all
+  gather_facts: false
+  roles:
+      - prepare
+      - testlib

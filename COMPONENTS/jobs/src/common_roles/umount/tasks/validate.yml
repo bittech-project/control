@@ -1,0 +1,5 @@
+- name: validate
+  ansible.builtin.set_fact:
+    cpnl_mountpoint: "{{cpnl_mountpoint | mandatory}}"
+    cpnl_device_path: "{{cpnl_device_path | mandatory}}"
+    cpnl_lazy_umount: "{{cpnl_lazy_umount | mandatory}}"

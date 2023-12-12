@@ -1,0 +1,7 @@
+#!/bin/sh
+# Скрипт-обертка для запуска удаления установки.
+# A wrapper script to start uninstall installation.
+_inventory=/opt/testlib/install/inventory.yml
+export ANSIBLE_CONFIG=/opt/testlib/install/ansible.cfg
+cd /
+ansible-playbook -i $_inventory /opt/testlib/install/remove.yml

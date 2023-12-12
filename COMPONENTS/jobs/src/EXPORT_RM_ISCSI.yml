@@ -1,0 +1,4 @@
+- name: rm iscsi
+  hosts: localhost
+  roles:
+      - iscsi/stop

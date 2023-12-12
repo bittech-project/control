@@ -1,0 +1,16 @@
+- name: nfs mounting
+  ansible.builtin.shell: 
+    cmd: mount -t nfs "{{ ip }}":"{{export_path}}" "{{folder_name}}"
+
+
+# Монтирование по nfs:
+#  mount -t nfs <ip>:<export path> <папка, в которую монтироваться>
+# Проверить успешность монтирования:
+# df -h
+# mount
+# Отмонтироваться: 
+# umount -t nfs <ip>:<export path> <папка, в которую монтироваться>
+# ansible-playbook EXPORT_ADD_NFS.yml -e '{"ip": 192.168.84.46,"export_path": /mnt/blazex/blz_31jqkf, "folder_name": /nfs}'
+
+# пример запуска
+# sudo ansible-playbook EXPORT_ADD_NFS.yml -e '{"ip": 192.168.84.46,"export_path": /mnt/blazex/blz_31jqkf, "folder_name": nfs/}'

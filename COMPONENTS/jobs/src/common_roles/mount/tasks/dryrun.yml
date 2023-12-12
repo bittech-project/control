@@ -1,0 +1,4 @@
+- name: dryrun fail
+  ansible.builtin.fail:
+    msg: dryrun fail
+  when: not cpnl_dryrun

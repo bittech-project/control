@@ -1,0 +1,11 @@
+- name: main block
+  block:   
+    - name: validation run
+      include_tasks: validate.yml
+    - name: regular run
+      include_tasks: run.yml  
+  rescue:
+    - name: Handle errors
+      ansible.builtin.include_role:
+        name: common_roles/handle_errors    
+ 

@@ -1,0 +1,4 @@
+- name: rm nvme
+  hosts: localhost
+  roles:
+      - nvme/stop

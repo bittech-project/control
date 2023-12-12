@@ -1,0 +1,5 @@
+- name: validate
+  ansible.builtin.set_fact:
+    ip: "{{ ip | mandatory}}"
+    export_path: "{{ export_path | mandatory}}"
+    folder_name: "{{ folder_name | mandatory}}"

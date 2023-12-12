@@ -1,0 +1,16 @@
+- name: main block
+  block:
+    - name: run validation
+      include_tasks: validate.yml
+
+    - name: regular run
+      include_tasks: run.yml
+      when: cpnl_dryrun is not defined
+
+    - name: dryrun
+      include_tasks: dryrun.yml
+      when: cpnl_dryrun is defined
+  rescue:
+    - name: Handle errors
+      ansible.builtin.include_role:
+        name: common_roles/handle_errors

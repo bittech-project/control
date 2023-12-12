@@ -1,0 +1,4 @@
+- name: start test
+  hosts: localhost
+  roles:
+      - test/start

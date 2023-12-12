@@ -1,0 +1,16 @@
+[Unit]
+Description=testlib-control
+
+After=network.target
+Wants=etcd.service
+
+[Service]
+Type=simple
+TimeoutSec=0
+WorkingDirectory=/opt/testlib/control/
+ExecStart=node ./dist/main.js
+ExecStop=
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

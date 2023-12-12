@@ -1,0 +1,26 @@
+- name: Assemble error message
+  ansible.builtin.set_fact:
+    error_message: "{{ ansible_failed_result.cmd|default({}) ~ ' returns ' ~ ansible_failed_result.msg|default({}) }}"
+
+- name: Append additional info if available
+  ansible.builtin.set_fact:
+    error_message: "{{ error_message ~ ', DETAILS: ' ~ ansible_failed_result.stderr | default() }}"
+  when: error_message or ansible_failed_result.stderr
+
+- name: Assemble error obj
+  ansible.builtin.set_fact:
+    error_obj:
+      error: "Execution failed"
+      message: "{{  error_message }}"
+
+- name: Save error details
+  ansible.builtin.set_stats:
+    data:
+      errors: "{{ errors | default([]) + [ error_obj ] }}"
+
+- name: Rethrow
+  ansible.builtin.fail:
+    msg: "{{ ansible_failed_result }}"
+  when:
+    - terminate is defined
+    - terminate == true

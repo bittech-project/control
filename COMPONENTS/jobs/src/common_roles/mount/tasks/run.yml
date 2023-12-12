@@ -1,0 +1,13 @@
+# real tasks run here
+- name: making dir to mount
+  file: path="{{ cpnl_mountpoint }}"
+    state=directory
+
+- name: mounting filesystem and adding in fstab
+  mount:
+    path: "{{ cpnl_mountpoint }}"
+    fstype: xfs
+    src: "{{ cpnl_device_path }}"
+    boot: false
+    state: mounted
+    opts: noauto

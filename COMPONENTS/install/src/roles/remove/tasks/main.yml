@@ -1,0 +1,23 @@
+- name: Deactivating all services
+  ansible.builtin.service:
+    name: testlib-control
+    enabled: false
+    state: stopped
+
+- name: Remove packages
+  ansible.builtin.package:
+    name:
+      - testlib-control
+    state: absent
+
+- name: Remove the user 'testlib'
+  ansible.builtin.user:
+    name: testlib
+    state: absent
+    remove: true
+
+- name: Recursively remove directory
+  ansible.builtin.file:
+    path: /opt/testlib
+    state: absent
+  ignore_errors: true

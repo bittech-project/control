@@ -1,0 +1,4 @@
+- name: Create empty errors array
+  ansible.builtin.set_stats:
+    data:
+      errors: "{{ errors | default([]) }}"

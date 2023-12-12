@@ -1,0 +1,9 @@
+all:
+  hosts:
+    node1:
+      pbit_node_index: 1 # порядковый номер ноды. возможные значения 1, 2, 3..10
+      pbit_environment_key: testlib1-1234abc # Уникальный для всех машин в сети ключ окружения
+      pbit_mgmt_addr: 10.20.30.40   # адрес хоста в сети управления (ip либо DNS)
+      pbit_data_network_addr: 10.0.0.100   # адрес хоста в сети передачи данных (ip либо DNS)
+      ansible_host: "{{pbit_mgmt_addr}}"
+      ansible_connection: local

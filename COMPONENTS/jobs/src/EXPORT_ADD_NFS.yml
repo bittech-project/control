@@ -1,0 +1,4 @@
+- name: nfs connect
+  hosts: localhost
+  roles:
+      - nfs/start

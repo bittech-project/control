@@ -1,0 +1,5 @@
+set -e
+_inventory=/opt/testlib/install/inventory.yml
+export ANSIBLE_CONFIG=/opt/testlib/install/ansible.cfg
+
+ansible-playbook -i $_inventory /opt/testlib/install/install.yml

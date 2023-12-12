@@ -1,0 +1,4 @@
+- name: nvme connect
+  hosts: localhost
+  roles:
+      - nvme/start

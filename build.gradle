@@ -1,0 +1,96 @@
+plugins {
+    id "nebula.ospackage" version "9.1.1"
+}
+
+def version  = "$System.env.BUILD_VERSION"
+version = version != "null" ? version: "0.0.0"
+project.version = version
+println(project.version)
+
+def BASE_PATH = "/opt/testlib"
+apply plugin: "nebula.ospackage"
+
+ospackage {
+    os = "linux"
+    user = "testlib"
+    group = "testlib"
+    fileMode = 0755
+
+//!
+//? testlib-control
+//!
+    from("./dist") { //!FIXME need add ui in publick
+        addParentDirs = false
+        into "${BASE_PATH}/control/dist"
+    }
+    // you have to run
+    // `npm pack` -  for collecting bundled node_modules
+    // `tar zxvf *.tgz` - for unpacking bundled node_modules into directory ./package
+    from("./package/node_modules") {
+        addParentDirs = false
+        into "${BASE_PATH}/control/node_modules"
+    }
+
+    from("./COMPONENTS/gui/dist") {
+        addParentDirs = false
+        into "${BASE_PATH}/control/public"
+    }
+
+    from("./resources") {
+        addParentDirs = false
+        exclude 'cfg'
+        into "${BASE_PATH}/control/resources"
+    }
+
+    link(
+        "/lib/systemd/system/testlib-control.service",
+        "${BASE_PATH}/control/resources/systemd/testlib-control.service")
+
+    link(
+        "/lib/systemd/system/testlib-agent.service",
+        "${BASE_PATH}/control/resources/systemd/testlib-agent.service")
+
+    from("./COMPONENTS/jobs/src") {
+        addParentDirs = false
+        into "${BASE_PATH}/jobs"
+    }
+
+    from("./COMPONENTS/install/src") {
+        addParentDirs = false
+        into "${BASE_PATH}/install"
+    }
+
+    from("./COMPONENTS/install/assembly/bin") { into "${BASE_PATH}/install/bin" }
+    link("/usr/bin/testlib-install", "${BASE_PATH}/install/bin/testlib-install")
+    link("/usr/bin/testlib-remove", "${BASE_PATH}/install/bin/testlib-remove")
+
+
+    from("./COMPONENTS/install/README.md") {
+        addParentDirs = false
+        into "${BASE_PATH}/install/"
+    }
+}
+
+
+task assembleFedora(type: Rpm) {
+    requires("nfs-kernel-server")
+    // requires("nfs-utils") // i dont know this dependensis on fedora
+    requires("ansible")
+    requires("parted")
+    requires("jq")
+    requires("nodejs", '18.13.0', GREATER | EQUAL)
+}
+
+task assembleDebian(type: Deb) {
+    requires("nfs-kernel-server")
+    requires("ansible")
+    requires("parted")
+    requires("jq")
+    requires("nodejs", '18.13.0', GREATER | EQUAL)
+}
+
+
+tasks.assemble {
+    dependsOn tasks.assembleFedora
+    dependsOn tasks.assembleDebian
+}

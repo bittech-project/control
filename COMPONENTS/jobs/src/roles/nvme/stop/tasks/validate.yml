@@ -1,0 +1,3 @@
+- name: validate
+  ansible.builtin.set_fact:
+    target: "{{ target | mandatory}}"

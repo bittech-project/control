@@ -1,0 +1,4 @@
+- name: iscsi connect
+  hosts: localhost
+  roles:
+      - iscsi/start

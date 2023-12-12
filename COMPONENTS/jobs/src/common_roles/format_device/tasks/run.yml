@@ -1,0 +1,8 @@
+# todo: add role actions here
+- name: Create a filesystem on device
+  filesystem:
+    fstype: "{{ cpnl_fs_type }}"
+    device: "{{ cpnl_device_path }}"
+    force: yes
+  when: cpnl_type == "FILE"
+    # opts: "{{ cpnl_formatting_opts }}"

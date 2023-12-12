@@ -1,0 +1,16 @@
+.idea
+.vscode
+inventory.yml
+build
+.vscode
+.gradle
+gradle/
+gradlew
+gradlew.bat
+src/group_vars/all.yml
+src/packages/*
+.project
+.settings/
+**/__pycache__
+*.rpm
+*.deb

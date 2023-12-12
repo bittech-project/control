@@ -1,0 +1,15 @@
+- name: Scan resources of node
+  ansible.builtin.script: python_scripts/scan/__main__.py
+  args:
+      executable: python3
+  register: pbit_blockdevices_result
+  become: true
+
+- name: set output value
+  ansible.builtin.set_fact:
+      scan_scanned_resources_: '{{ pbit_blockdevices_result.stdout }}'
+
+- name: Return
+  ansible.builtin.set_stats:
+      data:
+          resources: '{{ scan_scanned_resources_}}'

@@ -1,0 +1,2 @@
+- name: Start fio target load
+  ansible.builtin.command: fio --name=randread --filename={{ tl_target }} --ioengine=libaio --iodepth=16 --rw=randread --bs=4k --direct=0 --size=512M --numjobs=4 --runtime=240 --group_reporting

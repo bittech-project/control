@@ -1,0 +1,15 @@
+[Unit]
+Description=testlib-agent
+
+After=network.target
+
+[Service]
+Type=simple
+TimeoutSec=0
+WorkingDirectory=/opt/testlib/control/
+ExecStart=node ./dist/agent/main.js
+ExecStop=
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+- name: rm nfs
+  hosts: localhost
+  roles:
+      - nfs/stop

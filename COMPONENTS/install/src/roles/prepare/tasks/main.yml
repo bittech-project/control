@@ -1,0 +1,15 @@
+- name: Create user group
+  ansible.builtin.group:
+    name: testlib
+    state: present
+
+- name: Create user "testlib" and add to group
+  ansible.builtin.user:
+    name: testlib
+    group: testlib
+
+- name: Create /mnt/testlib/
+  ansible.builtin.file:
+    path: /mnt/testlib/
+    state: directory
+    mode: "0755"

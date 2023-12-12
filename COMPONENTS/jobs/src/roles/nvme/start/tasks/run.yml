@@ -1,0 +1,16 @@
+- name: modprobe nvme-tcp
+  ansible.builtin.shell:
+    cmd: modprobe nvme-tcp
+
+- name: modprobe nvmet-tcp
+  ansible.builtin.shell:
+    cmd: modprobe nvmet-tcp
+
+- name: export discover nvme
+  ansible.builtin.shell:
+    cmd: nvme discover -t tcp -a "{{ ip }}" -s 4420
+
+- name: export connect nvme
+  ansible.builtin.shell:
+    cmd: nvme connect -t tcp -n "{{ target }}" -a "{{ ip }}" -s 4420
+# пример запуска ansible-playbook EXPORT_ADD_NVME.yml -e '{"ip": 192.168.84.63, "target": iqn.2023-09.ru.tb:tb_71dszz}'

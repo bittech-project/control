@@ -1,0 +1,3 @@
+- name: logout export iscsi
+  ansible.builtin.shell:
+      cmd: iscsiadm -m node -u -T "{{ target }}"

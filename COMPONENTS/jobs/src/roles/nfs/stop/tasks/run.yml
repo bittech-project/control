@@ -1,0 +1,4 @@
+- name: nfs mounting
+  ansible.builtin.shell: 
+    cmd: umount -t nfs "{{ ip }}":"{{export_path}}" "{{folder_name}}"
+

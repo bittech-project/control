@@ -1,0 +1,47 @@
+- name: Inserting modules scst
+  ansible.builtin.shell:
+    cmd: "modprobe {{ item }}"
+  with_items:
+    - scst
+    - scst_disk
+    - scst_vdisk
+    - iscsi_scst
+  ignore_errors: true
+
+- name: Inserting modules nvme
+  ansible.builtin.shell:
+    cmd: "modprobe {{ item }}"
+  with_items:
+    - nvme_tcp
+    - nvmet
+    - nvmet_tcp
+    - nvme-rdma
+
+- name: creating config directory
+  ansible.builtin.file:
+    name: /opt/testlib/control/resources/cfg/
+    state: directory
+    owner: testlib
+    group: testlib
+    mode: 0755
+
+- name: Create testlib config
+  ansible.builtin.template:
+    src: config.env.j2
+    dest: /opt/testlib/control/resources/cfg/config.env
+    owner: testlib
+    group: testlib
+    mode: "0755"
+
+- name: Disable testlib service
+  ansible.builtin.service:
+    name: testlib-control
+    enabled: false
+    state: stopped
+
+- name: Enable testlib agent service
+  ansible.builtin.service:
+    name: testlib-agent
+    enabled: true
+    state: "restarted"
+  when: enable_agent

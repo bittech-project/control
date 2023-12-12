@@ -1,0 +1,6 @@
+- name: validate
+  ansible.builtin.set_fact:
+    cpnl_fs_type: xfs
+    cpnl_device_path: "{{cpnl_device_path | mandatory}}" 
+    cpnl_type: "{{cpnl_type | default('BLOCK')}}"
+    # cpnl_formatting_opts: "{{cpnl_formatting_opts | mandatory}}"

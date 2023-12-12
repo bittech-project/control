@@ -1,0 +1,16 @@
+- name: export connect iscsi
+  ansible.builtin.shell:
+    cmd: iscsiadm -m discovery -t st -p "{{ ip }}"
+
+- name: list for login iscsi
+  ansible.builtin.shell:
+    cmd: iscsiadm -m node
+
+- name: login iscsi
+  ansible.builtin.shell:
+    cmd: iscsiadm -m node -l -T "{{ target }}"
+
+- name: list of connected iscasi
+  ansible.builtin.shell:
+    cmd: iscsiadm -m session
+# пример запуска ansible-playbook EXPORT_CONNECT.yml -e '{"ip": 192.168.84.63, "node": iqn.2023-09.ru.tb:tb_71dszz}'

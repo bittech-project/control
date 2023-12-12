@@ -1,0 +1,5 @@
+# tcp-порт для web-gui
+pbit_testlib_port: 3001
+
+# Необходимо ли автоматическое включение testlib-agent после установки
+enable_agent: true
